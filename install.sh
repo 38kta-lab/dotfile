@@ -77,7 +77,7 @@ verify() {
     echo "verify: zsh failed"
   fi
 
-  if command -v td >/dev/null 2>&1; then
+  if zsh -lic 'type -w td >/dev/null 2>&1'; then
     echo "verify: td found"
   else
     echo "verify: td not found"
