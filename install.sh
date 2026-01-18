@@ -40,6 +40,15 @@ link_wezterm() {
     fi
     ln -sfn "$src" "$dest"
   fi
+
+  local key_src="$REPO/wezterm/keybinds.lua"
+  local key_dest="$WEZTERM_DIR/keybinds.lua"
+  if [ -e "$key_src" ]; then
+    if [ -e "$key_dest" ] && [ ! -L "$key_dest" ]; then
+      backup_path "$key_dest"
+    fi
+    ln -sfn "$key_src" "$key_dest"
+  fi
 }
 
 link_config_dir() {
