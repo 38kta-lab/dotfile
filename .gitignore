@@ -1,3 +1,4 @@
 # Ignore local/private config copies as needed for public repo
 zsh/env.zsh
 wezterm/keybinds.lua
+czrc/.czrc

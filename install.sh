@@ -9,7 +9,7 @@ timestamp() {
   date +%Y%m%d%H%M%S
 }
 
-backup_file() {
+backup_path() {
   local path="$1"
   if [ -e "$path" ] && [ ! -L "$path" ]; then
     mv "$path" "${path}.bak.$(timestamp)"
@@ -25,7 +25,7 @@ link_zsh() {
     [ -e "$src" ] || continue
     local dest="$ZSH_DIR/$(basename "$src")"
     if [ -e "$dest" ] && [ ! -L "$dest" ]; then
-      backup_file "$dest"
+      backup_path "$dest"
     fi
     ln -sfn "$src" "$dest"
   done
@@ -36,9 +36,39 @@ link_wezterm() {
   local dest="$WEZTERM_DIR/wezterm.lua"
   if [ -e "$src" ]; then
     if [ -e "$dest" ] && [ ! -L "$dest" ]; then
-      backup_file "$dest"
+      backup_path "$dest"
     fi
     ln -sfn "$src" "$dest"
+  fi
+}
+
+link_config_dir() {
+  local src="$1"
+  local dest="$2"
+  if [ -e "$src" ]; then
+    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+      backup_path "$dest"
+    fi
+    ln -sfn "$src" "$dest"
+  fi
+}
+
+link_starship() {
+  local src="$REPO/starship/starship.toml"
+  local dest="${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml"
+  if [ -e "$src" ]; then
+    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+      backup_path "$dest"
+    fi
+    ln -sfn "$src" "$dest"
+  fi
+}
+
+install_czrc_template() {
+  local src="$REPO/czrc/.czrc.example"
+  local dest="${XDG_CONFIG_HOME:-$HOME/.config}/.czrc"
+  if [ -e "$src" ] && [ ! -e "$dest" ]; then
+    cp "$src" "$dest"
   fi
 }
 
@@ -66,7 +96,7 @@ EOF
     return 0
   fi
 
-  backup_file "$target"
+  backup_path "$target"
   mv "$tmp" "$target"
 }
 
@@ -88,6 +118,13 @@ main() {
   ensure_dirs
   link_zsh
   link_wezterm
+  link_config_dir "$REPO/nvim" "${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+  link_config_dir "$REPO/git" "${XDG_CONFIG_HOME:-$HOME/.config}/git"
+  link_config_dir "$REPO/lazygit" "${XDG_CONFIG_HOME:-$HOME/.config}/lazygit"
+  link_config_dir "$REPO/czg" "${XDG_CONFIG_HOME:-$HOME/.config}/czg"
+  link_config_dir "$REPO/cz-git" "${XDG_CONFIG_HOME:-$HOME/.config}/cz-git"
+  link_starship
+  install_czrc_template
   write_zshrc
   verify
 }
