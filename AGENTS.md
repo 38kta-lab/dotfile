@@ -12,7 +12,7 @@ Target locations:
 - Zsh config dir: ~/.config/zsh
 - Zsh entrypoint: ~/.zshrc
 - WezTerm config dir: ~/.config/wezterm
-- WezTerm keybinds source: ~/.config/wezterm/keybinds.lua
+- WezTerm keybinds source: ~/.config/wezterm/keybinds.lua (managed in repo)
 
 Primary goals:
 1) Manage dotfiles via this repo.
@@ -25,7 +25,7 @@ Primary goals:
 - Do not delete existing user files. If conflicts exist, create backups with a timestamp suffix.
 - Minimize edits to ~/.zshrc. It should only source files under ~/.config/zsh (and nothing else).
 - Avoid adding new dependencies unless explicitly requested.
-- Do not rewrite my existing WezTerm keybinds; only link or reference them.
+- WezTerm keybinds are managed in repo and linked to ~/.config/wezterm/keybinds.lua.
 - Print exact commands you run and the files you touch.
 
 ## Repository structure to create (in this repo)
@@ -37,12 +37,12 @@ Create these folders/files if missing:
   - queue.zsh          # queue commands: td, tq, tqpick, helpers
   - fzf.zsh            # fzf-related helpers (optional; only if needed)
 - wezterm/
-  - keybinds.lua       # symlink target or referenced file if we decide to manage it here later
+  - keybinds.lua       # symlink target (managed in repo)
 - README.md            # short description + install steps
-- install.sh           # idempotent installer (safe to run multiple times)
+- init.sh              # idempotent installer (safe to run multiple times)
 
 ## Installation behavior (what to implement)
-Implement install.sh to do the following:
+Implement init.sh to do the following:
 
 1) Ensure directories exist:
    - ~/.config/zsh
@@ -59,8 +59,8 @@ Implement install.sh to do the following:
    - Do not duplicate lines if already present.
 
 4) WezTerm:
-   - Do NOT modify ~/.config/wezterm/keybinds.lua.
-   - Optionally add a note in README about where keybinds live.
+   - Link ~/.config/wezterm/keybinds.lua to the repo.
+   - Add a note in README about where keybinds live.
 
 5) Verification:
    - After installation, run:
@@ -69,7 +69,7 @@ Implement install.sh to do the following:
    - Print success/failure.
 
 Idempotency requirements:
-- Running install.sh multiple times must not create duplicate loader lines or break symlinks.
+- Running init.sh multiple times must not create duplicate loader lines or break symlinks.
 - It must not overwrite user configs without backup.
 
 ## Operating mode
