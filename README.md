@@ -25,14 +25,29 @@ gh auth login
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew tap jesseduffield/lazygit
+brew tap olets/tap
+brew install antigen
+brew install zsh-abbr
 brew install --cask wezterm@nightly
+brew install --cask font-hackgen-nerd
+brew install starship
 brew install neovim
 brew install fzf
 brew install bat
+brew install fd
+brew install ripgrep
 brew install gh
 brew install ghq
 brew install jesseduffield/lazygit/lazygit
 brew install git-delta
+brew install ghostscript
+brew install imagemagick
+brew install node
+brew install mermaid-cli
+brew install tectonic
+brew install tree-sitter
+brew install tree-sitter-cli
 npm install -g git-cz czg cz-git
 ```
 
