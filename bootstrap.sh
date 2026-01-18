@@ -8,6 +8,8 @@ fi
 
 brew install --cask wezterm@nightly
 brew install neovim
+brew install fzf
+brew install bat
 brew install gh
 brew install ghq
 brew install jesseduffield/lazygit/lazygit
@@ -21,4 +23,4 @@ fi
 
 echo "Next:"
 echo "  gh auth login"
-echo "  ./install.sh"
+echo "  ./init.sh"

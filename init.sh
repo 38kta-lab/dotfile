@@ -87,7 +87,7 @@ write_zshrc() {
   tmp="$(mktemp)"
 
   cat > "$tmp" <<'EOF'
-# Managed by dotfile install.sh
+# Managed by dotfile init.sh
 ZSH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
 for file in \
   "$ZSH_CONFIG_DIR/env.zsh" \
