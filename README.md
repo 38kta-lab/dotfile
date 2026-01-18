@@ -2,7 +2,7 @@
 
 Personal dotfiles for zsh and WezTerm.
 
-## Install
+## Initialization
 
 ```sh
 ./init.sh
