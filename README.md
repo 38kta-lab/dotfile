@@ -35,6 +35,7 @@ brew install starship
 brew install neovim
 brew install fzf
 brew install bat
+brew install zoxide
 brew install fd
 brew install ripgrep
 brew install gh
