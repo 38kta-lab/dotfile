@@ -52,6 +52,7 @@ brew install tectonic
 brew install tree-sitter
 brew install tree-sitter-cli
 npm install -g git-cz czg cz-git
+npx -y czg --api-key="sk-XXXX"
 ```
 
 Clone this repo with ghq, then install:
@@ -69,9 +70,9 @@ cd "$(ghq root)/github.com/38kta-lab/dotfile"
 
 ```sh
 npm install -g @openai/codex
-codex sign-in
 mkdir -p ~/.config/codex
 mv ~/.codex/* ~/.config/codex/
+codex sign-in
 npm install -g @google/gemini-cli
 ```
 
