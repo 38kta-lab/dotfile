@@ -18,6 +18,8 @@ Then run:
 
 ```sh
 gh auth login
+git config --global ghq.root "$HOME/src"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm"
 ./init.sh
 ```
 
@@ -56,6 +58,8 @@ Clone this repo with ghq, then install:
 
 ```sh
 gh auth login
+git config --global ghq.root "$HOME/src"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm"
 ghq get https://github.com/38kta-lab/dotfile
 cd "$(ghq root)/github.com/38kta-lab/dotfile"
 ./init.sh

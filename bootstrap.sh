@@ -40,4 +40,6 @@ fi
 
 echo "Next:"
 echo "  gh auth login"
+echo "  git config --global ghq.root \"$HOME/src\""
+echo "  mkdir -p \"$HOME/.config/zsh\" \"$HOME/.config/wezterm\""
 echo "  ./init.sh"
