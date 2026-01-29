@@ -6,6 +6,13 @@ if ! command -v brew >/dev/null 2>&1; then
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
+# Ensure Homebrew is on PATH for this shell and future zsh sessions
+if ! grep -q 'brew shellenv zsh' "$HOME/.zprofile" 2>/dev/null; then
+  echo "" >> "$HOME/.zprofile"
+  echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> "$HOME/.zprofile"
+fi
+eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+
 brew tap jesseduffield/lazygit
 brew tap olets/tap
 

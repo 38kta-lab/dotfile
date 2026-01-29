@@ -27,6 +27,9 @@ mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm"
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+echo "" >> "$HOME/.zprofile"
+echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> "$HOME/.zprofile"
+eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 brew tap jesseduffield/lazygit
 brew tap olets/tap
 brew install antigen
@@ -116,3 +119,10 @@ Dock
 
 Default browser
 - `Chrome`
+
+## Mac app
+
+- Zoom: Download is [here](https://zoom.us/ja/download)
+- Microsoft: Word, Excel, Powerpoint
+- Magnet: Download is [here](https://apps.apple.com/jp/app/magnet/id441258766?mt=12)
+- Gmail, Google calender
