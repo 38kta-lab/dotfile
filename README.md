@@ -126,3 +126,5 @@ Default browser
 - Microsoft: Word, Excel, Powerpoint
 - Magnet: Download is [here](https://apps.apple.com/jp/app/magnet/id441258766?mt=12)
 - Gmail, Google calender
+- Google drive for mac: Download is [here](https://support.google.com/drive/answer/10838124?sjid=14873508860033578048-NC)
+
