@@ -79,6 +79,59 @@ codex sign-in
 npm install -g @google/gemini-cli
 ```
 
+## Autosave (20:00)
+
+Create autosave commits on a dedicated branch per machine and push them at 20:00.
+
+Branch format: `autosave/<hostname>`
+
+Install:
+
+```sh
+chmod +x ./scripts/autosave-ghq.sh
+mkdir -p ~/Library/LaunchAgents
+sed -e "s|/Users/REPLACE_ME|$HOME|g" ./launchd/com.38kta.autosave-ghq.plist \
+  > ~/Library/LaunchAgents/com.38kta.autosave-ghq.plist
+launchctl unload ~/Library/LaunchAgents/com.38kta.autosave-ghq.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.38kta.autosave-ghq.plist
+```
+
+Notes:
+- Targets all git repositories under `~/src`.
+- Skips repos with no working tree changes.
+- If no remote is configured, it will skip pushing.
+
+## Autosave: Import Workflow
+
+Fetch and inspect autosave branches:
+
+```sh
+git fetch --all
+git branch -a | rg "autosave/"
+```
+
+Switch to autosave and review changes:
+
+```sh
+git switch autosave/<hostname>
+git log --oneline -n 5
+git status -sb
+```
+
+Bring changes into your work branch (example: main):
+
+```sh
+git switch main
+git merge autosave/<hostname>
+```
+
+Clean up autosave branch (optional):
+
+```sh
+git branch -D autosave/<hostname>
+git push origin --delete autosave/<hostname>
+```
+
 ## Notes
 
 - WezTerm keybinds are managed at `wezterm/keybinds.lua` and linked to `~/.config/wezterm/keybinds.lua`.
@@ -127,4 +180,3 @@ Default browser
 - Magnet: Download is [here](https://apps.apple.com/jp/app/magnet/id441258766?mt=12)
 - Gmail, Google calender
 - Google drive for mac: Download is [here](https://support.google.com/drive/answer/10838124?sjid=14873508860033578048-NC)
-
