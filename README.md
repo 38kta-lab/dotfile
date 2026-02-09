@@ -108,7 +108,29 @@ git commit -m "feat: ..."
 git push -u origin work/<hostname>
 ```
 
-Create a PR from `work/<hostname>` to `main` and **Squash and merge** it on GitHub.
+Create a PR from `work/<hostname>` to `main`:
+
+```sh
+gh pr create --base main --head work/<hostname> \
+  --title "docs: ..." --body "## Summary
+- ...
+
+## Notes
+- ..."
+```
+
+Then **Squash and merge** it on GitHub.
+You can also merge with gh:
+
+```sh
+gh pr merge <PR_NUMBER> --squash
+```
+
+Merge commit (no squash):
+
+```sh
+gh pr merge <PR_NUMBER> --merge
+```
 
 Then on other machines:
 
