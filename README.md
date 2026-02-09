@@ -126,6 +126,12 @@ You can also merge with gh:
 gh pr merge <PR_NUMBER> --squash
 ```
 
+Merge commit (no squash):
+
+```sh
+gh pr merge <PR_NUMBER> --merge
+```
+
 Then on other machines:
 
 ```sh
