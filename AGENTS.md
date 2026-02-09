@@ -26,6 +26,7 @@ Primary goals:
 - Minimize edits to ~/.zshrc. It should only source files under ~/.config/zsh (and nothing else).
 - Avoid adding new dependencies unless explicitly requested.
 - WezTerm keybinds are managed in repo and linked to ~/.config/wezterm/keybinds.lua.
+- Never include real API keys, tokens, or secrets in this repo. Use placeholders (e.g., sk-XXXX) and recommend secure storage instead.
 - Print exact commands you run and the files you touch.
 
 ## Repository structure to create (in this repo)
