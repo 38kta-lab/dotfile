@@ -79,6 +79,49 @@ codex sign-in
 npm install -g @google/gemini-cli
 ```
 
+## PR Workflow (squash)
+
+Use PRs with squash merge to keep `main` clean and reduce cross-machine conflicts.
+
+Branch naming (one branch per machine):
+- `work/<hostname>` (example: `work/kta38-mini-lab`)
+
+Get `<hostname>` with:
+
+```sh
+hostname -s
+```
+
+Flow:
+
+```sh
+# start work (every time)
+HOST="$(hostname -s)"
+git switch main
+git pull --rebase
+git switch work/<hostname>
+git rebase main
+
+# work + commit
+git add -A
+git commit -m "feat: ..."
+git push -u origin work/<hostname>
+```
+
+Create a PR from `work/<hostname>` to `main` and **Squash and merge** it on GitHub.
+
+Then on other machines:
+
+```sh
+git switch main
+git pull --rebase
+```
+
+Notes:
+- Keep `work/<hostname>` rebased onto `main` to avoid long-lived divergence.
+- Squash keeps history clean; use merge commits only when you need full commit history preserved.
+- Avoid pushing directly to `main`.
+
 ## Notes
 
 - WezTerm keybinds are managed at `wezterm/keybinds.lua` and linked to `~/.config/wezterm/keybinds.lua`.
