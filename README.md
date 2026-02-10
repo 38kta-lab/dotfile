@@ -93,6 +93,16 @@ Get `<hostname>` with:
 hostname -s
 ```
 
+Initial setup (first time on a machine):
+
+```sh
+HOST="$(hostname -s)"
+git switch main
+git pull --rebase
+git switch -c "work/$HOST"
+git push -u origin "work/$HOST"
+```
+
 Flow (manual):
 
 ```sh
@@ -129,6 +139,7 @@ gh pr merge <PR_NUMBER> --merge
 Aliases (see `zsh/alias.zsh`):
 
 ```sh
+winit   # initial setup: create/push work/<hostname> branch
 wmain   # update main only (before switching)
 wstart  # start work: update main -> switch work/<hostname> -> rebase
 wrebase # rebase current work branch onto main
