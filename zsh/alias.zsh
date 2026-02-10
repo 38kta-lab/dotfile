@@ -8,6 +8,11 @@ if command -v abbr >/dev/null 2>&1; then
   abbr -S lla='ls -l -A' >>/dev/null
 fi
 
+# gh: PR helpers
+alias prc='gh pr create --base main --head work/$(hostname -s) --fill'
+alias prm='gh pr merge --merge'
+alias prs='gh pr merge --squash'
+
 # vpn (Cisco Secure Client)
 
 # 起動（起動時に自動でVPN接続される前提）
