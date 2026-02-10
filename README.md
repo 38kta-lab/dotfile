@@ -111,26 +111,25 @@ git push -u origin work/<hostname>
 
 Create a PR from `work/<hostname>` to `main`:
 
-```sh
-gh pr create --base main --head work/<hostname> \
-  --title "docs: ..." --body "## Summary
-- ...
+Aliases (see `zsh/alias.zsh`):
 
-## Notes
-- ..."
+```sh
+prc   # gh pr create --base main --head work/<hostname> --fill
+prs   # gh pr merge --squash
+prm   # gh pr merge --merge
 ```
 
 Then **Squash and merge** it on GitHub.
 You can also merge with gh:
 
 ```sh
-gh pr merge <PR_NUMBER> --squash
+gh pr merge --squash
 ```
 
 Merge commit (no squash):
 
 ```sh
-gh pr merge <PR_NUMBER> --merge
+gh pr merge --merge
 ```
 
 Then on other machines:
