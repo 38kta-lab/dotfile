@@ -82,6 +82,7 @@ npm install -g @google/gemini-cli
 ## PR Workflow (squash)
 
 Use PRs with squash merge to keep `main` clean and reduce cross-machine conflicts.
+Rule of thumb: update `main`, but do not work directly on it.
 
 Branch naming (one branch per machine):
 - `work/<hostname>` (example: `work/kta38-mini-lab`)
