@@ -17,6 +17,7 @@ alias prs='gh pr merge --squash'
 alias wmain='git switch main && git pull --rebase'
 alias wstart='git switch main && git pull --rebase && git switch "work/$(hostname -s)" && git rebase main'
 alias wrebase='git rebase main'
+alias winit='HOST=$(hostname -s) && git switch main && git pull --rebase && git switch -c "work/$HOST" && git push -u origin "work/$HOST"'
 
 # vpn (Cisco Secure Client)
 
