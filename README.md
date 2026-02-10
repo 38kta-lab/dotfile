@@ -93,11 +93,10 @@ Get `<hostname>` with:
 hostname -s
 ```
 
-Flow:
+Flow (manual):
 
 ```sh
 # start work (every time)
-HOST="$(hostname -s)"
 git switch main
 git pull --rebase
 git switch work/<hostname>
@@ -111,25 +110,31 @@ git push -u origin work/<hostname>
 
 Create a PR from `work/<hostname>` to `main`:
 
-Aliases (see `zsh/alias.zsh`):
-
 ```sh
-prc   # gh pr create --base main --head work/<hostname> --fill
-prs   # gh pr merge --squash
-prm   # gh pr merge --merge
+gh pr create --base main --head work/<hostname> --fill
 ```
 
-Then **Squash and merge** it on GitHub.
-You can also merge with gh:
+Then **Squash and merge** it on GitHub, or with gh:
 
 ```sh
-gh pr merge --squash
+gh pr merge <PR_NUMBER> --squash
 ```
 
 Merge commit (no squash):
 
 ```sh
-gh pr merge --merge
+gh pr merge <PR_NUMBER> --merge
+```
+
+Aliases (see `zsh/alias.zsh`):
+
+```sh
+wmain   # update main only (before switching)
+wstart  # start work: update main -> switch work/<hostname> -> rebase
+wrebase # rebase current work branch onto main
+prc     # gh pr create --base main --head work/<hostname> --fill
+prs     # gh pr merge --squash
+prm     # gh pr merge --merge
 ```
 
 Then on other machines:
