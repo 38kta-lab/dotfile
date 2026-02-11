@@ -82,6 +82,7 @@ npm install -g @google/gemini-cli
 ## PR Workflow (squash)
 
 Use PRs with squash merge to keep `main` clean and reduce cross-machine conflicts.
+Rule of thumb: update `main`, but do not work directly on it.
 
 Branch naming (one branch per machine):
 - `work/<hostname>` (example: `work/kta38-mini-lab`)
@@ -92,11 +93,20 @@ Get `<hostname>` with:
 hostname -s
 ```
 
-Flow:
+Initial setup (first time on a machine):
+
+```sh
+HOST="$(hostname -s)"
+git switch main
+git pull --rebase
+git switch -c "work/$HOST"
+git push -u origin "work/$HOST"
+```
+
+Flow (manual):
 
 ```sh
 # start work (every time)
-HOST="$(hostname -s)"
 git switch main
 git pull --rebase
 git switch work/<hostname>
@@ -111,16 +121,10 @@ git push -u origin work/<hostname>
 Create a PR from `work/<hostname>` to `main`:
 
 ```sh
-gh pr create --base main --head work/<hostname> \
-  --title "docs: ..." --body "## Summary
-- ...
-
-## Notes
-- ..."
+gh pr create --base main --head work/<hostname> --fill
 ```
 
-Then **Squash and merge** it on GitHub.
-You can also merge with gh:
+Then **Squash and merge** it on GitHub, or with gh:
 
 ```sh
 gh pr merge <PR_NUMBER> --squash
@@ -130,6 +134,18 @@ Merge commit (no squash):
 
 ```sh
 gh pr merge <PR_NUMBER> --merge
+```
+
+Aliases (see `zsh/alias.zsh`):
+
+```sh
+winit   # initial setup: create/push work/<hostname> branch
+wmain   # update main only (before switching)
+wstart  # start work: update main -> switch work/<hostname> -> rebase
+wrebase # rebase current work branch onto main
+prc     # gh pr create --base main --head work/<hostname> --fill
+prs     # gh pr merge --squash
+prm     # gh pr merge --merge
 ```
 
 Then on other machines:
