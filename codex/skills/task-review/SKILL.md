@@ -1,0 +1,207 @@
+---
+name: task-review
+description: "Review and plan Japanese tasks for today, tomorrow, this week, next week, or a specified period by combining Google Calendar, ideas/inbox notes, projects/active hubs, agent-memory, and optionally GitHub Issues. Use when the user asks 今日のタスクは, 明日のタスクは, 来週のタスクは, 今週やること, タスク整理, 予定を組んで, Calendarに入れる候補, or wants actionable task priorities and calendar block suggestions."
+metadata:
+  short-description: "Plan tasks from Calendar, inbox, projects, and memory"
+---
+
+# Task Review
+
+Plan actionable tasks by combining Calendar constraints, inbox notes, Project Hubs, working memory, and optionally GitHub Issues.
+
+## Repository Rules
+
+Before reading or writing output:
+
+1. Read `README.md` for directory policy.
+2. Read `Rules.md` for safety, storage, and Issue/Project policy.
+3. Use `rg` first when searching notes and memories.
+
+For the `life` repo, the main inputs are:
+
+```text
+ideas/inbox/YYYY-MM-DD.md
+projects/active/*.md
+.codex/memories/agent-memory/*.md
+scripts/google_calendar_read.py
+scripts/google_calendar_create.py
+```
+
+Write user-facing summaries in Japanese unless the user asks otherwise.
+
+## When To Use
+
+Use this skill for:
+
+- `今日のタスクは？`
+- `明日のタスクは？`
+- `来週のタスクは？`
+- `今週やることを整理して`
+- `予定を組んで`
+- `Calendarに入れる候補を出して`
+- task planning that should account for Calendar events and active projects
+
+Do not use this skill for pure weekly reflection. Use `weekly-review` when the user asks for a weekly retrospective from digest/memory sources.
+
+## Review Window
+
+Resolve the requested period from the user's wording:
+
+| Request | Window |
+|---|---|
+| 今日 | local today 00:00 to tomorrow 00:00 |
+| 明日 | local tomorrow 00:00 to following day 00:00 |
+| 今週 | local today through Friday, unless user specifies otherwise |
+| 来週 | next Monday through next Sunday |
+| explicit date/range | use the specified date/range |
+
+Use local timezone `Asia/Tokyo` unless the repo or user says otherwise.
+Always state the resolved date range in the response.
+
+## Calendar Input
+
+If `scripts/google_calendar_read.py` exists, read Calendar for the review window:
+
+```bash
+conda activate life
+python scripts/google_calendar_read.py --format json --start YYYY-MM-DDT00:00:00 --end YYYY-MM-DDT00:00:00
+```
+
+If shell activation is unreliable, use the environment Python directly when present:
+
+```bash
+~/miniforge3/envs/life/bin/python scripts/google_calendar_read.py --format json --start ... --end ...
+```
+
+Default Calendar reads must not include location, attendee, or URL details. Do not pass `--show-location` unless the user explicitly asks.
+
+If Calendar read fails because auth is missing, continue using repo notes and report that Calendar was unavailable.
+
+## Note Inputs
+
+Read only the relevant files.
+
+Inbox:
+
+```bash
+find ideas/inbox -type f -name '*.md' | sort
+```
+
+For today/tomorrow, read today's inbox and the previous 3-7 days if needed for unresolved deadline items.
+For next week, scan recent inbox plus items that mention upcoming weekdays or deadlines.
+
+Projects:
+
+```bash
+rg "^(summary|created|updated|status|tags|related):|^## (Meetings / Checkpoints|Tasks|Blockers|Next Actions)|^- \\[[ x]\\]" projects/active -n
+```
+
+Read project files only when the summary, checkpoint, task, or next action looks relevant to the review window.
+
+Memory:
+
+```bash
+rg "^(summary|created|updated|status|tags):" .codex/memories/agent-memory -n
+```
+
+Read only memories with recent or explicitly relevant task-planning context, such as "tomorrow", "next action", "Calendar", or "weekly-review".
+
+GitHub Issues:
+
+- Use only if the user asks for Issue-aware planning, or if repo notes clearly say a task is already an Issue.
+- Follow `Rules.md` status limits and `issue-capture` policy.
+- Do not create or update Issues from this skill unless the user explicitly asks.
+
+## Planning Rules
+
+- Treat Calendar events as fixed constraints.
+- Use Calendar titles as available task context. Do not save or expose location, attendee, or URL data by default.
+- Prioritize tasks with explicit deadlines, meetings, presentations, reports, or committed follow-ups.
+- For today/tomorrow, keep the output executable: 3-6 main tasks is usually enough.
+- For next week, make a rough day-by-day plan rather than a dense minute-by-minute schedule.
+- Do not overfill the day. Leave buffers around meetings and long fixed events.
+- Clearly mark uncertain items as candidates.
+- If an item should become an Issue, list it as an Issue candidate; do not create it unless asked.
+
+## Calendar Write Rules
+
+Calendar writing is allowed only after explicit user approval.
+
+Allowed flow:
+
+1. Present Calendar block candidates with numbers.
+2. Wait for the user to approve, e.g. `1と3をCalendarに入れて`.
+3. Use `scripts/google_calendar_create.py --execute` only for approved blocks.
+
+Never create events automatically while answering an initial planning request.
+
+Initial event creation supports only:
+
+- `title`
+- `start`
+- `end`
+- `timezone`
+- optional short `description`
+
+Do not create attendee, location, notification email, recurring, or URL-rich events unless the user explicitly asks and the implementation supports it.
+
+## Output Shape
+
+For today/tomorrow:
+
+```markdown
+# 今日/明日のタスク: YYYY-MM-DD
+
+## Calendar
+
+| 時間 | 予定 |
+|---|---|
+
+## 今日/明日やるべきこと
+
+1. ...
+   - 理由:
+   - 所要時間:
+   - 推奨時間:
+
+## 空き時間の使い方
+
+| 時間帯 | 使い方 |
+|---|---|
+
+## Calendarに入れる候補
+
+1. HH:MM-HH:MM ...
+2. ...
+```
+
+For next week:
+
+```markdown
+# 来週のタスク: YYYY-MM-DD to YYYY-MM-DD
+
+## 既にある予定・制約
+
+## 来週の大枠
+
+- 月曜:
+- 火曜:
+- 水曜:
+- 木曜:
+- 金曜:
+
+## 期限・重要タスク
+
+## Calendarに入れる候補
+```
+
+Keep final answers concise. If no tasks are found, say so and suggest 1-3 sensible next checks.
+
+## Validation
+
+Before final response:
+
+1. Confirm the date range used.
+2. Confirm whether Calendar was read successfully.
+3. Confirm which source files were read when the answer depends on repo notes.
+4. If Calendar write candidates are included, ensure no event was created unless the user explicitly approved it.

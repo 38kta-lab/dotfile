@@ -39,6 +39,8 @@ brew install tectonic
 brew install tree-sitter
 brew install tree-sitter-cli
 
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"/install_miniforge.sh
+
 if command -v npm >/dev/null 2>&1; then
   npm install -g git-cz czg cz-git
 else
