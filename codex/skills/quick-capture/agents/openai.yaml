@@ -1,0 +1,7 @@
+interface:
+  display_name: "Quick Capture"
+  short_description: "Append lightweight notes to inbox"
+  default_prompt: "Use $quick-capture to append this idea or reminder to today's ideas/inbox note."
+
+policy:
+  allow_implicit_invocation: true
