@@ -108,6 +108,7 @@ write_zshrc() {
 ZSH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
 for file in \
   "$ZSH_CONFIG_DIR/env.zsh" \
+  "$ZSH_CONFIG_DIR/conda.zsh" \
   "$ZSH_CONFIG_DIR/plugins.zsh" \
   "$ZSH_CONFIG_DIR/alias.zsh" \
   "$ZSH_CONFIG_DIR/queue.zsh" \
