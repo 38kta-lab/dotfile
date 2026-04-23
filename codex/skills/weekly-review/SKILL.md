@@ -47,7 +47,9 @@ The default is inclusive of both start and end dates. Always write the date rang
 
 Primary source files:
 
+- `ideas/inbox/YYYY-MM-DD.md` files whose date is inside the review window.
 - `ideas/daily/md/YYYY-MM-DD-digest.md` files whose date is inside the review window.
+- `projects/active/*.md` files with active, pending, blocked, upcoming checkpoint, or updated content relevant to the review window.
 - `.codex/memories/agent-memory/*.md` files with `created` or `updated` inside the review window.
 
 Optional source files:
@@ -64,6 +66,18 @@ Find daily source files by date:
 
 ```bash
 find ideas/daily/md -type f -name '*-digest.md' | sort
+```
+
+Find inbox source files by date:
+
+```bash
+find ideas/inbox -type f -name '*.md' | sort
+```
+
+Find project hub files:
+
+```bash
+rg "^(summary|created|updated|status|tags|related):|^## (Meetings / Checkpoints|Blockers|Next Actions)" projects/active -n
 ```
 
 If there are no source files in the period, still create a short review that states the gap and suggests next actions.
@@ -101,11 +115,11 @@ Section guidance:
 - `Summary`: 3-5 sentences on what happened, what mattered, and what should happen next.
 - `Highlights`: important items only. Do not turn this into a full log.
 - `Research Signals`: patterns and research-relevant observations from digest notes. Mark inference as inference.
-- `Ideas Worth Keeping`: useful ideas that are not ready for GitHub Issues.
+- `Ideas Worth Keeping`: useful inbox or digest ideas that are not ready for GitHub Issues.
 - `Decisions / Policy Updates`: durable workflow, storage, or design decisions, especially from memory files.
 - `Open Questions`: unresolved questions worth revisiting.
 - `Possible Issues`: issue candidates in checkbox form. Do not create issues unless the user asks or invokes `issue-capture`.
-- `Next Actions`: 3-5 concrete actions for the next week.
+- `Next Actions`: 3-5 concrete actions for the next week, including project-hub actions when relevant.
 - `Source Files`: list every Markdown source file read.
 
 ## Review Rules

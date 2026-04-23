@@ -1,0 +1,7 @@
+interface:
+  display_name: "PJ Hub"
+  short_description: "Manage project hub notes"
+  default_prompt: "Use $pj-hub to create or update a project hub note with goals, checkpoints, tasks, blockers, and next actions."
+
+policy:
+  allow_implicit_invocation: true
