@@ -63,7 +63,7 @@ If the user tries to capture sensitive material, write a redacted safe version o
 5. Append one bullet per capture, newest at the bottom.
 6. Add a local time prefix when available.
 7. Add short tags only when obvious from the content.
-8. Add a `next:` hint only when the next handling step is clear.
+8. Add a `next:` hint only when the next handling step is clear. Do not default every actionable note to `pj-hub`.
 
 ## Entry Shape
 
@@ -81,19 +81,39 @@ Keep entries short. Do not expand a quick capture into a full plan unless the us
 
 ## Triage Hints
 
-When the capture clearly implies multi-step work, add:
+Use `issue-capture` when the capture is a concrete task or small task set that should be tracked as execution work:
 
 ```markdown
   - next: `$issue-capture` でIssue候補にする
 ```
 
-When it looks like a future project, add:
+Good `issue-capture` cases:
+
+- has a deadline or meeting deliverable
+- can be finished as one GitHub Issue
+- needs Project Status tracking
+- asks for a concrete implementation, document, slide, or investigation
+
+Use `pj-hub` when the capture needs project-level context before execution tasks are clear:
 
 ```markdown
   - next: `$pj-hub` でProject化を検討
 ```
 
-When it is just a reminder or idea, leave it as-is for weekly review.
+Good `pj-hub` cases:
+
+- spans multiple phases or milestones
+- needs goals, scope, repositories, checkpoints, blockers, and next actions in one place
+- will likely produce several Issues later
+- is a continuing research, writing, infrastructure, or tooling effort
+
+When both could apply, prefer `pj-hub` for broad project shaping and `issue-capture` for immediate execution tracking.
+
+When the next step is unclear, omit `next:` or use:
+
+```markdown
+  - next: 週次レビューで整理
+```
 
 ## Reporting
 
