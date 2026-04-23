@@ -1,0 +1,7 @@
+interface:
+  display_name: "Weekly Review"
+  short_description: "Review weekly digest and memory notes"
+  default_prompt: "Use $weekly-review to summarize this week's digest and memory notes into ideas/weekly, then render the HTML."
+
+policy:
+  allow_implicit_invocation: true

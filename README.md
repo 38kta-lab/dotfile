@@ -18,10 +18,15 @@ Then run:
 
 ```sh
 gh auth login
+gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
 mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ./init.sh
 ```
+
+`./bootstrap.sh` also installs Miniforge3 into `~/miniforge3` when missing.
+`./init.sh` links `zsh/env.zsh`, which loads conda shell support without
+auto-activating `base`.
 
 ## Manual bootstrap (no script)
 
@@ -62,12 +67,17 @@ Clone this repo with ghq, then install:
 
 ```sh
 gh auth login
+gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
 mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ghq get https://github.com/38kta-lab/dotfile
 cd "$(ghq root)/github.com/38kta-lab/dotfile"
+./install_miniforge.sh
 ./init.sh
 ```
+
+`gh auth refresh -s project` is required on each machine where Codex or `gh`
+updates GitHub Projects, such as the `Life` project Status field.
 
 ## Codex / Gemini CLI
 
@@ -77,6 +87,94 @@ mkdir -p ~/.config/codex
 mv ~/.codex/* ~/.config/codex/
 codex sign-in
 npm install -g @google/gemini-cli
+```
+
+## Miniforge / Conda
+
+Miniforge3 is installed under:
+
+```text
+~/miniforge3
+```
+
+Install or verify it:
+
+```sh
+./install_miniforge.sh
+```
+
+Use a pinned Miniforge release when needed:
+
+```sh
+MINIFORGE_VERSION=25.11.0-0 ./install_miniforge.sh
+```
+
+The installer supports Apple Silicon and Intel macOS by selecting the matching
+installer from the official conda-forge/miniforge GitHub releases:
+
+```text
+https://github.com/conda-forge/miniforge/releases
+```
+
+`base` should not auto-activate:
+
+```sh
+conda config --set auto_activate_base false
+```
+
+For per-repo environments, prefer `environment.yml` in that repo:
+
+```sh
+conda env create -f environment.yml
+conda activate <env-name>
+```
+
+If an environment already exists:
+
+```sh
+conda env update -f environment.yml --prune
+```
+
+## Google Calendar Credentials
+
+For Codex-assisted Calendar reads in the `life` repo, place the OAuth desktop
+client JSON at:
+
+```text
+~/.config/life/google-calendar-credentials.json
+```
+
+Copy this file between personal Macs using a private secure channel. Do not
+commit it to git, and do not create a public/shared link.
+
+On a new Mac:
+
+```sh
+mkdir -p "$HOME/.config/life"
+mv "$HOME/Downloads/google-calendar-credentials.json" "$HOME/.config/life/google-calendar-credentials.json"
+chmod 600 "$HOME/.config/life/google-calendar-credentials.json"
+```
+
+If the downloaded file has a `client_secret_*.json` name:
+
+```sh
+mkdir -p "$HOME/.config/life"
+mv "$HOME/Downloads"/client_secret_*.json "$HOME/.config/life/google-calendar-credentials.json"
+chmod 600 "$HOME/.config/life/google-calendar-credentials.json"
+```
+
+Do not copy this token between Macs:
+
+```text
+~/.config/life/google-calendar-read-token.json
+```
+
+Generate that token separately on each Mac by running the Calendar reader from
+the `life` repo after activating its conda environment:
+
+```sh
+conda activate life
+python scripts/google_calendar_read.py --format json
 ```
 
 ## Codex Skills
