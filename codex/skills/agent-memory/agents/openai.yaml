@@ -1,0 +1,3 @@
+display_name: Agent Memory
+short_description: Save and recall repository working memories.
+default_prompt: 記憶しておきたい内容、思い出したいトピック、またはmemory一覧の確認内容を教えてください。
