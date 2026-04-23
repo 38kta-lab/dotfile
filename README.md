@@ -18,6 +18,7 @@ Then run:
 
 ```sh
 gh auth login
+gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
 mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ./init.sh
@@ -62,12 +63,16 @@ Clone this repo with ghq, then install:
 
 ```sh
 gh auth login
+gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
 mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ghq get https://github.com/38kta-lab/dotfile
 cd "$(ghq root)/github.com/38kta-lab/dotfile"
 ./init.sh
 ```
+
+`gh auth refresh -s project` is required on each machine where Codex or `gh`
+updates GitHub Projects, such as the `Life` project Status field.
 
 ## Codex / Gemini CLI
 
