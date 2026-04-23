@@ -13,6 +13,7 @@ Target locations:
 - Zsh entrypoint: ~/.zshrc
 - WezTerm config dir: ~/.config/wezterm
 - WezTerm keybinds source: ~/.config/wezterm/keybinds.lua (managed in repo)
+- Codex global Skills dir: ~/.config/codex/skills
 
 Primary goals:
 1) Manage dotfiles via this repo.
@@ -26,6 +27,8 @@ Primary goals:
 - Minimize edits to ~/.zshrc. It should only source files under ~/.config/zsh (and nothing else).
 - Avoid adding new dependencies unless explicitly requested.
 - WezTerm keybinds are managed in repo and linked to ~/.config/wezterm/keybinds.lua.
+- User-created global Codex Skills are managed in repo under codex/skills/ and linked to ~/.config/codex/skills/.
+- Do not manage or copy Codex system Skills under ~/.config/codex/skills/.system/.
 - Never include real API keys, tokens, or secrets in this repo. Use placeholders (e.g., sk-XXXX) and recommend secure storage instead.
 - Print exact commands you run and the files you touch.
 
@@ -39,6 +42,8 @@ Create these folders/files if missing:
   - fzf.zsh            # fzf-related helpers (optional; only if needed)
 - wezterm/
   - keybinds.lua       # symlink target (managed in repo)
+- codex/
+  - skills/            # user-created global Codex Skills
 - README.md            # short description + install steps
 - init.sh              # idempotent installer (safe to run multiple times)
 
@@ -48,6 +53,7 @@ Implement init.sh to do the following:
 1) Ensure directories exist:
    - ~/.config/zsh
    - ~/.config/wezterm
+   - ~/.config/codex/skills
 
 2) Link zsh files:
    - Link repo zsh/*.zsh into ~/.config/zsh/
@@ -63,7 +69,12 @@ Implement init.sh to do the following:
    - Link ~/.config/wezterm/keybinds.lua to the repo.
    - Add a note in README about where keybinds live.
 
-5) Verification:
+5) Codex Skills:
+   - Link each repo codex/skills/<skill-name> directory into ~/.config/codex/skills/<skill-name>.
+   - Back up an existing non-symlink target before replacing it.
+   - Do not touch ~/.config/codex/skills/.system/.
+
+6) Verification:
    - After installation, run:
      - zsh -lic 'echo "zsh ok"'
      - command -v td || true

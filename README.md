@@ -1,6 +1,6 @@
 # dotfile
 
-Personal dotfiles for zsh and WezTerm.
+Personal dotfiles for zsh, WezTerm, and global Codex Skills.
 
 ## Initialization
 
@@ -19,7 +19,7 @@ Then run:
 ```sh
 gh auth login
 git config --global ghq.root "$HOME/src"
-mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ./init.sh
 ```
 
@@ -63,7 +63,7 @@ Clone this repo with ghq, then install:
 ```sh
 gh auth login
 git config --global ghq.root "$HOME/src"
-mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
 ghq get https://github.com/38kta-lab/dotfile
 cd "$(ghq root)/github.com/38kta-lab/dotfile"
 ./init.sh
@@ -78,6 +78,22 @@ mv ~/.codex/* ~/.config/codex/
 codex sign-in
 npm install -g @google/gemini-cli
 ```
+
+## Codex Skills
+
+Global user Skills are managed in this repo under:
+
+```text
+codex/skills/
+```
+
+`./init.sh` links each directory under `codex/skills/` into:
+
+```text
+~/.config/codex/skills/
+```
+
+System Skills under `~/.config/codex/skills/.system/` are not managed here.
 
 ## PR Workflow (squash)
 
@@ -163,6 +179,7 @@ Notes:
 ## Notes
 
 - WezTerm keybinds are managed at `wezterm/keybinds.lua` and linked to `~/.config/wezterm/keybinds.lua`.
+- Global Codex Skills are managed under `codex/skills/` and linked to `~/.config/codex/skills/`.
 - `~/.config/.czrc` is not committed; see `czrc/.czrc.example` for a template.
 
 ## Mac Setup Checklist

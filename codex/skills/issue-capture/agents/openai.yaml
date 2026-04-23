@@ -1,0 +1,3 @@
+display_name: Issue Capture
+short_description: Turn notes and conversations into scoped GitHub Issues.
+default_prompt: Issue化したい内容、整理したいタスク、またはProjectへ追加したい作業を教えてください。

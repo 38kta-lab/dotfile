@@ -4,6 +4,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
 WEZTERM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wezterm"
+CODEX_SKILLS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/codex/skills"
 
 timestamp() {
   date +%Y%m%d%H%M%S
@@ -17,7 +18,7 @@ backup_path() {
 }
 
 ensure_dirs() {
-  mkdir -p "$ZSH_DIR" "$WEZTERM_DIR"
+  mkdir -p "$ZSH_DIR" "$WEZTERM_DIR" "$CODEX_SKILLS_DIR"
 }
 
 link_zsh() {
@@ -71,6 +72,22 @@ link_starship() {
     fi
     ln -sfn "$src" "$dest"
   fi
+}
+
+link_codex_skills() {
+  local skills_src="$REPO/codex/skills"
+  [ -d "$skills_src" ] || return 0
+
+  for src in "$skills_src"/*; do
+    [ -d "$src" ] || continue
+    local name
+    name="$(basename "$src")"
+    local dest="$CODEX_SKILLS_DIR/$name"
+    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+      backup_path "$dest"
+    fi
+    ln -sfn "$src" "$dest"
+  done
 }
 
 install_czrc_template() {
@@ -133,6 +150,7 @@ main() {
   link_config_dir "$REPO/czg" "${XDG_CONFIG_HOME:-$HOME/.config}/czg"
   link_config_dir "$REPO/cz-git" "${XDG_CONFIG_HOME:-$HOME/.config}/cz-git"
   link_starship
+  link_codex_skills
   install_czrc_template
   write_zshrc
   verify
