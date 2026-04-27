@@ -32,7 +32,7 @@ ideas/daily/md/YYYY-MM-DD-digest.md
 ideas/daily/YYYY-MM-DD-digest.html
 ```
 
-Use the execution date in the local timezone for `YYYY-MM-DD` unless the user specifies another date.
+Use the previous calendar day in the local timezone for `YYYY-MM-DD` unless the user specifies another date.
 
 If the Markdown file already exists, append new URL sections. Do not overwrite previous digest entries. After every Markdown update, regenerate the HTML file.
 
@@ -50,7 +50,7 @@ If the Markdown file already exists, append new URL sections. Do not overwrite p
 5. Read only enough to capture the core message. For papers, prioritize title, abstract, figures/headings when accessible, and conclusion/discussion if needed.
 6. Write a concise Japanese digest centered on the core message, not a full summary.
 7. For papers and preprints, include an author line when author metadata is available. For news and institution releases, omit author metadata unless it is central to the source page.
-8. Save or append to `ideas/daily/md/YYYY-MM-DD-digest.md`.
+8. Save or append to `ideas/daily/md/YYYY-MM-DD-digest.md`, where `YYYY-MM-DD` is the previous calendar day by default.
 9. Render `ideas/daily/YYYY-MM-DD-digest.html` from the Markdown source.
 
 ## Output Shape
