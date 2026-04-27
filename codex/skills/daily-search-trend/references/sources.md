@@ -30,14 +30,12 @@ Keyword filtering is used only for PubMed and bioRxiv-relevant preprints.
 - bioRxiv preprints: query Europe PMC REST with `SRC:PPR`; direct bioRxiv API keyword search is not the primary path.
 - DOI or publisher pages: use only to verify metadata if API results are ambiguous.
 
-PubMed API pattern:
+PubMed API pattern for final exact-day adoption:
 
 ```text
 https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
   ?db=pubmed
-  &term=<keyword query>
-  &datetype=edat
-  &reldate=1
+  &term="<keyword query>" AND (YYYY/MM/DD[EDAT] : YYYY/MM/DD[EDAT])
   &retmode=json
 
 https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi
@@ -46,7 +44,7 @@ https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi
   &retmode=json
 ```
 
-Europe PMC preprint API pattern:
+Europe PMC preprint API pattern for final exact-day adoption:
 
 ```text
 https://www.ebi.ac.uk/europepmc/webservices/rest/search
@@ -58,10 +56,12 @@ https://www.ebi.ac.uk/europepmc/webservices/rest/search
 
 Notes:
 
+- Treat `EDAT` and `FIRST_IDATE` exact-day queries as the final authority for whether a record belongs in `YYYY-MM-DD-trend.md`.
+- A rolling `24h` fetch can be used only as a rough candidate collection step; do not finalize from it without exact-day reconfirmation.
 - Europe PMC search syntax supports `TITLE_ABS`, `FIRST_IDATE`, and `SRC:PPR`.
 - Treat Europe PMC `SRC:PPR` as a preprint pool and prefer records that identify bioRxiv in source metadata, journal/title metadata, DOI pattern, or URL.
 - If source metadata does not cleanly distinguish bioRxiv, include the item under Europe PMC preprints and state the limitation.
-- When an API only supports day-level filtering, filter to 24 hours in post-processing when timestamps exist; otherwise record the limitation.
+- When an API only supports day-level filtering, prefer exact-day adoption over strict 24-hour post-processing.
 
 ## Science And Biology News Sources
 
