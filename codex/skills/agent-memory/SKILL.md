@@ -34,6 +34,12 @@ Use a summary-first workflow.
 
 Repository notes and user-facing Markdown should follow the language policy of the current repo. In `life`, write notes in Japanese unless the user asks otherwise.
 
+For multi-machine setup, environment, or resume notes, avoid vague phrases such as "このPC". Prefer `host <hostname>` form, for example `host kta38-Air`. Get the short hostname with:
+
+```bash
+hostname -s
+```
+
 ## Search
 
 Replace `$MEMORY_DIR` with the path from `Rules.md`.
@@ -114,6 +120,7 @@ Recommended body sections:
 ```
 
 Use only the sections that are useful.
+When machine-specific state matters, include the hostname in the relevant bullet or sentence rather than relying on relative wording like "this PC" or "other PC".
 
 ## Recall
 
