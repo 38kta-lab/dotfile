@@ -12,6 +12,8 @@ HTML output path:
 ideas/daily/YYYY-MM-DD-digest.html
 ```
 
+Default `YYYY-MM-DD` is the previous calendar day in the local timezone unless the user specifies another date.
+
 ```markdown
 # URL Digest: YYYY-MM-DD
 

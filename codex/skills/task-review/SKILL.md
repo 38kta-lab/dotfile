@@ -25,6 +25,8 @@ projects/active/*.md
 .codex/memories/agent-memory/*.md
 scripts/google_calendar_read.py
 scripts/google_calendar_create.py
+scripts/gmail_task_review.py
+~/.local/share/life/portal-data/gmail/latest.json
 ```
 
 Write user-facing summaries in Japanese unless the user asks otherwise.
@@ -73,6 +75,13 @@ If shell activation is unreliable, use the environment Python directly when pres
 ~/miniforge3/envs/life/bin/python scripts/google_calendar_read.py --format json --start ... --end ...
 ```
 
+In the `life` repo, Calendar reads should by default cover both:
+
+- `TimeBlock`
+- `primary`
+
+Use `--calendar-id` only when the user explicitly wants to limit or switch the target calendars.
+
 Default Calendar reads must not include location, attendee, or URL details. Do not pass `--show-location` unless the user explicitly asks.
 
 If Calendar read fails because auth is missing, continue using repo notes and report that Calendar was unavailable.
@@ -112,15 +121,27 @@ GitHub Issues:
 - Follow `Rules.md` status limits and `issue-capture` policy.
 - Do not create or update Issues from this skill unless the user explicitly asks.
 
+Gmail triage:
+
+- If `~/.local/share/life/portal-data/gmail/latest.json` exists, treat it as an optional external input.
+- If `scripts/gmail_task_review.py` exists, prefer using it to derive `Gmail要対応 / Gmail要確認`.
+- Read only the structured output. Do not rely on raw Gmail bodies here.
+- Use `action_required` as task candidates.
+- Use `review_queue` only for category-level counts such as `締切・依頼系: 12件`.
+- If `latest.json` is missing or stale, continue without Gmail and say so briefly.
+
 ## Planning Rules
 
 - Treat Calendar events as fixed constraints.
 - Use Calendar titles as available task context. Do not save or expose location, attendee, or URL data by default.
+- When both `TimeBlock` and `primary` are read, merge them as the fixed schedule view for planning.
 - Prioritize tasks with explicit deadlines, meetings, presentations, reports, or committed follow-ups.
 - For today/tomorrow, keep the output executable: 3-6 main tasks is usually enough.
 - For next week, make a rough day-by-day plan rather than a dense minute-by-minute schedule.
 - Do not overfill the day. Leave buffers around meetings and long fixed events.
 - Clearly mark uncertain items as candidates.
+- If Gmail triage exists, summarize Gmail-derived tasks in short action language. Do not paste snippets or email bodies.
+- Prefer no more than 3 Gmail-derived tasks in the main task list unless the user explicitly asks for a fuller mail review.
 - If an item should become an Issue, list it as an Issue candidate; do not create it unless asked.
 
 ## Calendar Write Rules
@@ -163,6 +184,15 @@ For today/tomorrow:
    - 理由:
    - 所要時間:
    - 推奨時間:
+
+## Gmail要対応
+
+- ...
+
+## Gmail要確認
+
+- 締切・依頼系: N件
+- MTG・日程系: N件
 
 ## 空き時間の使い方
 

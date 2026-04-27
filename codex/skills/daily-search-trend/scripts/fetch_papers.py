@@ -47,16 +47,22 @@ def split_keywords(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def pubmed_query(keywords: list[str], max_results: int) -> tuple[list[dict], list[str]]:
+def parse_target_date(value: str) -> dt.date:
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Invalid date: {value!r}. Use YYYY-MM-DD.") from exc
+
+
+def pubmed_query(keywords: list[str], target_date: dt.date, max_results: int) -> tuple[list[dict], list[str]]:
     errors: list[str] = []
     id_keywords: dict[str, set[str]] = {}
     ordered_ids: list[str] = []
+    target_date_text = target_date.strftime("%Y/%m/%d")
     for keyword in keywords:
         params = {
             "db": "pubmed",
-            "term": f'"{keyword}"',
-            "datetype": "edat",
-            "reldate": "1",
+            "term": f'"{keyword}" AND ({target_date_text}[EDAT] : {target_date_text}[EDAT])',
             "retmode": "json",
             "retmax": str(max_results),
             "sort": "pub+date",
@@ -105,17 +111,19 @@ def pubmed_query(keywords: list[str], max_results: int) -> tuple[list[dict], lis
                     "",
                 ),
                 "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                "target_date": target_date.isoformat(),
                 "matched_keywords": sorted(id_keywords.get(pmid, set())),
             }
         )
     return records, errors
 
 
-def europe_pmc_preprints(keywords: list[str], from_date: str, to_date: str, max_results: int) -> tuple[list[dict], list[str]]:
+def europe_pmc_preprints(keywords: list[str], target_date: dt.date, max_results: int) -> tuple[list[dict], list[str]]:
     errors: list[str] = []
     records_by_key: dict[str, dict] = {}
+    target_date_text = target_date.isoformat()
     for keyword in keywords:
-        query = f'TITLE_ABS:"{keyword}" SRC:PPR FIRST_IDATE:[{from_date} TO {to_date}] sort_date:y'
+        query = f'TITLE_ABS:"{keyword}" SRC:PPR FIRST_IDATE:[{target_date_text} TO {target_date_text}] sort_date:y'
         params = {
             "query": query,
             "format": "json",
@@ -151,6 +159,7 @@ def europe_pmc_preprints(keywords: list[str], from_date: str, to_date: str, max_
                 "journal": item.get("journalTitle", ""),
                 "doi": doi,
                 "url": item.get("doiUrl") or full_text_url or f"https://europepmc.org/article/PPR/{item.get('id', '')}",
+                "target_date": target_date_text,
                 "matched_keywords": [],
             }
             key = (record.get("doi") or record.get("url") or record.get("title") or "").lower()
@@ -182,6 +191,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keywords", required=True, help="Comma-separated keyword list.")
     parser.add_argument("--hours", type=int, default=24, help="Search window in hours; APIs use day-level filters.")
+    parser.add_argument("--target-date", type=parse_target_date, help="Exact target day in YYYY-MM-DD. Overrides --hours windowing.")
     parser.add_argument("--max-results", type=int, default=50)
     args = parser.parse_args()
 
@@ -191,14 +201,21 @@ def main() -> int:
         return 2
 
     now = dt.datetime.now(dt.timezone.utc)
-    start = now - dt.timedelta(hours=args.hours)
-    from_date = start.date().isoformat()
-    to_date = now.date().isoformat()
+    if args.target_date is not None:
+        target_date = args.target_date
+        start = dt.datetime.combine(target_date, dt.time.min, tzinfo=dt.timezone.utc)
+        end = dt.datetime.combine(target_date + dt.timedelta(days=1), dt.time.min, tzinfo=dt.timezone.utc)
+        window_note = "PubMed EDAT and Europe PMC FIRST_IDATE are pinned to the exact target day."
+    else:
+        start = now - dt.timedelta(hours=args.hours)
+        target_date = start.date()
+        end = now
+        window_note = "APIs use day-level filters; records are pinned to the derived target date."
 
     records = []
     errors = []
-    pubmed_records, pubmed_errors = pubmed_query(keywords, args.max_results)
-    preprint_records, preprint_errors = europe_pmc_preprints(keywords, from_date, to_date, args.max_results)
+    pubmed_records, pubmed_errors = pubmed_query(keywords, target_date, args.max_results)
+    preprint_records, preprint_errors = europe_pmc_preprints(keywords, target_date, args.max_results)
     records.extend(pubmed_records)
     records.extend(preprint_records)
     errors.extend(pubmed_errors)
@@ -207,8 +224,9 @@ def main() -> int:
         "window": {
             "hours": args.hours,
             "from_utc": start.isoformat(),
-            "to_utc": now.isoformat(),
-            "note": "PubMed and Europe PMC filters are day-level; caller should mention this limitation.",
+            "to_utc": end.isoformat(),
+            "target_date": target_date.isoformat(),
+            "note": window_note,
         },
         "keywords": keywords,
         "errors": errors,

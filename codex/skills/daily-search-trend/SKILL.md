@@ -37,7 +37,7 @@ Read `references/output-template.md` before writing the final Markdown.
 Use the API helper first for paper/preprint search:
 
 ```bash
-python3 ~/.config/codex/skills/daily-search-trend/scripts/fetch_papers.py --keywords "cyanobacteria,photosystem II,carbon fixation" --hours 24
+python3 ~/.config/codex/skills/daily-search-trend/scripts/fetch_papers.py --keywords "cyanobacteria,photosystem II,carbon fixation" --target-date YYYY-MM-DD
 ```
 
 The helper queries PubMed through NCBI E-utilities and bioRxiv-like preprints through Europe PMC `SRC:PPR`. Read `references/sources.md` for API details and the selected news sources.
@@ -53,8 +53,9 @@ The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme bas
 ## Workflow
 
 1. Determine paper/preprint keywords from the user request. If none are given, use the default research themes in `references/sources.md`.
-2. Search PubMed by keyword with NCBI E-utilities.
-3. Search bioRxiv-relevant preprints by keyword through Europe PMC, using `SRC:PPR` and filtering toward bioRxiv when metadata allows.
+2. Compute the exact target day from the runtime date or user-specified date.
+3. Search PubMed by keyword with NCBI E-utilities, pinned to the exact target day with `EDAT`.
+4. Search bioRxiv-relevant preprints by keyword through Europe PMC, using `SRC:PPR` and `FIRST_IDATE` pinned to the same exact target day, then filter toward bioRxiv when metadata allows.
 4. Check Nature News, Science/AAAS News, and ナゾロジー（自然科学） from `references/sources.md` without keyword filtering. Collect only items posted on the target day. For Nature News and Science/AAAS News, use the official RSS feeds first, not the HTML news pages.
 5. Do not check research-institution announcements by default. Check them only when the user explicitly asks for `研究機関発表` or names institutions and provides or implies a date range such as `1か月前まで`.
    - For RIKEN, build the year-specific press URL from the execution date or requested range, such as `https://www.riken.jp/press/YYYY/index.html`. If the requested range crosses years, check all relevant yearly pages.
@@ -73,6 +74,15 @@ The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme bas
 12. Write one Markdown file to `ideas/daily/md/YYYY-MM-DD-trend.md`, using the target day in the filename, unless the user specifies another topic slug.
 13. Render `ideas/daily/YYYY-MM-DD-trend.html` from that Markdown with `scripts/render_trend_html.py`. Treat the HTML as the final user-facing output and the Markdown as the source.
 14. Include source URLs, target date, keywords, and portfolio files used.
+
+## Exact-Day Guardrail
+
+Do not finalize the PubMed or Europe PMC sections from a rolling `24h` window alone.
+
+- For PubMed, the final adoption step must use `YYYY/MM/DD[EDAT] : YYYY/MM/DD[EDAT]`.
+- For Europe PMC preprints, the final adoption step must use `FIRST_IDATE:[YYYY-MM-DD TO YYYY-MM-DD]` for the same target day.
+- If a helper was first run with `--hours 24` for rough collection, rerun or reconfirm with `--target-date YYYY-MM-DD` before writing the Markdown.
+- When a record's displayed `pubdate` looks different from the target day but the entry date matches the target day, it may still be retained if the exact-day query returned it.
 
 ## Output Rules
 
