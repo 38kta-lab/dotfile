@@ -1,7 +1,0 @@
-interface:
-  display_name: "Daily Search Trend"
-  short_description: "Build a 24h paper/news trend table"
-  default_prompt: "Use $daily-search-trend to collect the last 24 hours of PubMed, bioRxiv-related preprints, and selected science news into ideas/daily."
-
-policy:
-  allow_implicit_invocation: true

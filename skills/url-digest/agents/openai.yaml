@@ -1,3 +1,0 @@
-display_name: URL Digest
-short_description: URL必須で論文・ニュースを短い日本語digestとHTMLにする。
-default_prompt: "$url-digest 対象URLを貼ってください。前日の日付の ideas/daily/md/YYYY-MM-DD-digest.md に追記し、HTMLを書き出します。"

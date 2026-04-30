@@ -13,7 +13,7 @@ Before deciding where or how to capture work:
 
 1. Read `README.md` for directory policy and Issue policy.
 2. Read `Rules.md` for GitHub Projects status limits and safety rules.
-3. Search relevant memory summaries with `$agent-memory` behavior if memory may contain prior decisions.
+3. Search relevant memory summaries via the `agent-memory` skill if memory may contain prior decisions.
 
 For this `life` repo, task state is managed by GitHub Projects `Status`, not labels. Project details are documented in `Rules.md`; the `Life` Project number is `5`.
 Use the Project table view as the primary verification surface. Treat the board view as secondary.

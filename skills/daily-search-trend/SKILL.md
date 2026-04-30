@@ -37,7 +37,7 @@ Read `references/output-template.md` before writing the final Markdown.
 Use the API helper first for paper/preprint search:
 
 ```bash
-python3 ~/.config/codex/skills/daily-search-trend/scripts/fetch_papers.py --keywords "cyanobacteria,photosystem II,carbon fixation" --target-date YYYY-MM-DD
+python3 <skill-dir>/scripts/fetch_papers.py --keywords "cyanobacteria,photosystem II,carbon fixation" --target-date YYYY-MM-DD
 ```
 
 The helper queries PubMed through NCBI E-utilities and bioRxiv-like preprints through Europe PMC `SRC:PPR`. Read `references/sources.md` for API details and the selected news sources.
@@ -45,7 +45,7 @@ The helper queries PubMed through NCBI E-utilities and bioRxiv-like preprints th
 After writing Markdown, render HTML with:
 
 ```bash
-python3 ~/.config/codex/skills/daily-search-trend/scripts/render_trend_html.py ideas/daily/md/YYYY-MM-DD-trend.md -o ideas/daily/YYYY-MM-DD-trend.html
+python3 <skill-dir>/scripts/render_trend_html.py ideas/daily/md/YYYY-MM-DD-trend.md -o ideas/daily/YYYY-MM-DD-trend.html
 ```
 
 The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme based on Typora's Newsprint theme.
