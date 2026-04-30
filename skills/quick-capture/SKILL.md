@@ -35,7 +35,7 @@ Use this skill for lightweight, not-yet-structured items:
 - research thoughts that are not ready for a project file
 - possible future issues that should first pass through weekly review
 
-Do not use this skill for durable Codex working memory. Use `agent-memory` when the note is mainly for Codex to resume later.
+Do not use this skill for durable agent working memory. Use `agent-memory` when the note is mainly for the agent to resume later.
 
 Do not use this skill for multi-step work that the user explicitly wants tracked now. Use `issue-capture` for that.
 
@@ -84,7 +84,7 @@ Keep entries short. Do not expand a quick capture into a full plan unless the us
 Use `issue-capture` when the capture is a concrete task or small task set that should be tracked as execution work:
 
 ```markdown
-  - next: `$issue-capture` でIssue候補にする
+  - next: `/issue-capture` でIssue候補にする
 ```
 
 Good `issue-capture` cases:
@@ -97,7 +97,7 @@ Good `issue-capture` cases:
 Use `pj-hub` when the capture needs project-level context before execution tasks are clear:
 
 ```markdown
-  - next: `$pj-hub` でProject化を検討
+  - next: `/pj-hub` でProject化を検討
 ```
 
 Good `pj-hub` cases:
