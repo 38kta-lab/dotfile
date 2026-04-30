@@ -15,7 +15,7 @@ Before saving, listing, or recalling memories:
 2. Find the documented Codex working-memory location.
 3. Use that path as the memory directory.
 
-For this `life` repository, `Rules.md` defines `.codex/memories/agent-memory/`.
+For this `life` repository, `Rules.md` defines `.agent/memories/`.
 
 If `Rules.md` does not define a memory directory, ask the user where to store memories. Do not silently choose a global location.
 
