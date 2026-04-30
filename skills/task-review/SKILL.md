@@ -22,7 +22,7 @@ For the `life` repo, the main inputs are:
 ```text
 ideas/inbox/YYYY-MM-DD.md
 projects/active/*.md
-.codex/memories/agent-memory/*.md
+.agent/memories/*.md
 scripts/google_calendar_read.py
 scripts/google_calendar_create.py
 scripts/gmail_task_review.py
@@ -110,7 +110,7 @@ Read project files only when the summary, checkpoint, task, or next action looks
 Memory:
 
 ```bash
-rg "^(summary|created|updated|status|tags):" .codex/memories/agent-memory -n
+rg "^(summary|created|updated|status|tags):" .agent/memories -n
 ```
 
 Read only memories with recent or explicitly relevant task-planning context, such as "tomorrow", "next action", "Calendar", or "weekly-review".

@@ -50,7 +50,7 @@ Primary source files:
 - `ideas/inbox/YYYY-MM-DD.md` files whose date is inside the review window.
 - `ideas/daily/md/YYYY-MM-DD-digest.md` files whose date is inside the review window.
 - `projects/active/*.md` files with active, pending, blocked, upcoming checkpoint, or updated content relevant to the review window.
-- `.codex/memories/agent-memory/*.md` files with `created` or `updated` inside the review window.
+- `.agent/memories/*.md` files with `created` or `updated` inside the review window.
 
 Optional source files:
 
@@ -59,7 +59,7 @@ Optional source files:
 Do not read unrelated memory bodies. Search memory frontmatter first, then read only relevant files:
 
 ```bash
-rg "^(summary|created|updated|status|tags):" .codex/memories/agent-memory -n
+rg "^(summary|created|updated|status|tags):" .agent/memories -n
 ```
 
 Find daily source files by date:
@@ -137,7 +137,7 @@ Section guidance:
 After writing or updating the Markdown review, always render HTML:
 
 ```bash
-python3 ~/.config/codex/skills/weekly-review/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o ideas/weekly/YYYY-MM-DD-weekly-review.html
+python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o ideas/weekly/YYYY-MM-DD-weekly-review.html
 ```
 
 The renderer embeds `assets/newsprint-weekly.css`, a Newsprint-inspired theme aligned with the daily digest/trend HTML outputs.
