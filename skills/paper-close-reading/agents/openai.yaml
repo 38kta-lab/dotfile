@@ -1,3 +1,0 @@
-display_name: Paper Close Reading
-short_description: PDFとraw HTMLと図から clean-original と ja.html を作り、埋め込みHTMLにする。
-default_prompt: "$paper-close-reading tmp に PDF・raw HTML・Fig を置いたので、Step1 の clean-original.html を作り、その章立てで ja.html まで進めてください。"
