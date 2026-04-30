@@ -1,6 +1,6 @@
 ---
 name: url-digest
-description: "Create or append a Japanese digest from a required URL into ideas/daily/md/YYYY-MM-DD-digest.md, then render ideas/daily/YYYY-MM-DD-digest.html. Use when the user says URL-digest, $URL-digest, $url-digest, digest this URL, このURLをdigest, 論文を数行でまとめて, ニュースを数行でまとめて, or wants a concise core-message summary of a paper, preprint, DOI page, publisher page, official news article, or research news URL."
+description: "Create or append a Japanese digest from a required URL into ideas/daily/md/YYYY-MM-DD-digest.md, then render ideas/daily/YYYY-MM-DD-digest.html. Use when the user says url-digest, /url-digest, digest this URL, このURLをdigest, 論文を数行でまとめて, ニュースを数行でまとめて, or wants a concise core-message summary of a paper, preprint, DOI page, publisher page, official news article, or research news URL."
 metadata:
   short-description: "Digest one required URL into ideas/daily"
 ---
