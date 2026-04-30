@@ -11,8 +11,8 @@ Use this skill to preserve and retrieve working context as Markdown files in the
 
 Before saving, listing, or recalling memories:
 
-1. Read the current repository's `Rules.md`.
-2. Find the documented Codex working-memory location.
+1. Read the current repository's `Rules.md` (or `CLAUDE.md` if `Rules.md` does not exist).
+2. Find the documented working-memory location.
 3. Use that path as the memory directory.
 
 For this `life` repository, `Rules.md` defines `.agent/memories/`.
@@ -22,6 +22,16 @@ If `Rules.md` does not define a memory directory, ask the user where to store me
 ## Safety
 
 Treat repository memories as git-shared notes. Do not store secrets, directly abusable personal identifiers, unpublished research data, collaborator confidential information, or other material prohibited by the repository's rules.
+
+## Relationship to Claude Code's auto memory
+
+Claude Code may also maintain per-machine auto memories under `~/.claude/projects/<project>/memory/`. These two systems are complementary:
+
+- `agent-memory` skill (this skill): git-shared, multi-machine, curated. Triggered by explicit user requests like 「記憶して」「思い出して」.
+- Claude Code auto memory: per-machine, written automatically by Claude. Carries conversation context across sessions on the same machine.
+
+Use `agent-memory` for facts that should follow the repo across machines and be visible in git.
+Use Claude Code auto memory for ephemeral conversation context private to this machine. The two do not need to be kept in sync.
 
 ## Core Rule
 
