@@ -84,7 +84,7 @@ For news or institution releases, clearly distinguish reported findings from int
 Render HTML with:
 
 ```bash
-python3 ~/.config/codex/skills/url-digest/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o ideas/daily/YYYY-MM-DD-digest.html
+python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o ideas/daily/YYYY-MM-DD-digest.html
 ```
 
 ## Style Rules
