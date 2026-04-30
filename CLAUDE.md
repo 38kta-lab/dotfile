@@ -14,7 +14,8 @@ Target locations:
 - WezTerm config dir: ~/.config/wezterm
 - WezTerm keybinds source: ~/.config/wezterm/keybinds.lua (managed in repo)
 - Claude Code user dir: ~/.claude (settings, sessions, auto memory; not yet repo-managed)
-- Codex global Skills dir: ~/.config/codex/skills (still linked by init.sh; under review for Claude migration)
+- Global Skills dir (Claude): ~/.claude/skills (linked from `skills/`)
+- Global Skills dir (codex): ~/.config/codex/skills (linked from `skills/`; same source as Claude)
 
 Primary goals:
 1) Manage dotfiles via this repo.
@@ -29,8 +30,7 @@ Primary goals:
 - Minimize edits to ~/.zshrc. It should only source files under ~/.config/zsh (and nothing else).
 - Avoid adding new dependencies unless explicitly requested.
 - WezTerm keybinds are managed in repo and linked to ~/.config/wezterm/keybinds.lua.
-- Codex skills under `codex/skills/` are still linked by init.sh, but each skill is being reviewed for Claude migration. Do not modify, rename, or remove `codex/skills/<name>` contents unless explicitly asked.
-- Do not auto-create skills under `~/.claude/skills/`. Skill design is decided per item with the user; do not preemptively port codex skills.
+- Global skills are stored once under `skills/<name>/` and symlinked to both `~/.claude/skills/<name>/` and `~/.config/codex/skills/<name>/` by `init.sh`. Do not duplicate or fork the source. Do not modify, rename, or remove `skills/<name>` contents unless explicitly asked; each skill is still being reviewed for Claude-side path adjustments.
 - Do not manage or copy Codex system Skills under `~/.config/codex/skills/.system/`.
 - `~/.claude/settings.json` (Claude Code permissions / hooks / env) is intentionally NOT managed by this repo yet. Do not add it to `init.sh` until the user asks; permissions and hooks decisions are pending.
 - `~/.claude/projects/.../memory/` is the auto memory store managed by Claude itself. Do not symlink, copy, or hand-edit it from this repo.
@@ -45,8 +45,8 @@ Existing folders / files (do not break):
 - `wezterm/`
   - `wezterm.lua`, `keybinds.lua`
 - `nvim/`, `lazygit/`, `git/`, `czg/`, `cz-git/`, `czrc/`, `starship/` — config dirs / files linked by `init.sh`
+- `skills/` — global user skills, linked to both `~/.claude/skills/` and `~/.config/codex/skills/` (single source of truth; under per-skill review for path adjustments)
 - `codex/`
-  - `skills/` — legacy global Codex skills (under review for Claude migration)
   - `AGENTS.md.bak` — original codex-tuned AGENTS.md, preserved for reference
 - `README.md`
 - `bootstrap.sh` — first-machine bootstrap (Homebrew, taps, casks, npm globals)
@@ -56,13 +56,13 @@ Existing folders / files (do not break):
 ## Installation behavior (init.sh)
 `init.sh` currently does:
 
-1) Ensure `~/.config/{zsh,wezterm,codex/skills}` exist.
+1) Ensure `~/.config/{zsh,wezterm,codex/skills}` and `~/.claude/skills` exist.
 2) Symlink each repo `zsh/*.zsh` into `~/.config/zsh/`.
 3) Rewrite `~/.zshrc` to a thin loader that sources `~/.config/zsh/*.zsh` in a fixed order. An existing `~/.zshrc` is backed up if its content differs.
 4) Symlink WezTerm files (`wezterm.lua`, `keybinds.lua`) into `~/.config/wezterm/`.
 5) Symlink config dirs (`nvim`, `git`, `lazygit`, `czg`, `cz-git`) into `~/.config/`.
 6) Symlink `starship/starship.toml` into `~/.config/starship.toml`.
-7) Symlink each `codex/skills/<name>` into `~/.config/codex/skills/<name>` (legacy; still active).
+7) Symlink each `skills/<name>` into both `~/.claude/skills/<name>` and `~/.config/codex/skills/<name>` (single source, two destinations).
 8) Install `czrc/.czrc.example` into `~/.config/.czrc` if missing.
 9) Verify with `zsh -lic 'echo "zsh ok"'` and a `td` lookup.
 
@@ -81,8 +81,5 @@ If anything is missing (e.g., `fzf` not installed), report it and propose the sm
 ## Migration status (codex → Claude)
 - 2026-04 → 2026-05: primary agent switched from codex to Claude Code.
 - The original codex-tuned `AGENTS.md` is preserved at `codex/AGENTS.md.bak`.
-- `codex/skills/` remains wired into `init.sh`. Each skill is being reviewed individually for one of:
-  (a) replaced by a Claude Code built-in feature (skills, auto memory, `/schedule`, etc.),
-  (b) ported to `~/.claude/skills/<name>/SKILL.md`, or
-  (c) kept as-is for now.
-- `claude/settings.json` (permissions / hooks / env) and a `claude/skills/` tree are NOT yet introduced to this repo. Add them only when the user explicitly decides on the design.
+- The `codex/skills/` directory was renamed to top-level `skills/` and is now linked to both `~/.claude/skills/` and `~/.config/codex/skills/` from a single source of truth. Each skill's internal references (e.g., hardcoded `~/.config/codex/skills/...` paths inside SKILL.md / scripts) are reviewed individually for path adjustments.
+- `claude/settings.json` (permissions / hooks / env) is NOT yet introduced to this repo. Add it only when the user explicitly decides on the design.

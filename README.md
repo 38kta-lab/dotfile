@@ -20,7 +20,7 @@ Then run:
 gh auth login
 gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
-mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills" "$HOME/.claude/skills"
 ./init.sh
 ```
 
@@ -69,7 +69,7 @@ Clone this repo with ghq, then install:
 gh auth login
 gh auth refresh -s project
 git config --global ghq.root "$HOME/src"
-mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills"
+mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills" "$HOME/.claude/skills"
 ghq get https://github.com/38kta-lab/dotfile
 cd "$(ghq root)/github.com/38kta-lab/dotfile"
 ./install_miniforge.sh
@@ -177,21 +177,23 @@ conda activate life
 python scripts/google_calendar_read.py --format json
 ```
 
-## Codex Skills
+## Skills (Codex / Claude Code)
 
 Global user Skills are managed in this repo under:
 
 ```text
-codex/skills/
+skills/
 ```
 
-`./init.sh` links each directory under `codex/skills/` into:
+`./init.sh` links each directory under `skills/` into both:
 
 ```text
 ~/.config/codex/skills/
+~/.claude/skills/
 ```
 
 System Skills under `~/.config/codex/skills/.system/` are not managed here.
+Claude Code's auto memory under `~/.claude/projects/.../memory/` is also not managed here.
 
 ## PR Workflow (squash)
 
@@ -277,7 +279,7 @@ Notes:
 ## Notes
 
 - WezTerm keybinds are managed at `wezterm/keybinds.lua` and linked to `~/.config/wezterm/keybinds.lua`.
-- Global Codex Skills are managed under `codex/skills/` and linked to `~/.config/codex/skills/`.
+- Global Skills are managed under `skills/` and linked to both `~/.config/codex/skills/` and `~/.claude/skills/`.
 - `~/.config/.czrc` is not committed; see `czrc/.czrc.example` for a template.
 
 ## Mac Setup Checklist
