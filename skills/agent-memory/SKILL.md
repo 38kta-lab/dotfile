@@ -147,3 +147,15 @@ When the user asks to remember or check prior notes:
 - Mark stale work as `resolved`, `blocked`, or `abandoned` instead of silently leaving it ambiguous.
 - Consolidate scattered memories on the same topic when they become hard to scan.
 - Promote durable, shareable knowledge to normal repository areas when appropriate.
+
+## Auto-finalize
+
+After saving, updating, or consolidating memory files, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
+
+```bash
+bash scripts/agent_auto_finalize.sh \
+  -m "docs: 📝 agent-memory: <added|updated|consolidated> <short topic>" \
+  .agent/memories/YYYY-MM-DD-<short-topic>.md
+```
+
+Pass every memory file you actually wrote or modified — if you consolidated several into one and deleted the originals, pass all of them so the deletions are also committed. The script commits with `-o` so other staged changes are not swept in.
