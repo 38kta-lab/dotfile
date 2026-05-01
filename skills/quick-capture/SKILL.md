@@ -133,4 +133,4 @@ bash scripts/agent_auto_finalize.sh \
   ideas/inbox/YYYY-MM-DD.md
 ```
 
-Replace `YYYY-MM-DD` with the actual date file you wrote to, and the summary with a short Japanese phrase derived from the capture. Pass only the inbox file you just modified — the script commits with `-o` so other staged changes are not swept in. If `AGENT_AUTO_PRC=1` is also set, the script will additionally `gh pr create` once per branch (idempotent).
+Replace `YYYY-MM-DD` with the actual date file you wrote to, and the summary with a short Japanese phrase derived from the capture. Pass only the inbox file you just modified — the script commits with `-o` so other staged changes are not swept in.
