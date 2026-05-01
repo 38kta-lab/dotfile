@@ -95,3 +95,16 @@ python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-dige
 - Preserve source links.
 - Mark uncertainty clearly when access is partial, abstract-only, or blocked.
 - Do not use this digest corpus as the basis for `daily-search-trend` interest scoring yet.
+
+## Auto-finalize
+
+After producing both the Markdown and HTML, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
+
+```bash
+bash scripts/agent_auto_finalize.sh \
+  -m "docs: 📝 url-digest: YYYY-MM-DD <one-line topic>" \
+  ideas/daily/md/YYYY-MM-DD-digest.md \
+  ideas/daily/YYYY-MM-DD-digest.html
+```
+
+Replace `YYYY-MM-DD` with the digest day. Pass only the digest Markdown and HTML you just generated — the script commits with `-o` so other staged changes are not swept in.

@@ -149,3 +149,16 @@ After rendering:
 1. Check that both Markdown and HTML files exist.
 2. Run `gh project item-list` only if the user asked to update issues or Project status.
 3. Report the output paths and any missing-source limitations.
+
+## Auto-finalize
+
+After producing both the Markdown review and the HTML, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
+
+```bash
+bash scripts/agent_auto_finalize.sh \
+  -m "docs: 📝 weekly-review: YYYY-MM-DD to YYYY-MM-DD" \
+  ideas/weekly/md/YYYY-MM-DD-weekly-review.md \
+  ideas/weekly/YYYY-MM-DD-weekly-review.html
+```
+
+Replace `YYYY-MM-DD` with the review end date. Pass only the weekly-review Markdown and HTML you just generated — the script commits with `-o` so other staged changes are not swept in.
