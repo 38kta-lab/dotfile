@@ -69,11 +69,7 @@ conda activate life
 python scripts/google_calendar_read.py --format json --start YYYY-MM-DDT00:00:00 --end YYYY-MM-DDT00:00:00
 ```
 
-If shell activation is unreliable, use the environment Python directly when present:
-
-```bash
-~/miniforge3/envs/life/bin/python scripts/google_calendar_read.py --format json --start ... --end ...
-```
+Run via the repo's conda env (the `life` environment in this repo). Do not hardcode host-specific Python paths such as `~/miniforge3/envs/life/bin/python` — the conda install location varies per machine. If activation fails, locate the env's Python with `conda env list` or `which python` after activation, and report the issue rather than substituting an absolute path silently.
 
 In the `life` repo, Calendar reads should by default cover both:
 
