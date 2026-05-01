@@ -166,3 +166,17 @@ Before finishing, verify:
 ## References
 
 - `references/ja-html-template.md`: expected Japanese reading-note structure
+
+## Auto-finalize
+
+After producing the embedded `clean-original.html` and `ja.html`, and updating the lightweight index Markdown, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
+
+```bash
+bash scripts/agent_auto_finalize.sh \
+  -m "docs: 📝 paper-close-reading: <paper short title>" \
+  portfolio/paper-close-readings/tmp/clean-original.html \
+  portfolio/paper-close-readings/tmp/ja.html \
+  portfolio/paper-close-readings/YYYY-MM-DD-<slug>.md
+```
+
+Pass only the HTML artifacts and the index Markdown — never the PDF, raw HTML, or figure assets (per the "Do not commit PDFs or raw figure assets" rule). The script commits with `-o` so other staged changes are not swept in. Adjust the path list when the actual deliverable file set differs (for example, if `original.html` was also produced and should be committed).
