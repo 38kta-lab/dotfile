@@ -9,9 +9,12 @@ if command -v abbr >/dev/null 2>&1; then
 fi
 
 # gh: PR helpers
+# work/<hostname> ブランチは PC 横断で再利用するため、merge 後も branch を残す (--no-delete-branch)
 alias prc='gh pr create --base main --head work/$(hostname -s) --fill'
-alias prm='gh pr merge --merge'
-alias prs='gh pr merge --squash'
+alias prm='gh pr merge --merge --no-delete-branch'                    # 現在 branch の PR を merge
+alias prs='gh pr merge --squash --no-delete-branch'
+alias prmn='gh pr merge --merge --no-delete-branch'                   # 番号 or branch を引数で指定: prmn 42 / prmn work/fenrir
+alias prsn='gh pr merge --squash --no-delete-branch'
 
 # git: per-machine workflow helpers
 alias wmain='git switch main && git pull --rebase'
