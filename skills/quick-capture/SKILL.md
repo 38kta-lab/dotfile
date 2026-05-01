@@ -122,3 +122,15 @@ After appending, report:
 - the file path
 - the captured text in one short line
 - any `next:` hint added
+
+## Auto-finalize
+
+After reporting, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
+
+```bash
+bash scripts/agent_auto_finalize.sh \
+  -m "docs: 📝 quick-capture: <one-line summary of the captured text>" \
+  ideas/inbox/YYYY-MM-DD.md
+```
+
+Replace `YYYY-MM-DD` with the actual date file you wrote to, and the summary with a short Japanese phrase derived from the capture. Pass only the inbox file you just modified — the script commits with `-o` so other staged changes are not swept in. If `AGENT_AUTO_PRC=1` is also set, the script will additionally `gh pr create` once per branch (idempotent).
