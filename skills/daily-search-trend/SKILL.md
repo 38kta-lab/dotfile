@@ -140,4 +140,4 @@ bash scripts/agent_auto_finalize.sh \
   ideas/daily/YYYY-MM-DD-trend.html
 ```
 
-Replace `YYYY-MM-DD` with the target day. Pass only the trend Markdown and HTML you just generated — the script commits with `-o` so other staged changes are not swept in. If `AGENT_AUTO_PRC=1` is also set, the script will additionally `gh pr create` once per branch (idempotent).
+Replace `YYYY-MM-DD` with the target day. Pass only the trend Markdown and HTML you just generated — the script commits with `-o` so other staged changes are not swept in.
