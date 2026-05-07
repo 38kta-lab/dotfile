@@ -53,7 +53,20 @@ Before writing output, read the current repository's `README.md` and `Rules.md` 
 ideas/daily/md/YYYY-MM-DD-digest.md
 ```
 
-If the file already exists, append new sections. Do not overwrite existing entries.
+**Append behavior is mandatory** — never overwrite existing entries.
+
+Procedure when adding new digest sections:
+
+1. **Check if the file exists** with a quick `ls` or directory listing.
+2. **If it exists**:
+   - Use the `Read` tool to load the current contents.
+   - Compose the new content as `<existing-content>\n\n<new sections>`.
+   - Use the `Edit` tool with the file's last meaningful line as `old_string` (preferred), OR use `Write` with the full combined content.
+   - Never call `Write` with only the new sections — that erases prior entries.
+3. **If it does not exist**:
+   - Create it with a top-level header (e.g., `# Daily Digest: YYYY-MM-DD`) followed by the new section(s).
+
+This append rule applies even when other skills (`url-digest`, etc.) have already populated today's digest. Coexist peacefully — your sections sit below theirs, separated by a blank line.
 
 ## Storage Policy (life repo)
 
