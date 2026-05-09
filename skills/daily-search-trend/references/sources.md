@@ -82,31 +82,28 @@ News URLs:
 - ナゾロジー（自然科学） primary RSS: https://nazology.kusuguru.co.jp/archives/category/nature/feed
 - ナゾロジー（自然科学） browser reference: https://nazology.kusuguru.co.jp/archives/category/nature
 
+All three RSS feeds are fetched by `scripts/fetch_news.py` (single command, single permission prompt). The script handles browser-like User-Agent, RSS 1.0 (RDF) / RSS 2.0 / Atom parsing, and a fallback IP path for environments where local DNS sinkholes Nature/Science. Do not invoke `curl` directly for these sources.
+
 Nature News RSS handling:
 
-- Use `https://www.nature.com/nature.rss` as the primary source.
-- Fetch with a browser-like User-Agent when using CLI tools, for example: `curl -L -A "Mozilla/5.0" https://www.nature.com/nature.rss`.
-- Parse RSS/RDF `item` entries.
-- Use `dc:date` to filter to the target day.
-- Use `title` or `dc:title` for the original title and `link` or `prism:url` for the URL.
+- Primary URL: `https://www.nature.com/nature.rss` (RSS 1.0 / RDF format)
+- Filter by `dc:date` to the target day.
+- Use `title` (or `dc:title`) for the original title and `link` (or `prism:url`) for the URL.
 - Use the HTML page `https://www.nature.com/news` only as a human browser reference.
-- If the RSS feed fails, fall back to web search constrained to `site:nature.com/articles/d41586` with the target date.
+- If the RSS feed fails entirely, fall back to web search constrained to `site:nature.com/articles/d41586` with the target date.
 
 Science / AAAS RSS handling:
 
-- Use `https://www.science.org/rss/news_current.xml` as the primary source.
-- Fetch with a browser-like User-Agent when using CLI tools, for example: `curl -L -A "Mozilla/5.0" https://www.science.org/rss/news_current.xml`.
-- Parse RSS/RDF `item` entries.
-- Use `dc:date`, `prism:coverDate`, or `prism:coverDisplayDate` to filter to the target day.
-- Use `title` for the original title and `link` or `prism:url` for the URL.
-- Do not use the HTML page `https://www.science.org/news` as the primary machine source because it can return a Cloudflare challenge/403 outside a normal browser.
-- If the RSS feed fails, fall back to web search constrained to `site:science.org/content/article` with the target date.
+- Primary URL: `https://www.science.org/rss/news_current.xml` (RSS 2.0)
+- Filter by `dc:date`, `prism:coverDate`, or `prism:coverDisplayDate` to the target day.
+- Use `title` for the original title and `link` (or `prism:url`) for the URL.
+- Do not use the HTML page `https://www.science.org/news` as the primary machine source (Cloudflare challenge/403 outside a normal browser).
+- If the RSS feed fails entirely, fall back to web search constrained to `site:science.org/content/article` with the target date.
 
 ナゾロジー（自然科学） handling:
 
-- Use `https://nazology.kusuguru.co.jp/archives/category/nature/feed` as the primary source.
-- Parse RSS `item` entries.
-- Use `pubDate` to filter to the target day.
+- Primary URL: `https://nazology.kusuguru.co.jp/archives/category/nature/feed` (RSS 2.0)
+- Filter by `pubDate` to the target day.
 - Use `title` for the original title and `link` for the URL.
 - Because this source is Japanese, omit `タイトル訳` in the output table and use the two-column shape: `原文タイトル | 興味度`.
 
