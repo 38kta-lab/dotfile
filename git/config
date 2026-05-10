@@ -1,6 +1,10 @@
 [user]
 	name = 38kta-lab
 	email = 38kta.lab@gmail.com
+[core]
+	# 日本語など非 ASCII ファイル名を git status / log でそのまま表示する
+	# (false にしないと "\343\203\211" のような octal escape になる)
+	quotepath = false
 [ghq]
 	root = ~/src
 [github]
