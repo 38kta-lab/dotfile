@@ -101,6 +101,28 @@ install_czrc_template() {
   fi
 }
 
+write_zshenv() {
+  # ~/.zshenv は zsh のあらゆる起動 (login / interactive / 非対話 ssh) で読まれる。
+  # PATH や Homebrew の設定は env.zsh に集約しておき、~/.zshenv からそれを source する。
+  # こうすると `ssh fenrir 'tmux'` のような非対話実行でも tmux/nvim/claude が PATH に乗る。
+  local target="$HOME/.zshenv"
+  local tmp
+  tmp="$(mktemp)"
+
+  cat > "$tmp" <<'EOF'
+# Managed by dotfile init.sh
+[ -f "$HOME/.config/zsh/env.zsh" ] && source "$HOME/.config/zsh/env.zsh"
+EOF
+
+  if [ -f "$target" ] && cmp -s "$tmp" "$target"; then
+    rm -f "$tmp"
+    return 0
+  fi
+
+  backup_path "$target"
+  mv "$tmp" "$target"
+}
+
 write_zshrc() {
   local target="$HOME/.zshrc"
   local tmp
@@ -108,6 +130,8 @@ write_zshrc() {
 
   cat > "$tmp" <<'EOF'
 # Managed by dotfile init.sh
+# PATH などの基本 env は ~/.zshenv 経由で env.zsh が一括投入する。
+# ここでは対話シェルでのみ必要なモジュール (alias, plugins, queue, fzf 等) を source する。
 ZSH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
 for file in \
   "$ZSH_CONFIG_DIR/env.zsh" \
@@ -156,6 +180,7 @@ main() {
   link_starship
   link_skills
   install_czrc_template
+  write_zshenv
   write_zshrc
   verify
 }
