@@ -86,6 +86,8 @@ config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 --   右上 (10%)      : ssh fenrir + tmux attach -t life (常時起動の Claude Code セッション)
 --   右下 (10%)      : ssh fenrir + cd life (素のシェル)
 -- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
+-- PATH (brew shellenv + ~/.local/bin) は env.zsh が ~/.zshenv 経由で必ず投入されるため、
+-- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
 wezterm.on("gui-startup", function(cmd)
 	local tab, pane, window = wezterm.mux.spawn_window(cmd or {})
 	local right = pane:split({ direction = "Right", size = 0.2 })
