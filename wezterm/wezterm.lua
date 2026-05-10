@@ -81,12 +81,18 @@ config.keys = require("keybinds").keys
 config.key_tables = require("keybinds").key_tables
 config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
+-- 起動時の 3 ペイン構成 (fenrir 主作業先方針、2026-05-10):
+--   左 (80%)        : ssh fenrir + cd life + nvim
+--   右上 (10%)      : ssh fenrir + tmux attach -t life (常時起動の Claude Code セッション)
+--   右下 (10%)      : ssh fenrir + cd life (素のシェル)
+-- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
 wezterm.on("gui-startup", function(cmd)
 	local tab, pane, window = wezterm.mux.spawn_window(cmd or {})
 	local right = pane:split({ direction = "Right", size = 0.2 })
-	right:split({ direction = "Bottom", size = 0.5 })
-	pane:send_text("nvim\n")
-	right:send_text("codex resume\n")
+	local right_bottom = right:split({ direction = "Bottom", size = 0.5 })
+	pane:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && nvim'\n")
+	right:send_text("ssh fenrir -t 'tmux a -t life'\n")
+	right_bottom:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && exec zsh -l'\n")
 	window:gui_window():maximize()
 end)
 
