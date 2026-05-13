@@ -22,6 +22,32 @@ alias wstart='git switch main && git pull --rebase && git switch "work/$(hostnam
 alias wrebase='git rebase main'
 alias winit='HOST=$(hostname -s) && git switch main && git pull --rebase && git switch -c "work/$HOST" && git push -u origin "work/$HOST"'
 
+# guppy job submission (GPU server, no Slurm). See life repo
+# `scripts/automation/run_on_guppy.sh` + `_shared/conventions.md`.
+alias gsub='bash ~/src/github.com/38kta-lab/life/scripts/automation/run_on_guppy.sh'
+alias gque='ssh guppy "tmux ls 2>/dev/null || echo \"(no tmux sessions)\""'
+alias gtop='ssh guppy "nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu --format=csv"'
+glog() {
+  # tail -F the latest log file under <project>/log/.
+  # Usage:  glog                # default = 12_L log dir
+  #         glog <log-dir>      # specify other repo's log dir
+  local target_dir="${1:-/data/kta/_repos/12_L_pyshell_interactors/log}"
+  local latest
+  latest=$(ls -t "${target_dir}"/*.log 2>/dev/null | head -1)
+  if [[ -z "$latest" ]]; then
+    echo "no log files under ${target_dir}" >&2
+    return 1
+  fi
+  echo "tail -F $latest"
+  tail -F "$latest"
+}
+
+# vili (Slurm head node = ymir) sbatch helpers
+alias vsub='ssh ymir sbatch'                     # vsub /data/kta/_repos/<repo>/script/sbatch/<name>.sh
+alias vque='ssh ymir squeue -u kta'
+alias vacc='ssh ymir sacct -u kta --starttime today'
+alias vinfo='ssh ymir sinfo'
+
 # vpn (Cisco Secure Client)
 
 # 起動（起動時に自動でVPN接続される前提）
