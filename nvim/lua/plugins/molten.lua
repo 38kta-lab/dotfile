@@ -3,6 +3,8 @@
 -- 参照: https://github.com/benlubas/molten-nvim
 --
 -- 前提:
+--   - **fenrir 限定**: conda env `nvim` + kernel discovery + JupyterHub 連携が fenrir 上のみセットアップ済。
+--     他ホスト (Air / mini-lab) では plugin を install しない (enabled flag で skip)。
 --   - Python provider (pynvim + jupyter_client) は conda env `nvim` 経由 (options.lua で `vim.g.python3_host_prog` 設定済)
 --   - kernel は jupyter で discovery される (`shared-py310`, `shared-r44` を `~/Library/Jupyter/kernels/` に登録済)
 --   - 使用 cwd: 各研究 repo (例: 12_L_pyshell_interactors/ipynb/) で nvim 起動
@@ -14,9 +16,12 @@
 --   4. 結果は仮想行 (virt text) で表示、`<localleader>mo` で詳細 window 開く
 --
 -- LazyVim の `<localleader>` デフォルト = `\` (backslash)
+local on_fenrir = vim.fn.hostname() == "fenrir"
+
 return {
   {
     "benlubas/molten-nvim",
+    enabled = on_fenrir,
     version = "^1.0.0",
     build = ":UpdateRemotePlugins",
     ft = { "python" },
@@ -43,8 +48,10 @@ return {
   },
   -- jupytext.nvim: .ipynb を開くと自動で python 表現に変換、保存で .ipynb に書き戻し。
   -- molten-nvim が ft=python で動くので、.ipynb もこれ経由で扱える。
+  -- fenrir 限定 (molten と組で運用、他ホストでは ipynb 編集を当面行わない方針)。
   {
     "GCBallesteros/jupytext.nvim",
+    enabled = on_fenrir,
     lazy = false,
     config = function()
       require("jupytext").setup({
