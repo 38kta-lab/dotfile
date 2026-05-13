@@ -1,5 +1,21 @@
-if command -v starship >/dev/null 2>&1; then
+# JupyterLab Terminal (xterm.js) 検出: starship の右寄せプロンプト等が
+# xterm.js の cursor 制御と衝突し、最初の 1 文字が二重表示される display バグを誘発。
+# Lab context だけ starship を skip して minimal prompt に切り替え。
+__in_jupyter_terminal() {
+  [[ -n "$JPY_SESSION_NAME" || -n "$JUPYTER_SERVER_URL" ]]
+}
+
+if command -v starship >/dev/null 2>&1 && ! __in_jupyter_terminal; then
   eval "$(starship init zsh)"
+elif __in_jupyter_terminal; then
+  # minimal 2-line prompt: 1 行目に cwd と git branch、2 行目に `❯ `
+  autoload -Uz vcs_info
+  precmd_vcs() { vcs_info }
+  precmd_functions+=(precmd_vcs)
+  zstyle ':vcs_info:git:*' formats ' (%b)'
+  setopt prompt_subst
+  PROMPT=$'%F{cyan}%~%f%F{yellow}${vcs_info_msg_0_}%f\n%F{green}❯%f '
+  RPROMPT=''
 fi
 
 if command -v zoxide >/dev/null 2>&1; then
