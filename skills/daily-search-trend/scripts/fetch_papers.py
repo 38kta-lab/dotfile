@@ -13,6 +13,7 @@ import html
 import json
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -22,10 +23,19 @@ NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 
 
-def get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "daily-search-trend/0.1"})
-    with urllib.request.urlopen(req, timeout=30) as response:
-        return json.load(response)
+def get_json(url: str, *, max_attempts: int = 3) -> dict:
+    backoffs = [5, 15, 45]
+    for attempt in range(max_attempts):
+        req = urllib.request.Request(url, headers={"User-Agent": "daily-search-trend/0.1"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt < max_attempts - 1:
+                time.sleep(backoffs[attempt])
+                continue
+            raise
+    raise RuntimeError("get_json exhausted retries with no exception captured")
 
 
 def as_text(value: object) -> str:
