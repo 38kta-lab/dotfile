@@ -1,12 +1,18 @@
 # dotfile
 
-Personal dotfiles for zsh, WezTerm, and global Codex Skills.
+Personal dotfiles for zsh, WezTerm, and global Codex / Claude Code Skills.
 
 ## Initialization
 
 ```sh
 ./init.sh
 ```
+
+`init.sh` は idempotent。以下のいずれかをやったら再実行する:
+
+- `skills/<name>/` を追加した (新 skill)
+- `skills/<name>/` を削除した (broken symlink が `link_skills` で自動 cleanup)
+- `zsh/`, `wezterm/`, `nvim/`, `git/`, `lazygit/`, `czg/`, `cz-git/`, `starship/` の構成を変えた
 
 ## Bootstrap (new machine)
 
