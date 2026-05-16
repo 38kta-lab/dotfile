@@ -20,11 +20,11 @@ Before writing output:
 For the `life` repo, save output to:
 
 ```text
-ideas/weekly/md/YYYY-MM-DD-weekly-review.md
-ideas/weekly/YYYY-MM-DD-weekly-review.html
+ideas/weekly/md/YYYY-MM-DD-weekly-review.md             (git tracked)
+/data/kta/_life/weekly/YYYY-MM-DD-weekly-review.html    (non-git, served at /weekly/)
 ```
 
-Use the review end date for `YYYY-MM-DD`.
+Use the review end date for `YYYY-MM-DD`. See GitHub issue #76 for the MD-source / HTML-artifact split.
 
 ## Review Window
 
@@ -137,7 +137,7 @@ Section guidance:
 After writing or updating the Markdown review, always render HTML:
 
 ```bash
-python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o ideas/weekly/YYYY-MM-DD-weekly-review.html
+python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o /data/kta/_life/weekly/YYYY-MM-DD-weekly-review.html
 ```
 
 The renderer embeds `assets/newsprint-weekly.css`, a Newsprint-inspired theme aligned with the daily digest/trend HTML outputs.
@@ -157,8 +157,7 @@ After producing both the Markdown review and the HTML, run the shared finalize s
 ```bash
 bash scripts/agent_auto_finalize.sh \
   -m "docs: 📝 weekly-review: YYYY-MM-DD to YYYY-MM-DD" \
-  ideas/weekly/md/YYYY-MM-DD-weekly-review.md \
-  ideas/weekly/YYYY-MM-DD-weekly-review.html
+  ideas/weekly/md/YYYY-MM-DD-weekly-review.md
 ```
 
-Replace `YYYY-MM-DD` with the review end date. Pass only the weekly-review Markdown and HTML you just generated — the script commits with `-o` so other staged changes are not swept in.
+Replace `YYYY-MM-DD` with the review end date. Only the weekly-review Markdown is committed — the HTML lives under `/data/kta/_life/weekly/` (non-git, #76 Phase 3).

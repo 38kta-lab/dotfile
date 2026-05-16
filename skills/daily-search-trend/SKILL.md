@@ -16,7 +16,7 @@ Before running the trend:
 3. Read `portfolio/` files. Use only `portfolio/` to infer the user's research interests and score items.
 4. If `portfolio/` is missing or too sparse to judge interest, state that limitation in the output and use `★★★☆☆` as a neutral provisional score. Do not infer interest from `memo.md`, `README.md`, `Rules.md`, or requested keywords.
 
-For the `life` repo, write the editable Markdown source under `ideas/daily/md/` and the final HTML under `ideas/daily/`.
+For the `life` repo, write the editable Markdown source under `ideas/daily/md/` (git tracked) and the final HTML under `/data/kta/_life/daily/` (non-git, served by fenrir caddy at `/daily/`). See GitHub issue #76 for the MD-source / HTML-artifact split.
 
 ## Search Window
 
@@ -24,8 +24,8 @@ Use the previous calendar day as the default time window. If the skill is run on
 
 Use day-level filters instead of strict 24-hour filters. For the `life` repo, name the output files after the target day:
 
-- Markdown source: `ideas/daily/md/YYYY-MM-DD-trend.md`
-- HTML final output: `ideas/daily/YYYY-MM-DD-trend.html`
+- Markdown source: `ideas/daily/md/YYYY-MM-DD-trend.md` (git)
+- HTML final output: `/data/kta/_life/daily/YYYY-MM-DD-trend.html` (non-git, served at `http://fenrir:8080/daily/YYYY-MM-DD-trend.html`)
 
 Always use current dates from the runtime environment. Do not assume the model's knowledge is current.
 
@@ -53,7 +53,7 @@ Output is a single JSON manifest on stdout with one entry per RSS item filtered 
 After writing Markdown, render HTML with:
 
 ```bash
-python3 <skill-dir>/scripts/render_trend_html.py ideas/daily/md/YYYY-MM-DD-trend.md -o ideas/daily/YYYY-MM-DD-trend.html
+python3 <skill-dir>/scripts/render_trend_html.py ideas/daily/md/YYYY-MM-DD-trend.md -o /data/kta/_life/daily/YYYY-MM-DD-trend.html
 ```
 
 The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme based on Typora's Newsprint theme.
@@ -80,7 +80,7 @@ The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme bas
 10. For papers and preprints, set `カテゴリ` to matched search-keyword tags such as `#cyanobacteria #photosynthesis` instead of generic `論文` or `プレプリント`.
 11. For English science/news and non-Japanese research-institution announcement items, use `原文タイトル`, `タイトル訳`, and `興味度`. For Japanese science/news and Japanese research-institution announcement items, omit `タイトル訳` and use only `原文タイトル` and `興味度`.
 12. Write one Markdown file to `ideas/daily/md/YYYY-MM-DD-trend.md`, using the target day in the filename, unless the user specifies another topic slug.
-13. Render `ideas/daily/YYYY-MM-DD-trend.html` from that Markdown with `scripts/render_trend_html.py`. Treat the HTML as the final user-facing output and the Markdown as the source.
+13. Render `/data/kta/_life/daily/YYYY-MM-DD-trend.html` from that Markdown with `scripts/render_trend_html.py`. Treat the HTML as the final user-facing output and the Markdown as the source.
 14. Include source URLs, target date, keywords, and portfolio files used.
 
 ## Exact-Day Guardrail
@@ -145,7 +145,7 @@ After rendering the HTML, regenerate the personal portal's daily index so the fe
 python3 scripts/refresh_daily_index.py
 ```
 
-This rewrites `ideas/daily/index.json` from the actual file listing in `ideas/daily/`. It is fast (~ms) and idempotent. Always include `ideas/daily/index.json` in the auto-finalize call below so the regenerated index gets committed and pushed.
+This rewrites `/data/kta/_life/daily/index.json` from the actual file listing there. It is fast (~ms) and idempotent. The index.json is non-git (lives next to the HTML artifacts), so do NOT include it in the auto-finalize call below.
 
 ## Auto-finalize
 
@@ -154,9 +154,7 @@ After producing both the Markdown and HTML, run the shared finalize script. It i
 ```bash
 bash scripts/agent_auto_finalize.sh \
   -m "docs: 📝 daily-search-trend: YYYY-MM-DD" \
-  ideas/daily/md/YYYY-MM-DD-trend.md \
-  ideas/daily/YYYY-MM-DD-trend.html \
-  ideas/daily/index.json
+  ideas/daily/md/YYYY-MM-DD-trend.md
 ```
 
-Replace `YYYY-MM-DD` with the target day. Pass only the trend Markdown, HTML, and the refreshed `index.json` — the script commits with `-o` so other staged changes are not swept in.
+Replace `YYYY-MM-DD` with the target day. Only the trend Markdown is committed — the HTML and index.json live under `/data/kta/_life/daily/` (non-git, #76 Phase 3).

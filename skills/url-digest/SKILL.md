@@ -28,11 +28,11 @@ Before writing output, read the repository's `README.md` and `Rules.md` when ava
 For this repo, save output to:
 
 ```text
-ideas/daily/md/YYYY-MM-DD-digest.md
-ideas/daily/YYYY-MM-DD-digest.html
+ideas/daily/md/YYYY-MM-DD-digest.md             (git tracked)
+/data/kta/_life/daily/YYYY-MM-DD-digest.html    (non-git, served at /daily/)
 ```
 
-Use the previous calendar day in the local timezone for `YYYY-MM-DD` unless the user specifies another date.
+Use the previous calendar day in the local timezone for `YYYY-MM-DD` unless the user specifies another date. See GitHub issue #76 for the MD-source / HTML-artifact split.
 
 If the Markdown file already exists, append new URL sections. Do not overwrite previous digest entries. After every Markdown update, regenerate the HTML file.
 
@@ -51,7 +51,7 @@ If the Markdown file already exists, append new URL sections. Do not overwrite p
 6. Write a concise Japanese digest centered on the core message, not a full summary.
 7. For papers and preprints, include an author line when author metadata is available. For news and institution releases, omit author metadata unless it is central to the source page.
 8. Save or append to `ideas/daily/md/YYYY-MM-DD-digest.md`, where `YYYY-MM-DD` is the previous calendar day by default.
-9. Render `ideas/daily/YYYY-MM-DD-digest.html` from the Markdown source.
+9. Render `/data/kta/_life/daily/YYYY-MM-DD-digest.html` from the Markdown source.
 
 ## Output Shape
 
@@ -84,7 +84,7 @@ For news or institution releases, clearly distinguish reported findings from int
 Render HTML with:
 
 ```bash
-python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o ideas/daily/YYYY-MM-DD-digest.html
+python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o /data/kta/_life/daily/YYYY-MM-DD-digest.html
 ```
 
 ## Style Rules
@@ -104,7 +104,7 @@ After rendering the HTML, regenerate the personal portal's daily index so the fe
 python3 scripts/refresh_daily_index.py
 ```
 
-This rewrites `ideas/daily/index.json` from the actual file listing in `ideas/daily/`. It is fast (~ms) and idempotent. Always include `ideas/daily/index.json` in the auto-finalize call below so the regenerated index gets committed and pushed.
+This rewrites `/data/kta/_life/daily/index.json` from the actual file listing there. It is fast (~ms) and idempotent. The index.json is non-git (lives next to the HTML artifacts), so do NOT include it in the auto-finalize call below.
 
 ## Auto-finalize
 
@@ -113,9 +113,7 @@ After producing both the Markdown and HTML, run the shared finalize script. It i
 ```bash
 bash scripts/agent_auto_finalize.sh \
   -m "docs: 📝 url-digest: YYYY-MM-DD <one-line topic>" \
-  ideas/daily/md/YYYY-MM-DD-digest.md \
-  ideas/daily/YYYY-MM-DD-digest.html \
-  ideas/daily/index.json
+  ideas/daily/md/YYYY-MM-DD-digest.md
 ```
 
-Replace `YYYY-MM-DD` with the digest day. Pass only the digest Markdown, HTML, and the refreshed `index.json` — the script commits with `-o` so other staged changes are not swept in.
+Replace `YYYY-MM-DD` with the digest day. Only the digest Markdown is committed — the HTML and index.json live under `/data/kta/_life/daily/` (non-git, #76 Phase 3).
