@@ -41,6 +41,9 @@ def inline_md(text: str) -> str:
         escaped,
     )
 
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"(?<![\*\w])\*([^\*\n]+?)\*(?!\*)", r"<em>\1</em>", escaped)
+
     for key, value in placeholders.items():
         escaped = escaped.replace(key, value)
     return escaped
