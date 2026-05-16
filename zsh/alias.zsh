@@ -8,18 +8,29 @@ if command -v abbr >/dev/null 2>&1; then
   abbr -S lla='ls -l -A' >>/dev/null
 fi
 
-# gh: PR helpers
-# work/<hostname> ブランチは PC 横断で再利用する。gh pr merge は default で branch を残す挙動 (-d を付けないかぎり)。
+# gh: PR helpers (secondary PC の緊急退避から main へ取り込むためのもの)
+# fenrir = primary は 2026-05-16 から main 直接運用、これらは不要。
+# secondary (Air / mini-lab) で緊急退避中に書いた work/<host> を main へ戻すときに使う。
 alias prc='gh pr create --base main --head work/$(hostname -s) --fill'
 alias prm='gh pr merge --merge'                    # 現在 branch の PR を merge (branch keep)
 alias prs='gh pr merge --squash'
-alias prmn='gh pr merge --merge'                   # 番号 or branch を引数で指定: prmn 42 / prmn work/fenrir
+alias prmn='gh pr merge --merge'                   # 番号 or branch を引数で指定: prmn 42
 alias prsn='gh pr merge --squash'
 
 # git: per-machine workflow helpers
+# fenrir: main 直接運用 (work/fenrir 廃止、2026-05-16〜)
+# secondary: 緊急退避時のみ work/<host> を使う
 alias wmain='git switch main && git pull --rebase'
-alias wstart='git switch main && git pull --rebase && git switch "work/$(hostname -s)" && git rebase main'
+wstart() {
+  # fenrir は main 直接、secondary は work/<host> へ
+  if [[ "$(hostname -s)" == "fenrir" ]]; then
+    git switch main && git pull --rebase
+  else
+    git switch main && git pull --rebase && git switch "work/$(hostname -s)" && git rebase main
+  fi
+}
 alias wrebase='git rebase main'
+# winit: secondary PC で緊急退避用 branch を初めて作るとき (1 回だけ)
 alias winit='HOST=$(hostname -s) && git switch main && git pull --rebase && git switch -c "work/$HOST" && git push -u origin "work/$HOST"'
 
 # guppy job submission (GPU server, no Slurm). See life repo
