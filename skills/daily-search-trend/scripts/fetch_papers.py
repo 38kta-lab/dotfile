@@ -11,6 +11,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import os
 import re
 import sys
 import time
@@ -21,6 +22,22 @@ import urllib.error
 
 NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+
+# NCBI E-utilities API key (optional). With key: 10 req/sec; without: 3 req/sec.
+# Set NCBI_API_KEY in ~/.config/life/ncbi.env (sourced by run_daily_trend.sh).
+NCBI_API_KEY = os.getenv("NCBI_API_KEY", "")
+NCBI_EMAIL = os.getenv("NCBI_EMAIL", "")
+NCBI_TOOL = "daily-search-trend"
+
+
+def add_ncbi_params(params: dict[str, str]) -> dict[str, str]:
+    """Append NCBI-recommended identifying params (api_key, email, tool)."""
+    if NCBI_API_KEY:
+        params["api_key"] = NCBI_API_KEY
+    if NCBI_EMAIL:
+        params["email"] = NCBI_EMAIL
+    params["tool"] = NCBI_TOOL
+    return params
 
 
 def get_json(url: str, *, max_attempts: int = 3) -> dict:
@@ -70,13 +87,13 @@ def pubmed_query(keywords: list[str], target_date: dt.date, max_results: int) ->
     ordered_ids: list[str] = []
     target_date_text = target_date.strftime("%Y/%m/%d")
     for keyword in keywords:
-        params = {
+        params = add_ncbi_params({
             "db": "pubmed",
             "term": f'"{keyword}" AND ({target_date_text}[EDAT] : {target_date_text}[EDAT])',
             "retmode": "json",
             "retmax": str(max_results),
             "sort": "pub+date",
-        }
+        })
         esearch_url = f"{NCBI_EUTILS}/esearch.fcgi?{urllib.parse.urlencode(params)}"
         try:
             ids = get_json(esearch_url).get("esearchresult", {}).get("idlist", [])
@@ -92,11 +109,11 @@ def pubmed_query(keywords: list[str], target_date: dt.date, max_results: int) ->
     if not ids:
         return [], errors
 
-    summary_params = {
+    summary_params = add_ncbi_params({
         "db": "pubmed",
         "id": ",".join(ids),
         "retmode": "json",
-    }
+    })
     summary_url = f"{NCBI_EUTILS}/esummary.fcgi?{urllib.parse.urlencode(summary_params)}"
     try:
         data = get_json(summary_url).get("result", {})
