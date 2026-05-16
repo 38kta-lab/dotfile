@@ -79,6 +79,12 @@ link_skills() {
   local skills_src="$REPO/skills"
   [ -d "$skills_src" ] || return 0
 
+  # Cleanup: remove broken symlinks (e.g., a skill that was removed from dotfile).
+  for dest_dir in "$CODEX_SKILLS_DIR" "$CLAUDE_SKILLS_DIR"; do
+    [ -d "$dest_dir" ] || continue
+    find "$dest_dir" -maxdepth 1 -type l ! -exec test -e {} \; -exec rm {} \;
+  done
+
   for src in "$skills_src"/*; do
     [ -d "$src" ] || continue
     local name
