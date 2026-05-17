@@ -65,11 +65,11 @@ Always state the resolved date range in the response.
 If `scripts/google_calendar_read.py` exists, read Calendar for the review window:
 
 ```bash
-conda activate life
+source ~/miniforge3/etc/profile.d/conda.sh && conda activate life
 python scripts/google_calendar_read.py --format json --start YYYY-MM-DDT00:00:00 --end YYYY-MM-DDT00:00:00
 ```
 
-Run via the repo's conda env (the `life` environment in this repo). Do not hardcode host-specific Python paths such as `~/miniforge3/envs/life/bin/python` — the conda install location varies per machine. If activation fails, locate the env's Python with `conda env list` or `which python` after activation, and report the issue rather than substituting an absolute path silently.
+Run via the repo's conda env (the `life` environment in this repo). **Always source conda.sh before `conda activate`** — bare `conda activate` silently fails when the shell hasn't loaded conda's shell function (typical when Claude Code's Bash tool spawns a non-login shell). The next `python` call would then resolve to `command not found` and the calendar read returns nothing, which looks like "Calendar is empty" but is actually a tool failure. Do not hardcode host-specific Python paths such as `~/miniforge3/envs/life/bin/python` — the conda install location varies per machine. If activation fails, locate the env's Python with `conda env list` or `which python` after activation, and report the issue rather than substituting an absolute path silently.
 
 In the `life` repo, Calendar reads should by default cover both:
 
@@ -123,6 +123,19 @@ rg "^(summary|created|updated|status|tags):" .agent/memories -n
 ```
 
 Read only memories with recent or explicitly relevant task-planning context, such as "tomorrow", "next action", "Calendar", or "weekly-review".
+
+PJ Activity Feed (案 3 / life#81 で実装、`/data/kta/_life/task-review/pj_activity.json`):
+
+```bash
+cat /data/kta/_life/task-review/pj_activity.json
+```
+
+`scripts/automation/pj_activity_feed.py` で生成 (30 分周期、bulk-render と同時)。各 active PJ について `hub_md.stale_days`、`nas_code` / `nas_data` の `recent_changes` top 5、`inferred_last_done`、`inferred_wip` を含む。
+
+- `inferred_wip` を直近 WIP の候補にする (hub MD の `[ ]` 中の最大 KM ID 推定だが、NAS で活動があれば NAS 側を優先)
+- `inferred_last_done` 以降の `[ ]` から「今日のタスク」を選ぶ
+- `stale_days >= 5` の hub は出力で `⚠️ PJ hub stale` 併記
+- ファイル不在の場合は無視して進めて、出力に `(pj_activity.json absent)` を一言入れる
 
 GitHub Issues:
 
