@@ -137,6 +137,21 @@ cat /data/kta/_life/task-review/pj_activity.json
 - `stale_days >= 5` の hub は出力で `⚠️ PJ hub stale` 併記
 - ファイル不在の場合は無視して進めて、出力に `(pj_activity.json absent)` を一言入れる
 
+## Known Judgment Errors
+
+最終出力 (今日/明日のタスク / Gmail 要対応 / Calendar 候補 等) を組み立てる**前に**、過去の判断ミス registry を grep して、Status が `open` のエントリと **同じ Category の誤判定を繰り返さない**よう確認する:
+
+```bash
+rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/judgment-errors.md | rg "\| open \|"
+```
+
+主要な `open` Category (2026-05-17 時点):
+
+- **archived-pj-action**: `projects/archive/` 配下 PJ や `status: done` hub に対する action 提案を出さない。Gmail で関連する subject が出ても、archive 化済みの PJ なら action_required から外す。
+- **self-sent-misread**: From が user 自身のメール (`USER_EMAIL` 一致) を upcoming task と解釈しない。状態追跡 (返信待ち / 提出済) と捉えて action_required に入れない。
+
+新しい判断ミスを user から訂正された場合は、その場で `outputs/skill-improvements/judgment-errors.md` に 1 行 append する (Date / Skill / Category / Bad / Correction / Root Cause / Status=open)。
+
 GitHub Issues:
 
 - Use only if the user asks for Issue-aware planning, or if repo notes clearly say a task is already an Issue.
