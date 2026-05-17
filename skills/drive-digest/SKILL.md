@@ -37,9 +37,11 @@ The existing OAuth client (`~/.config/life/google-calendar-credentials.json`) is
 The skill stores a Drive read-only OAuth token at `~/.config/life/drive-read-token.json`. To create it on a new PC:
 
 ```bash
-conda activate life
+source ~/miniforge3/etc/profile.d/conda.sh && conda activate life
 python <skill-dir>/scripts/drive_reader.py --setup-only
 ```
+
+(Always `source` the conda profile first — bare `conda activate` silently fails in non-login shells like Claude Code's Bash tool, leading to `python: command not found` downstream.)
 
 This opens a browser for OAuth consent. Sign in with the same Google account that owns `life-inbox/`. The token is saved to `~/.config/life/drive-read-token.json`.
 
@@ -87,8 +89,11 @@ The script must be invoked **from the repo root** so relative paths resolve corr
 
 1. **Authenticate and list**: from the life repo root, run the helper script to enumerate and download new files. Always pass `--seen` and `--download-dir` as repo-relative paths so all PCs share state.
 
+   All `python` calls below require the `life` conda env. Activate once per shell with `source ~/miniforge3/etc/profile.d/conda.sh && conda activate life` (bare `conda activate` silently fails in Claude Code's Bash tool).
+
    For `youtube-digest` subfolder:
    ```bash
+   source ~/miniforge3/etc/profile.d/conda.sh && conda activate life
    python <skill-dir>/scripts/drive_reader.py \
        --subfolder youtube-digest \
        --download-dir ideas/youtube-digest \
@@ -98,6 +103,7 @@ The script must be invoked **from the repo root** so relative paths resolve corr
 
    For `paper-close-reading` subfolder:
    ```bash
+   source ~/miniforge3/etc/profile.d/conda.sh && conda activate life
    python <skill-dir>/scripts/drive_reader.py \
        --subfolder paper-close-reading \
        --download-dir ideas/paper-close-reading \
