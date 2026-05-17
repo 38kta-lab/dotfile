@@ -98,10 +98,23 @@ For next week, scan recent inbox plus items that mention upcoming weekdays or de
 Projects:
 
 ```bash
-rg "^(summary|created|updated|status|tags|related):|^## (Meetings / Checkpoints|Tasks|Blockers|Next Actions)|^- \\[[ x]\\]" projects/active -n
+rg "^(summary|created|updated|status|tags|related|nas_repo):|^## (Meetings / Checkpoints|Tasks|Blockers|Next Actions)|^- \\[[ x]\\]" projects/active -n
 ```
 
 Read project files only when the summary, checkpoint, task, or next action looks relevant to the review window.
+
+**PJ hub の解釈ルール (life#76 後の重要)**:
+
+- Tasks 節の `- [x]` checkbox は **完了済** として扱い、今日の候補から除外する。
+- `- [ ]` checkbox のうち、KM ID (例 `KM_N0005`) や explicit な締切が後のものを優先候補にする。「最後に `[x]` がついた KM ID + 1」が直近 WIP の良い目安。
+- Milestones / schedule の date table (例 `| 2026-05-17 (土) | KM_N0001: ... |`) は **aspirational schedule (執筆時の予定)** として扱う。そこに書かれた日付が今日と一致しても、対応する `- [ ]` checkbox の状態を必ず照合してから採用する。
+  - table 上 "5/17 = KM_N0001" でも、Tasks 節で `KM_N0004 [x]` 済 + `KM_N0005 [ ]` 進行中なら、**checkbox 状態を優先**、table は履歴として扱う。
+- frontmatter `updated:` が今日から 5 日以上前なら、出力に `⚠️ PJ hub stale (last updated YYYY-MM-DD)` を併記する。stale hub の milestone schedule は特に信用しない。
+
+**PJ activity feed (案 3、実装後)**:
+
+- `/data/kta/_life/task-review/pj_activity.json` が存在すれば必ず読む。生成元は `scripts/automation/pj_activity_feed.py`、各 active PJ について git log 最新 commit / NAS repo の直近変更 / agent-memory tag match を集約。
+- pj_activity.json と PJ hub MD が矛盾する場合、**pj_activity.json (= 実際の活動証拠) を優先**する。hub MD は意図、activity feed は実態。
 
 Memory:
 
@@ -132,6 +145,7 @@ Gmail triage:
 - Use Calendar titles as available task context. Do not save or expose location, attendee, or URL data by default.
 - When both `TimeBlock` and `primary` are read, merge them as the fixed schedule view for planning.
 - Prioritize tasks with explicit deadlines, meetings, presentations, reports, or committed follow-ups.
+- When deciding "today's task" for a PJ, follow the PJ hub 解釈ルール above (checkbox 優先、date table は履歴扱い、5 日以上 stale なら警告)。pj_activity.json があれば最優先。
 - For today/tomorrow, keep the output executable: 3-6 main tasks is usually enough.
 - For next week, make a rough day-by-day plan rather than a dense minute-by-minute schedule.
 - Do not overfill the day. Leave buffers around meetings and long fixed events.
