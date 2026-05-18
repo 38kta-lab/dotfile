@@ -81,20 +81,21 @@ config.keys = require("keybinds").keys
 config.key_tables = require("keybinds").key_tables
 config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
--- 起動時の 3 ペイン構成 (fenrir 主作業先方針、2026-05-10):
---   左 (80%)        : ssh fenrir + cd life + nvim
---   右上 (10%)      : ssh fenrir + tmux attach -t life (常時起動の Claude Code セッション)
---   右下 (10%)      : ssh fenrir + cd life (素のシェル)
+-- 起動時の 3 ペイン構成 (fenrir 主作業先方針、2026-05-18 更新で role swap):
+--   左 (80%)         : ssh fenrir + tmux attach -t life (Claude Code セッション、メイン作業)
+--   右上 (右の 2/3)  : ssh fenrir + cd life + nvim (編集)
+--   右下 (右の 1/3)  : ssh fenrir + cd life + clear + shell (sub 操作用、起動時 clear で clean に)
 -- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
 -- PATH (brew shellenv + ~/.local/bin) は env.zsh が ~/.zshenv 経由で必ず投入されるため、
 -- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
 wezterm.on("gui-startup", function(cmd)
 	local tab, pane, window = wezterm.mux.spawn_window(cmd or {})
 	local right = pane:split({ direction = "Right", size = 0.2 })
-	local right_bottom = right:split({ direction = "Bottom", size = 0.5 })
-	pane:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && nvim'\n")
-	right:send_text("ssh fenrir -t 'tmux a -t life'\n")
-	right_bottom:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && exec zsh -l'\n")
+	-- right を 2/3 (上=nvim) と 1/3 (下=shell) に分割。size は新しく作るペイン (Bottom) の比率なので 1/3。
+	local right_bottom = right:split({ direction = "Bottom", size = 1 / 3 })
+	pane:send_text("ssh fenrir -t 'tmux a -t life'\n")
+	right:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && nvim'\n")
+	right_bottom:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n")
 	window:gui_window():maximize()
 end)
 
