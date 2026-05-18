@@ -37,6 +37,10 @@ def inline_md(text: str) -> str:
     escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link_repl, escaped)
     escaped = re.sub(r"&lt;(https?://[^&]+)&gt;", lambda m: stash(f'<a href="{m.group(1)}">{m.group(1)}</a>'), escaped)
 
+    # **bold** / *italic* — applied after code/link extraction so they don't touch placeholders.
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"(?<![\*\w])\*([^*\n]+?)\*(?!\*)", r"<em>\1</em>", escaped)
+
     for key, value in placeholders.items():
         escaped = escaped.replace(key, value)
     return escaped
