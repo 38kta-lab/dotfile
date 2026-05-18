@@ -37,6 +37,10 @@ def inline_md(text: str) -> str:
     escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link_repl, escaped)
     escaped = re.sub(r"&lt;(https?://[^&]+)&gt;", lambda m: stash(f'<a href="{m.group(1)}">{m.group(1)}</a>'), escaped)
 
+    # **bold** / *italic* — applied after code/link extraction so they don't touch placeholders.
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"(?<![\*\w])\*([^*\n]+?)\*(?!\*)", r"<em>\1</em>", escaped)
+
     for key, value in placeholders.items():
         escaped = escaped.replace(key, value)
     return escaped
@@ -130,12 +134,16 @@ def parse_blocks(lines: list[str]) -> str:
             i += 1
             continue
 
-        if re.match(r"^\s*\d+\.\s+", line):
+        ol_match = re.match(r"^\s*(\d+)\.\s+", line)
+        if ol_match:
             if in_ul:
                 out.append("</ul>")
                 in_ul = False
             if not in_ol:
-                out.append("<ol>")
+                # Honor the source number so independent <ol> blocks (split by
+                # sub-bullets) don't all restart at "1." (life-renderer fix).
+                start_n = int(ol_match.group(1))
+                out.append(f'<ol start="{start_n}">' if start_n != 1 else "<ol>")
                 in_ol = True
             item = re.sub(r"^\s*\d+\.\s+", "", line)
             out.append(f"<li>{inline_md(item)}</li>")
