@@ -58,6 +58,14 @@ python3 <skill-dir>/scripts/render_trend_html.py ideas/daily/md/YYYY-MM-DD-trend
 
 The renderer embeds `assets/newsprint-trend.css`, a Newsprint-inspired theme based on Typora's Newsprint theme.
 
+**IMPORTANT — `/data/kta/_life/` write rule (life#77 follow-up):**
+
+claude binary は LaunchDaemon context で macOS TCC により `/data/kta/_life/` への直接書き込みが拒否される (User=kta でも process binary 単位で TCC 判定、bash/python は FDA grant 済だが claude は version-dir based で grant が update に耐えない)。
+
+- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.** 失敗するか、または silent fallback で別場所に書く事故が起きる。
+- `/data/kta/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_trend_html.py` と `refresh_daily_index.py` がそれ。
+- MD は repo (`ideas/daily/md/`、`/Users/kta/` 配下) に Write tool で書いて OK (TCC 非対象)。
+
 ## Workflow
 
 1. Determine paper/preprint keywords from the user request. If none are given, use the default research themes in `references/sources.md`.

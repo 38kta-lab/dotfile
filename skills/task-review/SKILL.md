@@ -182,6 +182,17 @@ Gmail triage:
 - Prefer no more than 3 Gmail-derived tasks in the main task list unless the user explicitly asks for a fuller mail review.
 - If an item should become an Issue, list it as an Issue candidate; do not create it unless asked.
 
+## File Write Rules (macOS TCC / FDA、life#77 follow-up)
+
+When this skill is invoked from `run_morning_brief.sh` (or any LaunchDaemon-spawned wrapper), claude binary may NOT have Full Disk Access (FDA) for `/data/kta/_life/` (TCC blocks per-binary; bash/python have FDA but claude is version-dir based and grant doesn't survive updates).
+
+Rules:
+
+- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.** It silently fails or returns a "permission denied" / "sandbox blocked" error.
+- The wrapper script (`run_morning_brief.sh`) gives you a target MD path under `${repo}/ideas/task-review/md/` (gitignored). **Write only there.**
+- HTML rendering / `/data/kta/_life/` artifact creation is done by the wrapper *after* this skill returns, via `python3 render_morning_brief.py` (python has FDA).
+- For `pj_activity.json` etc. that the skill *reads* from `/data/kta/_life/task-review/`: read-only access via the Read tool may or may not work depending on TCC scope. If the file is missing or unreadable, proceed without it and note `(pj_activity.json absent)` in the output.
+
 ## Calendar Write Rules
 
 Calendar writing is allowed only after explicit user approval.

@@ -87,6 +87,14 @@ Render HTML with:
 python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o /data/kta/_life/daily/YYYY-MM-DD-digest.html
 ```
 
+**IMPORTANT — `/data/kta/_life/` write rule (life#77 follow-up):**
+
+claude binary は LaunchDaemon context で macOS TCC により `/data/kta/_life/` への直接書き込みが拒否される。
+
+- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.**
+- `/data/kta/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_digest_html.py` と `refresh_daily_index.py` がそれ。
+- MD は repo (`ideas/daily/md/`、`/Users/kta/` 配下) に Write tool で書いて OK。
+
 ## Style Rules
 
 - Write repository notes and user-facing Markdown in Japanese unless the user asks otherwise.

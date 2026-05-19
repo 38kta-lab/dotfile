@@ -142,6 +142,14 @@ python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-wee
 
 The renderer embeds `assets/newsprint-weekly.css`, a Newsprint-inspired theme aligned with the daily digest/trend HTML outputs.
 
+**IMPORTANT — `/data/kta/_life/` write rule (life#77 follow-up):**
+
+claude binary は LaunchDaemon context で macOS TCC により `/data/kta/_life/` への直接書き込みが拒否される。
+
+- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.**
+- `/data/kta/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_weekly_html.py` がそれ。
+- MD は repo (`ideas/weekly/md/`、`/Users/kta/` 配下) に Write tool で書いて OK。
+
 ## Validation
 
 After rendering:
