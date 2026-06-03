@@ -111,6 +111,24 @@ Read project files only when the summary, checkpoint, task, or next action looks
   - table 上 "5/17 = KM_N0001" でも、Tasks 節で `KM_N0004 [x]` 済 + `KM_N0005 [ ]` 進行中なら、**checkbox 状態を優先**、table は履歴として扱う。
 - frontmatter `updated:` が今日から 5 日以上前なら、出力に `⚠️ PJ hub stale (last updated YYYY-MM-DD)` を併記する。stale hub の milestone schedule は特に信用しない。
 
+**Meetings / Checkpoints の扱い (2026-06-04 追加)**:
+
+各 active PJ hub の `## Meetings / Checkpoints` テーブルを毎回スキャンし、確定した予定 (= `(TBD)` でも `TBD` でもない date) のうち **今日〜+14 日** に該当するものを抽出する:
+
+```bash
+rg "^\|\s*\d{4}-\d{2}-\d{2}" projects/active/*.md
+```
+
+- 抽出した予定は brief の `## Calendar` セクション直下に「PJ MTG / Checkpoint (Calendar 未登録の可能性)」として併記する。Google Calendar と重複していれば 1 つに統合。
+- **prep があるとき**: MTG 行の Prep 列に `#NN` がある場合、その Issue を当該 MTG の prep deadline (MTG 前日) と紐付けて `## 今日やるべきこと` に上げる。
+- **Deadline-Bound 節の date 言及** (`- [ ] YYYY-MM-DD ...` 形式 or 本文の `2026-06-08 (月)` 形式) も同様に抽出して deadline-driven task として扱う。
+
+例: tsukatani hub の `| 2026-06-08 (月) 13:00 | MTG | ... | 三宅側の方法論 1-pager (#93) + ... |` 行があれば、brief で:
+- 6/8 当日: `## Calendar` 直下に「13:00 学変 A MTG (塚谷 ⇄ 三宅)」
+- 6/4-6/7 (prep 期間): `## 今日やるべきこと` に「6/8 MTG prep: #93/#94/#95 を草稿 v1 で塚谷さんへ事前共有」
+
+pj_activity.json 側に `upcoming_checkpoints` / `upcoming_deadlines` フィールドがあれば優先利用 (`scripts/automation/pj_activity_feed.py` で生成、2026-06-04 拡張)。
+
 **PJ activity feed (案 3、実装後)**:
 
 - `/data/kta/_life/task-review/pj_activity.json` が存在すれば必ず読む。生成元は `scripts/automation/pj_activity_feed.py`、各 active PJ について git log 最新 commit / NAS repo の直近変更 / agent-memory tag match を集約。
@@ -154,7 +172,21 @@ rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/ju
 
 GitHub Issues:
 
-- Use only if the user asks for Issue-aware planning, or if repo notes clearly say a task is already an Issue.
+- **Default**: always read open Issues + their Project Status at the start of every task-review / morning-brief run (2026-06-04 改訂)。
+  ```bash
+  gh issue list --repo 38kta-lab/life --state open --limit 100 \
+    --json number,title,projectItems \
+    --jq '.[] | "#\(.number) | \(.projectItems | map(.status.name // "no-status") | join(",")) | \(.title)"'
+  ```
+- Surface Issues with Project Status `In progress` near the top of `## 今日やるべきこと` (= currently being worked on).
+- Surface Issues whose **title / body / latest comment** references dates within the review window:
+  ```bash
+  # Per Issue date scan (only for top ~10 candidate issues with dates in title or PJ-hub linkage):
+  gh issue view <NN> --repo 38kta-lab/life --json title,body,comments \
+    --jq '.title, .body, .comments[].body' | rg "\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}"
+  ```
+  Use this only on Issues that look likely to have a date (titles containing 提出, 締切, MTG, deadline, or linked from a PJ hub Meetings/Deadline-Bound section).
+- When listing today's tasks, reference the relevant Issue by `#NN` so the brief integrates with Project Board.
 - Follow `Rules.md` status limits and `issue-capture` policy.
 - Do not create or update Issues from this skill unless the user explicitly asks.
 
