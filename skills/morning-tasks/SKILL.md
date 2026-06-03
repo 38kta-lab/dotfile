@@ -94,6 +94,46 @@ Loaded ideas/task-review/md/morning-2026-06-03.md → 5 tasks
 TaskList で進捗確認できます。
 ```
 
+## Pending / In-flight Task Patterns
+
+As the user works through the day, tasks rarely move cleanly from `pending` → `completed`. Handle these recurring cases:
+
+### 1. Task already submitted, awaiting external event
+
+Example: the brief lists "6/5 出張申請の状態確認" but the user replies "申請は提出済み、出張後に報告書を出す". The status-check action is effectively done, but a follow-up step exists after the trip.
+
+- **Do**: keep status as `pending`, update `subject` and `description` to reflect the remaining action and trigger (e.g. "出張完了後に報告書を経理へ提出" / "本日 action 不要、出張後に再浮上させる pending").
+- **Do not**: split into two tasks (one completed, one new) — the brief was already one item and the session-scoped task list does not benefit from extra granularity.
+
+### 2. Task being worked on in another Claude session
+
+Example: the user says "#4 は別セッションで進行中".
+
+- **Do**: `TaskUpdate status=deleted` in this session.
+- **Why**: TaskCreate is session-scoped and does not sync across sessions. Keeping the task here creates a stale duplicate that the other session cannot update.
+- **Do not**: leave it as `pending` / mark as `in_progress` — both mislead later turns in this session into thinking work is owed here.
+
+### 3. Email-driven task resolved by triage (該当なし / 提出済み)
+
+Example: the brief lists "6/3〆 事務メール 3 件" but on review the user finds none of them require a reply (該当条件外 / 希望なし / 既提出).
+
+- **Do**: `TaskUpdate status=completed`, AND tag the relevant Gmail messages with `9. Done/Triage` so the next morning's brief and `gmail_triage` exclude them.
+- **Tag command pattern**:
+  ```bash
+  conda activate life && python scripts/gmail_label.py \
+    --query 'subject:"<unique substring>"' \
+    --add-label "9. Done/Triage" --max-results 5 --dry-run
+  ```
+  Always dry-run first to confirm the query matches only the intended message(s). Use unique substrings like `sysbunka 04165` / `syslocal 02296` rather than broad keywords like "勤務状況等申告書" (which match months of history).
+- **Why**: marking the task done without tagging the email causes the same item to reappear in tomorrow's brief, recreating the task next time `morning-tasks` runs.
+
+### 4. Brief item already on Calendar
+
+Example: the brief asks to confirm a future event; checking Calendar shows it is already registered with the correct time.
+
+- **Do**: `TaskUpdate status=completed`. No new task needed unless a conflict surfaced.
+- **Calendar read**: `python scripts/google_calendar_read.py --start YYYY-MM-DD --end YYYY-MM-DD+1`.
+
 ## What This Skill Does NOT Do
 
 - Does NOT regenerate the brief — that is cron-driven.
