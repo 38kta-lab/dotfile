@@ -136,6 +136,10 @@ rg "^(summary|created|updated|status|tags|related):|^# " projects/active project
 7. Add Issue candidates under `Related Issues` or `Notes`, but do not create GitHub Issues unless the user asks or invokes `issue-capture`.
 8. If the project is waiting on a date, person, meeting, or external event, use `status: pending`.
 9. If the project is complete, set `status: done` or move it to `projects/archive/` only when the user asks or the repository policy supports it.
+10. **For the `life` repo specifically**: after creating a new `projects/active/<slug>.md` (or moving to archive), also:
+    a. Add a 1-line row to `projects/README.md` Active (or Archive) table: `| [<slug>](./active/<slug>.html) | <one-line summary> |`. Keep the table sorted alphabetically by slug.
+    b. Run `bash scripts/render_all.sh` to regenerate the HTML in `/data/kta/_life/` so the fenrir portal (`http://fenrir:8080/projects/`) shows the new entry.
+    c. Same rule applies when archiving: remove from Active table, add to Archive table, then re-render.
 
 ## Review Behavior
 
