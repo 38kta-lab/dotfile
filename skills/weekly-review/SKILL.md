@@ -21,7 +21,7 @@ For the `life` repo, save output to:
 
 ```text
 ideas/weekly/md/YYYY-MM-DD-weekly-review.md             (git tracked)
-/data/kta/_life/weekly/YYYY-MM-DD-weekly-review.html    (non-git, served at /weekly/)
+/Users/kta/src/github.com/38kta-lab/_life/weekly/YYYY-MM-DD-weekly-review.html    (non-git, served at /weekly/)
 ```
 
 Use the review end date for `YYYY-MM-DD`. See GitHub issue #76 for the MD-source / HTML-artifact split.
@@ -137,17 +137,17 @@ Section guidance:
 After writing or updating the Markdown review, always render HTML:
 
 ```bash
-python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o /data/kta/_life/weekly/YYYY-MM-DD-weekly-review.html
+python3 <skill-dir>/scripts/render_weekly_html.py ideas/weekly/md/YYYY-MM-DD-weekly-review.md -o /Users/kta/src/github.com/38kta-lab/_life/weekly/YYYY-MM-DD-weekly-review.html
 ```
 
 The renderer embeds `assets/newsprint-weekly.css`, a Newsprint-inspired theme aligned with the daily digest/trend HTML outputs.
 
-**IMPORTANT — `/data/kta/_life/` write rule (life#77 follow-up):**
+**IMPORTANT — `/Users/kta/src/github.com/38kta-lab/_life/` write rule (life#77 follow-up):**
 
-claude binary は LaunchDaemon context で macOS TCC により `/data/kta/_life/` への直接書き込みが拒否される。
+claude binary は LaunchDaemon context で macOS TCC により `/Users/kta/src/github.com/38kta-lab/_life/` への直接書き込みが拒否される。
 
-- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.**
-- `/data/kta/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_weekly_html.py` がそれ。
+- **NEVER use the Write tool to write a file under `/Users/kta/src/github.com/38kta-lab/_life/...` directly.**
+- `/Users/kta/src/github.com/38kta-lab/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_weekly_html.py` がそれ。
 - MD は repo (`ideas/weekly/md/`、`/Users/kta/` 配下) に Write tool で書いて OK。
 
 ## Validation
@@ -168,4 +168,4 @@ bash scripts/agent_auto_finalize.sh \
   ideas/weekly/md/YYYY-MM-DD-weekly-review.md
 ```
 
-Replace `YYYY-MM-DD` with the review end date. Only the weekly-review Markdown is committed — the HTML lives under `/data/kta/_life/weekly/` (non-git, #76 Phase 3).
+Replace `YYYY-MM-DD` with the review end date. Only the weekly-review Markdown is committed — the HTML lives under `/Users/kta/src/github.com/38kta-lab/_life/weekly/` (non-git, #76 Phase 3).

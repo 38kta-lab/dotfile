@@ -29,7 +29,7 @@ For this repo, save output to:
 
 ```text
 ideas/daily/md/YYYY-MM-DD-digest.md             (git tracked)
-/data/kta/_life/daily/YYYY-MM-DD-digest.html    (non-git, served at /daily/)
+/Users/kta/src/github.com/38kta-lab/_life/daily/YYYY-MM-DD-digest.html    (non-git, served at /daily/)
 ```
 
 Use the previous calendar day in the local timezone for `YYYY-MM-DD` unless the user specifies another date. See GitHub issue #76 for the MD-source / HTML-artifact split.
@@ -51,7 +51,7 @@ If the Markdown file already exists, append new URL sections. Do not overwrite p
 6. Write a concise Japanese digest centered on the core message, not a full summary.
 7. For papers and preprints, include an author line when author metadata is available. For news and institution releases, omit author metadata unless it is central to the source page.
 8. Save or append to `ideas/daily/md/YYYY-MM-DD-digest.md`, where `YYYY-MM-DD` is the previous calendar day by default.
-9. Render `/data/kta/_life/daily/YYYY-MM-DD-digest.html` from the Markdown source.
+9. Render `/Users/kta/src/github.com/38kta-lab/_life/daily/YYYY-MM-DD-digest.html` from the Markdown source.
 
 ## Output Shape
 
@@ -84,15 +84,15 @@ For news or institution releases, clearly distinguish reported findings from int
 Render HTML with:
 
 ```bash
-python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o /data/kta/_life/daily/YYYY-MM-DD-digest.html
+python3 <skill-dir>/scripts/render_digest_html.py ideas/daily/md/YYYY-MM-DD-digest.md -o /Users/kta/src/github.com/38kta-lab/_life/daily/YYYY-MM-DD-digest.html
 ```
 
-**IMPORTANT — `/data/kta/_life/` write rule (life#77 follow-up):**
+**IMPORTANT — `/Users/kta/src/github.com/38kta-lab/_life/` write rule (life#77 follow-up):**
 
-claude binary は LaunchDaemon context で macOS TCC により `/data/kta/_life/` への直接書き込みが拒否される。
+claude binary は LaunchDaemon context で macOS TCC により `/Users/kta/src/github.com/38kta-lab/_life/` への直接書き込みが拒否される。
 
-- **NEVER use the Write tool to write a file under `/data/kta/_life/...` directly.**
-- `/data/kta/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_digest_html.py` と `refresh_daily_index.py` がそれ。
+- **NEVER use the Write tool to write a file under `/Users/kta/src/github.com/38kta-lab/_life/...` directly.**
+- `/Users/kta/src/github.com/38kta-lab/_life/` への書き込みは **必ず `python3 <render-script>` を bash 経由で呼び出す** (python3 は FDA grant 済)。本 skill では `render_digest_html.py` と `refresh_daily_index.py` がそれ。
 - MD は repo (`ideas/daily/md/`、`/Users/kta/` 配下) に Write tool で書いて OK。
 
 ## Style Rules
@@ -112,7 +112,7 @@ After rendering the HTML, regenerate the personal portal's daily index so the fe
 python3 scripts/refresh_daily_index.py
 ```
 
-This rewrites `/data/kta/_life/daily/index.json` from the actual file listing there. It is fast (~ms) and idempotent. The index.json is non-git (lives next to the HTML artifacts), so do NOT include it in the auto-finalize call below.
+This rewrites `/Users/kta/src/github.com/38kta-lab/_life/daily/index.json` from the actual file listing there. It is fast (~ms) and idempotent. The index.json is non-git (lives next to the HTML artifacts), so do NOT include it in the auto-finalize call below.
 
 ## Auto-finalize
 
@@ -124,4 +124,4 @@ bash scripts/agent_auto_finalize.sh \
   ideas/daily/md/YYYY-MM-DD-digest.md
 ```
 
-Replace `YYYY-MM-DD` with the digest day. Only the digest Markdown is committed — the HTML and index.json live under `/data/kta/_life/daily/` (non-git, #76 Phase 3).
+Replace `YYYY-MM-DD` with the digest day. Only the digest Markdown is committed — the HTML and index.json live under `/Users/kta/src/github.com/38kta-lab/_life/daily/` (non-git, #76 Phase 3).
