@@ -26,7 +26,7 @@ projects/active/*.md
 scripts/google_calendar_read.py
 scripts/google_calendar_create.py
 scripts/gmail_task_review.py
-~/.local/share/life/portal-data/gmail/latest.json
+~/.local/share/life/_life/gmail/latest.json
 ```
 
 Write user-facing summaries in Japanese unless the user asks otherwise.
@@ -192,7 +192,7 @@ GitHub Issues:
 
 Gmail triage:
 
-- If `~/.local/share/life/portal-data/gmail/latest.json` exists, treat it as an optional external input.
+- If `~/.local/share/life/_life/gmail/latest.json` exists, treat it as an optional external input.
 - If `scripts/gmail_task_review.py` exists, prefer using it to derive `Gmail要対応 / Gmail要確認`.
 - Read only the structured output. Do not rely on raw Gmail bodies here.
 - Use `action_required` as task candidates.
