@@ -131,7 +131,7 @@ pj_activity.json 側に `upcoming_checkpoints` / `upcoming_deadlines` フィー�
 
 **PJ activity feed (案 3、実装後)**:
 
-- `/data/u/_life/task-review/pj_activity.json` が存在すれば必ず読む。生成元は `scripts/automation/pj_activity_feed.py`、各 active PJ について git log 最新 commit / NAS repo の直近変更 / agent-memory tag match を集約。
+- `/Users/kta/src/github.com/38kta-lab/_life/task-review/pj_activity.json` が存在すれば必ず読む。生成元は `scripts/automation/pj_activity_feed.py`、各 active PJ について git log 最新 commit / NAS repo の直近変更 / agent-memory tag match を集約。
 - pj_activity.json と PJ hub MD が矛盾する場合、**pj_activity.json (= 実際の活動証拠) を優先**する。hub MD は意図、activity feed は実態。
 
 Memory:
@@ -142,10 +142,10 @@ rg "^(summary|created|updated|status|tags):" .agent/memories -n
 
 Read only memories with recent or explicitly relevant task-planning context, such as "tomorrow", "next action", "Calendar", or "weekly-review".
 
-PJ Activity Feed (案 3 / life#81 で実装、`/data/u/_life/task-review/pj_activity.json`):
+PJ Activity Feed (案 3 / life#81 で実装、`/Users/kta/src/github.com/38kta-lab/_life/task-review/pj_activity.json`):
 
 ```bash
-cat /data/u/_life/task-review/pj_activity.json
+cat /Users/kta/src/github.com/38kta-lab/_life/task-review/pj_activity.json
 ```
 
 `scripts/automation/pj_activity_feed.py` で生成 (30 分周期、bulk-render と同時)。各 active PJ について `hub_md.stale_days`、`nas_code` / `nas_data` の `recent_changes` top 5、`inferred_last_done`、`inferred_wip` を含む。
@@ -216,14 +216,14 @@ Gmail triage:
 
 ## File Write Rules (macOS TCC / FDA、life#77 follow-up)
 
-When this skill is invoked from `run_morning_brief.sh` (or any LaunchDaemon-spawned wrapper), claude binary may NOT have Full Disk Access (FDA) for `/data/u/_life/` (TCC blocks per-binary; bash/python have FDA but claude is version-dir based and grant doesn't survive updates).
+When this skill is invoked from `run_morning_brief.sh` (or any LaunchDaemon-spawned wrapper), claude binary may NOT have Full Disk Access (FDA) for `/Users/kta/src/github.com/38kta-lab/_life/` (TCC blocks per-binary; bash/python have FDA but claude is version-dir based and grant doesn't survive updates).
 
 Rules:
 
-- **NEVER use the Write tool to write a file under `/data/u/_life/...` directly.** It silently fails or returns a "permission denied" / "sandbox blocked" error.
+- **NEVER use the Write tool to write a file under `/Users/kta/src/github.com/38kta-lab/_life/...` directly.** It silently fails or returns a "permission denied" / "sandbox blocked" error.
 - The wrapper script (`run_morning_brief.sh`) gives you a target MD path under `${repo}/ideas/task-review/md/` (gitignored). **Write only there.**
-- HTML rendering / `/data/u/_life/` artifact creation is done by the wrapper *after* this skill returns, via `python3 render_morning_brief.py` (python has FDA).
-- For `pj_activity.json` etc. that the skill *reads* from `/data/u/_life/task-review/`: read-only access via the Read tool may or may not work depending on TCC scope. If the file is missing or unreadable, proceed without it and note `(pj_activity.json absent)` in the output.
+- HTML rendering / `/Users/kta/src/github.com/38kta-lab/_life/` artifact creation is done by the wrapper *after* this skill returns, via `python3 render_morning_brief.py` (python has FDA).
+- For `pj_activity.json` etc. that the skill *reads* from `/Users/kta/src/github.com/38kta-lab/_life/task-review/`: read-only access via the Read tool may or may not work depending on TCC scope. If the file is missing or unreadable, proceed without it and note `(pj_activity.json absent)` in the output.
 
 ## Calendar Write Rules
 
