@@ -129,6 +129,27 @@ rg "^\|\s*\d{4}-\d{2}-\d{2}" projects/active/*.md
 
 pj_activity.json 側に `upcoming_checkpoints` / `upcoming_deadlines` フィールドがあれば優先利用 (`scripts/automation/pj_activity_feed.py` で生成、2026-06-04 拡張)。
 
+**Calendar event ↔ PJ hub 連携 (2026-06-04 追加)**:
+
+pj_activity.json には Calendar event を hub に紐付けた結果が入っている。
+
+- 各 PJ の `next_calendar_events: [...]`: title 内 `[<token>]` から該当 hub に解決された Calendar event (next 14 日)。`link_method` (`alias` / `slug` / `descriptor` / `substring`) と `link_token` も付く。
+- top-level `unlinked_calendar_events: [...]`: token なし or 未マッチで紐付かなかった event。
+- top-level `calendar_alias_map: {alias: slug}`: 現在登録されている alias 一覧。
+- top-level `calendar_status: "ok" | "unavailable"`: Calendar 読込結果。`unavailable` の場合 brief で「Calendar 読込失敗」を明記。
+
+解決規則 (`resolve_event()` in `pj_activity_feed.py`):
+1. **alias 完全一致** — frontmatter `calendar_alias:` の値 (例: `[tsukatani]` → `A02-tsukatani-heme-biosignature`)
+2. **slug 完全一致** (例: `[A02-tsukatani-heme-biosignature]`)
+3. **descriptor 完全一致** (slug の tier prefix 剥がした残り、例: `[tsukatani-heme-biosignature]`)
+4. **一意 substring 一致** (alias keys + slugs + descriptors に対して、候補が 1 つだけの場合)
+5. いずれも該当しないか候補多数 → `unlinked_calendar_events` 行き
+
+brief での扱い:
+- `## Calendar` セクションで Calendar event と PJ MTG / Checkpoint を統合表示する際、`next_calendar_events` 内の event は **対応 PJ slug + link_token** を併記 (例: `13:00 学変 A MTG (塚谷 ⇄ 三宅) → A02 (alias [tsukatani])`)。
+- `unlinked_calendar_events` はそのまま列挙、PJ 紐付けなし。
+- PJ MTG / Checkpoint (hub 由来 `upcoming_checkpoints`) と Calendar event (`next_calendar_events`) が同一 PJ で同日に出てきたら **一行に統合** (Calendar event の `start` / `end` 時刻を優先、hub の goal / prep 情報を併記)。
+
 **PJ activity feed (案 3、実装後)**:
 
 - `/Users/kta/.local/share/life/_life/task-review/pj_activity.json` が存在すれば必ず読む。生成元は `scripts/automation/pj_activity_feed.py`、各 active PJ について git log 最新 commit / NAS repo の直近変更 / agent-memory tag match を集約。
