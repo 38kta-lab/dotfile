@@ -70,3 +70,14 @@ vpnup() {
 vpndown() {
   pkill -x "Cisco Secure Client" 2>/dev/null
 }
+
+# slack workspace 横断 status / DND (M09)
+# 引数 = duration (min)、省略時は preset の既定値
+_life_slack_status() {
+  conda run -n life python ~/src/github.com/38kta-lab/life/scripts/slack/status_set.py "$@"
+}
+focus()      { _life_slack_status --preset focus      ${1:+--duration $1} }
+meeting()    { _life_slack_status --preset meeting    ${1:+--duration $1} }
+experiment() { _life_slack_status --preset experiment ${1:+--duration $1} }
+break-time() { _life_slack_status --preset break      ${1:+--duration $1} }
+off()        { _life_slack_status --clear }
