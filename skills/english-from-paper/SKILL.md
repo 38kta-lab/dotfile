@@ -14,10 +14,10 @@ Reuse a finished paper close-reading (`<slug>-ja.md`) as the source for 4-modali
 | Modality | Artifact produced here |
 |---|---|
 | **reading + writing** | `<slug>-en-study.md` (vocab / collocation / grammar), `<slug>-en-quiz.md` + `<slug>-en-quiz-ans.md` |
-| **listening** | `<slug>-podcast-script.md` (English-only reference transcript) + NotebookLM-generated mp3 (user makes manually) |
+| **listening** | `<slug>-podcast-script.md` (English-only reference transcript) + NotebookLM-generated m4a (user makes manually) |
 | **speaking** | out of scope — user runs Claude voice with 2-3 papers as context |
 
-NotebookLM generates the actual podcast mp3. This skill only prepares the input files + customize prompt for upload.
+NotebookLM generates the actual podcast m4a. This skill only prepares the input files + customize prompt for upload.
 
 ## Expected Input
 
@@ -161,7 +161,9 @@ sources being `tmp/clean-original.html` + `<slug>-en-study.md`.
 
 ## Output: `<slug>-notebooklm-prompt.txt`
 
-Plain text, English (NotebookLM accepts English prompts):
+Plain text, English (NotebookLM accepts English prompts).
+
+**Note on duration**: NotebookLM treats the "X-minute" instruction as a hint, not a hard constraint. With a content-rich source, expect the actual output to run **1.5–2× the requested duration** (i.e. a "12-minute" request typically lands at 15–25 min). This is acceptable for listening practice — the 12-min framing is kept because removing it gives even longer outputs, and the per-segment time budget (3/3/4/2) still shapes pacing within the longer episode. Confirmed 2026-06-07 with Kobayashi 2014 trial: 12-min request → 18-min `.m4a` output.
 
 ```
 Generate a 12-minute Audio Overview of this notebook for biology researchers.
@@ -218,8 +220,8 @@ Tell the user (in the skill's final report):
   2. **Otherwise**: upload `clean-original.txt` as a text source.
   3. **Always**: upload `<slug>-en-study.md` as an additional source (NotebookLM accepts `.md`).
 - Audio Overview → Customize → paste contents of `<slug>-notebooklm-prompt.txt`
-- Save the resulting mp3 back to the same Drive folder as `<slug>-podcast.mp3` (auto-syncs to Air)
-- Once mp3 is in place, share the Drive URL so the index can be updated
+- Save the resulting .m4a (NotebookLM exports AAC `.m4a`, not `.mp3`) back to the same Drive folder. Either keep NotebookLM's auto-generated descriptive title (e.g. `Three_Unique_Enzymes_for_the_Protox_Bottleneck.m4a`) or rename to `<slug>-podcast.m4a` — both are picked up by the per-paper folder, and the descriptive title is preserved in the index entry verbatim.
+- Once m4a is in place, share the Drive URL so the index can be updated
 
 ## Updating the Index
 
@@ -231,11 +233,11 @@ Add a new section to `<slug>.md`:
 - 学習テキスト: [<slug>-en-study](./<slug>-en-study.html)
 - Quiz: [Q](./<slug>-en-quiz.html) / [A](./<slug>-en-quiz-ans.html)
 - Podcast script (EN): [<slug>-podcast-script](./<slug>-podcast-script.html)
-- Podcast (mp3): TBD (NotebookLM 投入後に Drive URL を記入)
+- Podcast (m4a): TBD (NotebookLM 投入後に Drive URL を記入)
 - NotebookLM prompt: `<slug>-notebooklm-prompt.txt`
 ```
 
-After mp3 is created and Drive URL provided, update the Podcast (mp3) line.
+After m4a is created and Drive URL provided, update the Podcast (m4a) line.
 
 ## regen_paper_index.py Filter
 
@@ -262,9 +264,9 @@ This patch must land in the same change set as the first skill run.
 2. **Read** `tmp/clean-original.html` (HTML mode) or text-extracted PDF (PDF mode) for the canonical English source.
 3. **Generate** the 5 output files in `portfolio/paper-close-readings/`.
 4. **Stage** to Drive: `clean-original.html` + `<slug>-en-study.md` + `<slug>-notebooklm-prompt.txt` → `paper-podcasts/<slug>/`.
-5. **Update** `<slug>.md` index with the `## English study` section (mp3 link as TBD).
+5. **Update** `<slug>.md` index with the `## English study` section (m4a link as TBD).
 6. **Render** to portal: `bash scripts/render_all.sh`. (4 markdown files become HTML; the `.txt` is not rendered.)
-7. **Report**: file paths, Drive folder path, NotebookLM upload instructions, and a reminder to send back the mp3 Drive URL.
+7. **Report**: file paths, Drive folder path, NotebookLM upload instructions, and a reminder to send back the m4a Drive URL.
 
 ## Quality Bars
 
@@ -297,16 +299,16 @@ This patch must land in the same change set as the first skill run.
 ## What This Skill Does NOT Do
 
 - Does NOT run NotebookLM — user does that manually on fenrir
-- Does NOT generate the mp3 audio
+- Does NOT generate the m4a audio
 - Does NOT run Claude voice / speaking practice — separate session on user's side
-- Does NOT update the `Podcast (mp3)` link with a Drive URL automatically — requires user to provide the URL after NotebookLM finishes
+- Does NOT update the `Podcast (m4a)` link with a Drive URL automatically — requires user to provide the URL after NotebookLM finishes
 - Does NOT create new paper close-readings — `<slug>-ja.md` must already exist
 
 ## Repository-Specific Convention For life
 
 - Outputs live in `portfolio/paper-close-readings/` (co-located with paper-close-reading artifacts)
 - Drive staging path: `~/Library/CloudStorage/GoogleDrive-38kta.lab@gmail.com/マイドライブ/paper-podcasts/<slug>/`
-- Per-paper Drive folder collects: NotebookLM inputs (HTML + study + prompt) and the eventual mp3
+- Per-paper Drive folder collects: NotebookLM inputs (HTML + study + prompt) and the eventual m4a
 - Audience for podcast prompt: **biology researchers (broad)** — wider than user's plant physiology focus so NotebookLM doesn't drift into one subfield
 
 ## Auto-finalize
