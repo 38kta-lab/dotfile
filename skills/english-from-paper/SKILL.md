@@ -196,13 +196,16 @@ The skill auto-fills `<TITLE>`, `<AUTHORS>`, `<JOURNAL>`, `<YEAR>`, `<FOCUS_HINT
 
 ## Drive Staging
 
-Copy 3 files to the Drive folder for pickup via fenrir remote desktop:
+NotebookLM accepts: PDF / Google Doc / Google Slide / `.txt` / Website URL / YouTube URL / audio. It does **not** accept raw `.html` uploads. So the staging produces a `.txt` version of the paper body and copies it alongside the HTML (HTML kept as offline backup, txt is what gets uploaded).
 
 ```bash
 DRIVE_ROOT="$HOME/Library/CloudStorage/GoogleDrive-38kta.lab@gmail.com/マイドライブ"
 DST="$DRIVE_ROOT/paper-podcasts/<slug>"
 mkdir -p "$DST"
 cp portfolio/paper-close-readings/tmp/clean-original.html         "$DST/"
+python3 scripts/papers/html_to_txt.py \
+  portfolio/paper-close-readings/tmp/clean-original.html \
+  "$DST/clean-original.txt"
 cp portfolio/paper-close-readings/<slug>-en-study.md              "$DST/"
 cp portfolio/paper-close-readings/<slug>-notebooklm-prompt.txt    "$DST/"
 ```
@@ -210,7 +213,10 @@ cp portfolio/paper-close-readings/<slug>-notebooklm-prompt.txt    "$DST/"
 Tell the user (in the skill's final report):
 
 - Files staged at `paper-podcasts/<slug>/` in Drive
-- On fenrir: open NotebookLM → New notebook → upload `clean-original.html` + `<slug>-en-study.md` as sources
+- On fenrir, open NotebookLM → New notebook → add sources in this priority:
+  1. **If the paper is on PMC** (open access): "Add source → Website" with the PMC URL — gives the cleanest text + caption extraction. PMC URL pattern: `https://www.ncbi.nlm.nih.gov/pmc/articles/PMCxxxxxxx/`
+  2. **Otherwise**: upload `clean-original.txt` as a text source.
+  3. **Always**: upload `<slug>-en-study.md` as an additional source (NotebookLM accepts `.md`).
 - Audio Overview → Customize → paste contents of `<slug>-notebooklm-prompt.txt`
 - Save the resulting mp3 back to the same Drive folder as `<slug>-podcast.mp3` (auto-syncs to Air)
 - Once mp3 is in place, share the Drive URL so the index can be updated
