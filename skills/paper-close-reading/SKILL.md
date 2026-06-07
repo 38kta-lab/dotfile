@@ -25,36 +25,69 @@ Turn a prepared paper staging directory into 3 reading artifacts:
 
 ## Expected Input
 
-The user has already prepared a staging directory containing at least:
-
-- paper PDF
-- raw HTML saved from the browser console, OR fetched via `scripts/papers/fetch_html.py <publisher-url>`
-- extracted figure images such as `Fig.1.png`, `Fig.2.png`, ...
-
-In the `life` repo, this usually means:
+The user has already prepared a staging directory at:
 
 ```text
 portfolio/paper-close-readings/tmp/
+```
+
+There are two input modes — prefer **HTML mode** when available, fall back to **PDF mode** when not.
+
+### HTML mode (preferred)
+
+- `tmp/original.html` — raw page HTML from the publisher (with full body, figures, references)
+- `tmp/Fig.1.png` (or `.jpg`) ... `tmp/Fig.N.png` — extracted figure images
+
+This mode supports accurate text and structure-preserving rendering. Acquire HTML via either:
+
+- `scripts/papers/fetch_html.py <publisher-url>` — playwright + stealth + UTokyo institutional IP, passes Cloudflare and gives full figure markup
+- Browser "Save Page As → Web Page Complete" if scripted fetch is blocked
+
+### PDF mode (fallback)
+
+Use this mode when HTML cannot be obtained:
+
+- Cloudflare / anti-bot blocks `fetch_html.py` even with stealth
+- Publisher has no web HTML edition (book chapters, some preprint servers)
+- Off-campus and no EZproxy access
+- Paywall blocks HTML but PDF is accessible (e.g. via Paperpile)
+
+Inputs:
+
+- `tmp/<author-year>.pdf` — the PDF file (often already in Paperpile: `~/Library/CloudStorage/GoogleDrive-38kta.lab@gmail.com/マイドライブ/Paperpile/<year>/...pdf`)
+- `tmp/Fig.1.png` ... `tmp/Fig.N.png` — figures extracted manually (e.g. macOS Preview "export as image", or `pdftoppm` from poppler)
+
+In PDF mode you skip Step 1 (`clean-original.html`) — there is no clean HTML to produce. Run `pdftotext -layout tmp/<...>.pdf tmp/full.txt` (poppler) once to get text, then read directly from the PDF (or text dump) when writing `<slug>-ja.md`. Note that pdftotext loses table layout and may garble special characters / multi-column flow — flag any ambiguous extraction in the close-reading 批判的コメント section if it affects the conclusion.
+
+### Mode declaration
+
+In the index `<slug>.md`, declare which mode was used so future you (and search) can find it:
+
+```markdown
+---
+input_mode: html   # or: pdf
+...
+---
 ```
 
 Before writing output, read the current repository's `README.md` and `Rules.md` when available.
 
 ## Required Workflow
 
-1. Inspect the staging directory and identify the raw HTML, PDF, and figure files.
-2. **Step 1: Create `tmp/clean-original.html`**.
+1. Inspect the staging directory. Determine **HTML mode** (raw `original.html` available) vs **PDF mode** (only PDF + figures). Record the mode in the index `<slug>.md` frontmatter as `input_mode: html` or `input_mode: pdf`.
+2. **Step 1: Create `tmp/clean-original.html`** — only in HTML mode. In PDF mode skip this step and proceed directly to Step 2.
    - Keep the article body, figures, tables, and references.
    - Remove surrounding publisher UI, related-content blocks, and other page chrome.
    - Preserve the original English text.
-   - Embed figure references (`src="Fig.1.png"`) as data: URIs using `embed_local_images_in_html.py`.
-3. Create or refresh `tmp/original.html` if a broader original reading copy is useful.
-4. **Step 2: Write `<slug>-ja.md`** at `portfolio/paper-close-readings/<slug>-ja.md` based on `clean-original.html`.
+   - Embed figure references (`src="Fig.1.png"`) as data: URIs using `embed_local_images_in_html.py` (optionally with `--max-width 1200` for smaller offline copy).
+3. (HTML mode only) Create or refresh `tmp/original.html` if a broader original reading copy is useful.
+4. **Step 2: Write `<slug>-ja.md`** at `portfolio/paper-close-readings/<slug>-ja.md` based on `clean-original.html` (HTML mode) or PDF text + visual reading (PDF mode).
    - Use the paper's own section structure as the spine.
    - Summarize `Introduction`, `Materials and methods`, `Results and discussion`, `Conclusions` in Japanese.
    - Reference figures inline with markdown image syntax: `![Fig.1: caption](tmp/Fig.1.png)`. These will be embedded automatically during render.
-   - Always include a `## 批判的コメント` section.
-5. **Step 3: Write `<slug>.md`** index at `portfolio/paper-close-readings/<slug>.md` with title / authors / DOI / journal / one-line summary / links to ja and original.
-6. **Render to portal**: run `bash scripts/render_all.sh` (or rely on the next scheduled render). render_all.sh resolves the `tmp/` image paths relative to the source `.md` location and embeds them as data: URIs in the portal HTML.
+   - Always include a `## 批判的コメント` section. In PDF mode, also flag any text-extraction uncertainty (table layout / equations / multi-column flow) so future you knows what to re-verify.
+5. **Step 3: Write `<slug>.md`** index at `portfolio/paper-close-readings/<slug>.md` with `input_mode`, title, authors, DOI, journal, one-line summary, links to ja and original.
+6. **Render to portal**: run `bash scripts/render_all.sh` (or rely on the next scheduled render). render_all.sh resolves the `tmp/` image paths relative to the source `.md` location, embeds them as data: URIs (with `--max-width 1200` resize), and regenerates the `/paper/` index automatically.
 
 ## Step 1 Rule
 
