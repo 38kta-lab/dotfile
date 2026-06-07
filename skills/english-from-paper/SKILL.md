@@ -281,9 +281,14 @@ This patch must land in the same change set as the first skill run.
 
 `<slug>-en-quiz.md`:
 
-- Mix of cloze / multiple-choice / open comprehension
+- **Fixed total of 20 questions** with section breakdown:
+  - **A. Vocabulary cloze** — 8 questions
+  - **B. Collocation / preposition choice** — 5 questions
+  - **C. Comprehension** — 7 questions (~1–2 sentence answers)
+- Frontmatter: `question_count: 20`
 - Comprehension questions test the paper's **contribution**, not trivia
 - All answers derivable from paper or study material — no external knowledge required
+- Numbering is sequential across sections (1-8 in A, 9-13 in B, 14-20 in C)
 
 `<slug>-podcast-script.md`:
 
