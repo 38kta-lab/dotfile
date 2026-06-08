@@ -89,18 +89,19 @@ config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
 -- 起動時のペイン構成 (fenrir 主作業先方針、2026-06-08 更新で 35:35:30 + 30 を上下分割):
 --   col1 (35%)        : ssh fenrir + tmux attach -t life (Claude Code メイン作業)
---   col2 (35%)        : ssh fenrir + 対話 zsh → Ctrl+G (ghq-fzf) 展開
+--   col2 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開
 --   col3 上 (30 の 80%): ssh fenrir + 対話 zsh → Ctrl+G (ghq-fzf) 展開
 --   col3 下 (30 の 20%): ssh fenrir + cd life + clear + shell (sub 操作用)
 -- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
 -- PATH (brew shellenv + ~/.local/bin) は env.zsh が ~/.zshenv 経由で必ず投入されるため、
 -- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
--- Ctrl+G = ghq-fzf zle ウィジェット (~/.config/zsh/fzf.zsh の bindkey '^g')。
--- 制御文字 \x07 (BEL = Ctrl+G) を対話 zsh 起動後に送って展開する。
+-- Ctrl+G = ghq-fzf, Ctrl+J = tmux-session-fzf (~/.config/zsh/fzf.zsh の bindkey)。
+-- 制御文字 (\x07=Ctrl+G, \x0a=Ctrl+J) を対話 zsh 起動後に送って展開する。
 wezterm.on("gui-startup", function(cmd)
 	-- ssh fenrir で対話 zsh を起動 (cd life + clear)。split の size は新規ペインの比率。
 	local SSH_ZSH = "ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n"
 	local CTRL_G = "\x07" -- BEL = Ctrl+G → ghq-fzf
+	local CTRL_J = "\x0a" -- LF = Ctrl+J → tmux-session-fzf
 
 	local tab, col1, window = wezterm.mux.spawn_window(cmd or {})
 	-- col1 を 35%、残り 65% を right に。
@@ -113,9 +114,10 @@ wezterm.on("gui-startup", function(cmd)
 
 	-- col1: tmux life セッションに attach (メイン作業)。
 	col1:send_text("ssh fenrir -t 'tmux a -t life'\n")
-	-- fzf 展開ペイン: 対話 zsh 起動後に Ctrl+G を送る。
+	-- col2: 対話 zsh 起動後に Ctrl+J → tmux セッション選択 fzf。
 	col2:send_text(SSH_ZSH)
-	col2:send_text(CTRL_G)
+	col2:send_text(CTRL_J)
+	-- col3 上: 対話 zsh 起動後に Ctrl+G → ghq-fzf。
 	col3:send_text(SSH_ZSH)
 	col3:send_text(CTRL_G)
 	-- col3 下: sub 操作用の通常 shell。
