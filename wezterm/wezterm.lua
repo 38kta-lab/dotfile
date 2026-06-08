@@ -97,6 +97,9 @@ config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 -- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
 -- Ctrl+G = ghq-fzf, Ctrl+J = tmux-session-fzf (~/.config/zsh/fzf.zsh の bindkey)。
 -- 制御文字 (\x07=Ctrl+G, \x0a=Ctrl+J) を対話 zsh 起動後に送って展開する。
+-- 送出は call_after で遅延。ssh 起動直後は端末が cooked モードで、特に \x0a (Ctrl+J)
+-- は改行として line discipline に食われて zle に届かない。zle (raw モード) が立ち上がる
+-- 頃に送るため 2 秒待つ。
 wezterm.on("gui-startup", function(cmd)
 	-- ssh fenrir で対話 zsh を起動 (cd life + clear)。split の size は新規ペインの比率。
 	local SSH_ZSH = "ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n"
@@ -114,15 +117,16 @@ wezterm.on("gui-startup", function(cmd)
 
 	-- col1: tmux life セッションに attach (メイン作業)。
 	col1:send_text("ssh fenrir -t 'tmux a -t life'\n")
-	-- col2: 対話 zsh 起動後に Ctrl+J → tmux セッション選択 fzf。
-	col2:send_text(SSH_ZSH)
-	col2:send_text(CTRL_J)
-	-- col3 上: 対話 zsh 起動後に Ctrl+G → ghq-fzf。
-	col3:send_text(SSH_ZSH)
-	col3:send_text(CTRL_G)
+	-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
+	col2:send_text(SSH_ZSH) -- col2: Ctrl+J → tmux セッション選択 fzf
+	col3:send_text(SSH_ZSH) -- col3 上: Ctrl+G → ghq-fzf
 	-- col3 下: sub 操作用の通常 shell。
 	col3_bottom:send_text(SSH_ZSH)
 	window:gui_window():maximize()
+	wezterm.time.call_after(2.0, function()
+		col2:send_text(CTRL_J)
+		col3:send_text(CTRL_G)
+	end)
 end)
 
 return config
