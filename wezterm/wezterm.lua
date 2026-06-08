@@ -48,6 +48,14 @@ config.colors = {
 	tab_bar = {
 		inactive_tab_edge = "none",
 	},
+	-- pane 境界線を金色 (アクティブタブと同色) にして分割構造を見やすく
+	split = "#ae8b2d",
+}
+
+-- 非アクティブ pane を暗く沈め、アクティブ pane を一目で分かるようにする
+config.inactive_pane_hsb = {
+	saturation = 0.7,
+	brightness = 0.5,
 }
 
 -- タブの形をカスタマイズ
