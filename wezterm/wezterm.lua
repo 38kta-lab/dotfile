@@ -54,8 +54,8 @@ config.colors = {
 
 -- 非アクティブ pane を暗く沈め、アクティブ pane を一目で分かるようにする
 config.inactive_pane_hsb = {
-	saturation = 0.7,
-	brightness = 0.5,
+	saturation = 0.5,
+	brightness = 0.3,
 }
 
 -- タブの形をカスタマイズ
