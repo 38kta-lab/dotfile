@@ -96,8 +96,8 @@ config.key_tables = require("keybinds").key_tables
 config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
 -- 起動時のペイン構成 (fenrir 主作業先方針、2026-06-08 更新で 35:35:30 + 30 を上下分割):
---   col1 (35%)        : ssh fenrir + tmux attach -t life (Claude Code メイン作業)
---   col2 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開
+--   col1 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開
+--   col2 (35%)        : ssh fenrir + tmux attach -t life (Claude Code メイン作業)
 --   col3 上 (30 の 80%): ssh fenrir + 対話 zsh → Ctrl+G (ghq-fzf) 展開
 --   col3 下 (30 の 20%): ssh fenrir + cd life + clear + shell (sub 操作用)
 -- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
@@ -123,16 +123,16 @@ wezterm.on("gui-startup", function(cmd)
 	-- col3 (30%) を上 80% / 下 20% に分割。size は新規 (Bottom) の比率なので 0.2。
 	local col3_bottom = col3:split({ direction = "Bottom", size = 0.2 })
 
-	-- col1: tmux life セッションに attach (メイン作業)。
-	col1:send_text("ssh fenrir -t 'tmux a -t life'\n")
 	-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
-	col2:send_text(SSH_ZSH) -- col2: Ctrl+J → tmux セッション選択 fzf
+	col1:send_text(SSH_ZSH) -- col1: Ctrl+J → tmux セッション選択 fzf
+	-- col2: tmux life セッションに attach (メイン作業)。
+	col2:send_text("ssh fenrir -t 'tmux a -t life'\n")
 	col3:send_text(SSH_ZSH) -- col3 上: Ctrl+G → ghq-fzf
 	-- col3 下: sub 操作用の通常 shell。
 	col3_bottom:send_text(SSH_ZSH)
 	window:gui_window():maximize()
 	wezterm.time.call_after(2.0, function()
-		col2:send_text(CTRL_J)
+		col1:send_text(CTRL_J)
 		col3:send_text(CTRL_G)
 	end)
 end)
