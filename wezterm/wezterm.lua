@@ -8,6 +8,12 @@ config.use_ime = true
 config.window_background_opacity = 0.5
 config.macos_window_background_blur = 20
 
+-- gui-startup の split をフルサイズで計算させるため、起動ウィンドウを大きく作る。
+-- 小さい既定 (80x24) のまま split → maximize すると増分が均等再配分されず
+-- col3 (35:35:30 の 30) が痩せて見えるのを防ぐ。maximize は gui-startup 末尾で実行。
+config.initial_cols = 320
+config.initial_rows = 88
+
 ----------------------------------------------------
 -- Tab
 ----------------------------------------------------
