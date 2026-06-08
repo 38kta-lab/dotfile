@@ -59,17 +59,16 @@ Do NOT auto-invoke. Do NOT run from morning-brief cron (that's a separate artifa
 
 ### Publish to portal
 
-`bash scripts/render_all.sh` は task-review を扱わないので、morning brief cron と同じ 2 ステップで明示的に publish する:
+`bash scripts/render_all.sh` の section 4b で **自動的に** night brief を render する:
 
-```bash
-cp ideas/task-review/md/night-<tomorrow>.md \
-   ~/.local/share/life/_life/task-review/night-<tomorrow>.md
-python3 scripts/automation/render_morning_brief.py \
-   ideas/task-review/md/night-<tomorrow>.md \
-   -o ~/.local/share/life/_life/task-review/night-<tomorrow>.html
-```
+- `ideas/task-review/md/night-<date>.md` の mtime が dst HTML より新しければ再描画
+- `render_morning_brief.py` 経由で Newsprint 配色 HTML を生成
+- 同日付の `morning-<date>.html` が既に存在すれば、**両 HTML 右上に companion-link を相互注入**
+  (morning → 「→ night brief (前夜の計画)」 / night → 「→ morning brief (当日朝)」)
 
-→ portal: `http://fenrir:8080/task-review/night-<tomorrow>.html` (Newsprint 配色)
+skill 側でやることは `ideas/task-review/md/night-<tomorrow>.md` を書くだけ。`bash scripts/render_all.sh` を 1 回呼んで portal 反映を確認。
+
+→ portal: `http://fenrir:8080/task-review/night-<tomorrow>.html` (Newsprint 配色 + companion-link)
 
 ### Template
 
