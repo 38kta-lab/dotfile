@@ -81,21 +81,39 @@ config.keys = require("keybinds").keys
 config.key_tables = require("keybinds").key_tables
 config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
--- 起動時の 3 ペイン構成 (fenrir 主作業先方針、2026-05-18 更新で role swap):
---   左 (80%)         : ssh fenrir + tmux attach -t life (Claude Code セッション、メイン作業)
---   右上 (右の 2/3)  : ssh fenrir + cd life + nvim (編集)
---   右下 (右の 1/3)  : ssh fenrir + cd life + clear + shell (sub 操作用、起動時 clear で clean に)
+-- 起動時のペイン構成 (fenrir 主作業先方針、2026-06-08 更新で 35:35:30 + 30 を上下分割):
+--   col1 (35%)        : ssh fenrir + tmux attach -t life (Claude Code メイン作業)
+--   col2 (35%)        : ssh fenrir + 対話 zsh → Ctrl+G (ghq-fzf) 展開
+--   col3 上 (30 の 80%): ssh fenrir + 対話 zsh → Ctrl+G (ghq-fzf) 展開
+--   col3 下 (30 の 20%): ssh fenrir + cd life + clear + shell (sub 操作用)
 -- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
 -- PATH (brew shellenv + ~/.local/bin) は env.zsh が ~/.zshenv 経由で必ず投入されるため、
 -- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
+-- Ctrl+G = ghq-fzf zle ウィジェット (~/.config/zsh/fzf.zsh の bindkey '^g')。
+-- 制御文字 \x07 (BEL = Ctrl+G) を対話 zsh 起動後に送って展開する。
 wezterm.on("gui-startup", function(cmd)
-	local tab, pane, window = wezterm.mux.spawn_window(cmd or {})
-	local right = pane:split({ direction = "Right", size = 0.2 })
-	-- right を 2/3 (上=nvim) と 1/3 (下=shell) に分割。size は新しく作るペイン (Bottom) の比率なので 1/3。
-	local right_bottom = right:split({ direction = "Bottom", size = 1 / 3 })
-	pane:send_text("ssh fenrir -t 'tmux a -t life'\n")
-	right:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && nvim'\n")
-	right_bottom:send_text("ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n")
+	-- ssh fenrir で対話 zsh を起動 (cd life + clear)。split の size は新規ペインの比率。
+	local SSH_ZSH = "ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n"
+	local CTRL_G = "\x07" -- BEL = Ctrl+G → ghq-fzf
+
+	local tab, col1, window = wezterm.mux.spawn_window(cmd or {})
+	-- col1 を 35%、残り 65% を right に。
+	local right = col1:split({ direction = "Right", size = 0.65 })
+	-- right (65%) から col3 (30%) を切り出す。残った right が col2 (35%)。
+	local col3 = right:split({ direction = "Right", size = 30 / 65 })
+	local col2 = right
+	-- col3 (30%) を上 80% / 下 20% に分割。size は新規 (Bottom) の比率なので 0.2。
+	local col3_bottom = col3:split({ direction = "Bottom", size = 0.2 })
+
+	-- col1: tmux life セッションに attach (メイン作業)。
+	col1:send_text("ssh fenrir -t 'tmux a -t life'\n")
+	-- fzf 展開ペイン: 対話 zsh 起動後に Ctrl+G を送る。
+	col2:send_text(SSH_ZSH)
+	col2:send_text(CTRL_G)
+	col3:send_text(SSH_ZSH)
+	col3:send_text(CTRL_G)
+	-- col3 下: sub 操作用の通常 shell。
+	col3_bottom:send_text(SSH_ZSH)
 	window:gui_window():maximize()
 end)
 
