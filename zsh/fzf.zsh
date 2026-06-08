@@ -26,3 +26,29 @@ if command -v ghq >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
   zle -N ghq-fzf
   bindkey '^g' ghq-fzf
 fi
+
+# tmux session switcher (^j)
+# tmux ls を fzf で表示し、preview に各セッションの window 一覧を出す。
+# tmux 内なら switch-client、tmux 外なら attach する。
+# ^j は LF だが端末の Enter は ^m なので通常の改行とは競合しない。
+if command -v tmux >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
+  function tmux-session-fzf() {
+    local session
+    session=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | fzf \
+      --prompt='tmux> ' --height=40% --reverse \
+      --preview 'tmux list-windows -t {} -F "#{window_index}: #{window_name} [#{pane_current_command}]"')
+    if [ -n "$session" ]; then
+      if [ -n "$TMUX" ]; then
+        tmux switch-client -t "$session"
+        zle reset-prompt
+      else
+        BUFFER="tmux attach -t $session"
+        zle accept-line
+      fi
+    else
+      zle reset-prompt
+    fi
+  }
+  zle -N tmux-session-fzf
+  bindkey '^j' tmux-session-fzf
+fi
