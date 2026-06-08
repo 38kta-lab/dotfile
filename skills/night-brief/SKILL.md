@@ -55,6 +55,22 @@ Do NOT auto-invoke. Do NOT run from morning-brief cron (that's a separate artifa
 
 ファイル名の日付は **brief 対象 = 翌日** (作成日ではない)。理由: 翌朝 morning brief が `morning-<today>.md` を見るとき、対応する night brief が同じ日付になっていると carry-over が直感的。
 
+`ideas/task-review/md/` は **gitignored** (morning brief と同じ扱い、artifact は durable だが git-tracked ではない)。
+
+### Publish to portal
+
+`bash scripts/render_all.sh` は task-review を扱わないので、morning brief cron と同じ 2 ステップで明示的に publish する:
+
+```bash
+cp ideas/task-review/md/night-<tomorrow>.md \
+   ~/.local/share/life/_life/task-review/night-<tomorrow>.md
+python3 scripts/automation/render_morning_brief.py \
+   ideas/task-review/md/night-<tomorrow>.md \
+   -o ~/.local/share/life/_life/task-review/night-<tomorrow>.html
+```
+
+→ portal: `http://fenrir:8080/task-review/night-<tomorrow>.html` (Newsprint 配色)
+
 ### Template
 
 ```markdown
