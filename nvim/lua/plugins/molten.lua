@@ -1,5 +1,5 @@
 -- molten-nvim: Jupyter kernel cell 実行 + 結果表示を nvim 内で。
--- Phase 1: text 出力のみ (画像表示なし、image.nvim は後で Phase 2 で追加)。
+-- Phase 2: image.nvim 連携で画像 (matplotlib plot 等) も表示可能。
 -- 参照: https://github.com/benlubas/molten-nvim
 --
 -- 前提:
@@ -8,12 +8,14 @@
 --   - Python provider (pynvim + jupyter_client) は conda env `nvim` 経由 (options.lua で `vim.g.python3_host_prog` 設定済)
 --   - kernel は jupyter で discovery される (`shared-py310`, `shared-r44` を `~/Library/Jupyter/kernels/` に登録済)
 --   - 使用 cwd: 各研究 repo (例: 12_L_pyshell_interactors/ipynb/) で nvim 起動
+--   - 画像表示前提: image.nvim plugin (image.lua) + tmux allow-passthrough on (tmux/tmux.conf)
 --
 -- 基本ワークフロー:
 --   1. `.py` を開く (cell 区切り = `# %%`)、または `.ipynb` を開く (jupytext.nvim が自動変換)
 --   2. `:MoltenInit` で kernel 選択 (shared-py310 等)
 --   3. `<localleader>e` (operator) or 範囲選択 + `<localleader>e` (visual) で cell 実行
 --   4. 結果は仮想行 (virt text) で表示、`<localleader>mo` で詳細 window 開く
+--   5. matplotlib などの図出力は output window で画像として描画される
 --
 -- LazyVim の `<localleader>` デフォルト = `\` (backslash)
 local on_fenrir = vim.fn.hostname() == "fenrir"
@@ -26,13 +28,16 @@ return {
     build = ":UpdateRemotePlugins",
     ft = { "python" },
     init = function()
-      vim.g.molten_image_provider = "none" -- Phase 1: 画像なし
+      vim.g.molten_image_provider = "image.nvim" -- Phase 2: image.nvim 経由で画像表示
       vim.g.molten_output_win_max_height = 20
       vim.g.molten_virt_text_output = true
       vim.g.molten_auto_open_output = false
       vim.g.molten_wrap_output = true
       vim.g.molten_virt_lines_off_by_1 = true
     end,
+    -- image.nvim は同じく fenrir 限定。molten が image_provider = "image.nvim" を指定するため
+    -- image.nvim より後に読まれないよう dependencies で順序保証する。
+    dependencies = { "3rd/image.nvim" },
     keys = {
       { "<localleader>mi", function() vim.cmd("MoltenInit") end, desc = "Molten: init kernel" },
       { "<localleader>md", function() vim.cmd("MoltenDeinit") end, desc = "Molten: deinit kernel" },
