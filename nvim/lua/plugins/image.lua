@@ -28,10 +28,13 @@ return {
             filetypes = { "markdown" },
           },
         },
-        max_width = nil,
-        max_height = nil,
-        max_width_window_percentage = nil,
-        max_height_window_percentage = 50,
+        -- afk2777 dotfile (zenn-nvim-jupyter 記事) 準拠の画質構成:
+        -- percentage 制約を無効化 (math.huge) して image.nvim がリサイズしないようにし、
+        -- 絶対値 500 で上限だけ設ける。matplotlib 出力 PNG が pixel-lossless で kitty graphics 経由表示される。
+        max_width = 500,
+        max_height = 500,
+        max_width_window_percentage = math.huge,
+        max_height_window_percentage = math.huge,
         window_overlap_clear_enabled = true,
         window_overlap_clear_ft_ignore = { "cmp_menu", "cmp_docs", "" },
         editor_only_render_when_focused = false,
