@@ -29,9 +29,12 @@ return {
     ft = { "python" },
     init = function()
       vim.g.molten_image_provider = "image.nvim" -- Phase 2: image.nvim 経由で画像表示
-      vim.g.molten_output_win_max_height = 20
-      vim.g.molten_virt_text_output = true
-      vim.g.molten_auto_open_output = false
+      vim.g.molten_output_win_max_height = 500   -- afk2777 準拠: popup 高さ上限を実質無制限化 (画像のリサイズ抑止)
+      -- virt_text_output と auto_open_output は両立しない (前者が inline で表示するため後者の popup が抑止される)。
+      -- Phase 2 では popup での確実な画像表示を優先 → virt_text_output = false + auto_open_output = true。
+      -- 短い text 出力も popup に出る (毎回 q で閉じる運用)。
+      vim.g.molten_virt_text_output = false
+      vim.g.molten_auto_open_output = true
       vim.g.molten_wrap_output = true
       vim.g.molten_virt_lines_off_by_1 = true
     end,
@@ -63,6 +66,21 @@ return {
         style = "markdown",   -- or "hydrogen": .ipynb cells を `# %%` 区切りの python に変換
         output_extension = "auto",
         force_ft = nil,
+      })
+
+      -- .ipynb 開時に自動で MoltenInit を呼んで kernel 選択 popup を出す。
+      -- 同一 buffer での再呼出は buffer-local 変数で抑止 (重複 init 防止)。
+      -- molten plugin が lazy load なので少し defer する。
+      vim.api.nvim_create_autocmd("BufWinEnter", {
+        pattern = "*.ipynb",
+        group = vim.api.nvim_create_augroup("molten_auto_init_ipynb", { clear = true }),
+        callback = function(args)
+          if vim.b[args.buf].molten_initialized then return end
+          vim.b[args.buf].molten_initialized = true
+          vim.defer_fn(function()
+            pcall(vim.cmd, "MoltenInit")
+          end, 150)
+        end,
       })
     end,
   },
