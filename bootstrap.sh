@@ -36,6 +36,7 @@ brew install imagemagick
 brew install node
 brew install mermaid-cli
 brew install tectonic
+brew install tmux
 brew install tree-sitter
 brew install tree-sitter-cli
 
