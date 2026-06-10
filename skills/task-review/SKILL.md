@@ -21,6 +21,7 @@ For the `life` repo, the main inputs are:
 
 ```text
 ideas/inbox/YYYY-MM-DD.md
+ideas/task-review/md/night-YYYY-MM-DD.md   # 前夜の計画 (今日モード時の baseline、下「Night Brief Carry-Over」)
 projects/active/*.md
 .agent/memories/*.md
 scripts/google_calendar_read.py
@@ -81,6 +82,27 @@ Use `--calendar-id` only when the user explicitly wants to limit or switch the t
 Default Calendar reads must not include location, attendee, or URL details. Do not pass `--show-location` unless the user explicitly asks.
 
 If Calendar read fails because auth is missing, continue using repo notes and report that Calendar was unavailable.
+
+## Night Brief Carry-Over (今日モード)
+
+When planning **today** (e.g. invoked by the 06:15 morning-brief cron, or the user asks 今日のタスク), check for a night brief written the evening before:
+
+```bash
+ls ideas/task-review/md/night-$(date +%F).md
+```
+
+`night-<today>.md` holds the user's **hand-decided** plan for today — the 「翌日 1 日の rough plan」 table, per-block `[status:X]` tags, and **manually-added events that are NOT in Calendar or Gmail** (wet 実験, 移動/commute, TA 説明, バッファ枠 等). These are decisions, not re-derivable from Calendar+Gmail.
+
+If it exists, treat it as the **planning baseline**, not just one more input:
+
+- Carry over its rough-plan time-blocks and `[status:X]` choices. Do **not** silently re-derive a different day structure and drop the night plan's blocks.
+- Reconcile against today's Calendar + Gmail: keep the night structure, layer in events / action items that appeared since the brief was written, and flag conflicts (e.g. a new Calendar event overlapping a planned focus block).
+- Honor the night brief's 「翌朝 morning brief への引継ぎ」 section — those are explicit handoff notes.
+- If new Calendar/Gmail items make the night plan clearly stale, adjust and **say what changed and why** rather than overwriting without trace.
+
+If no night brief exists for today, plan from Calendar + Gmail + inbox/hubs as usual.
+
+(Why: 2026-06-10 に、前夜 night brief で決めた rough plan が翌朝 morning brief に全く反映されない事象が発覚。原因は morning cron が `/task-review 今日` を Calendar+Gmail だけで実行し night brief を読んでいなかったこと。本節と `run_morning_brief.sh` のプロンプト追記で対応。)
 
 ## Note Inputs
 
