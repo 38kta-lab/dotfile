@@ -75,22 +75,6 @@ link_starship() {
   fi
 }
 
-link_ipython() {
-  # ~/.ipython/profile_default/ipython_config.py を dotfile から symlink。
-  # IPython の profile_default ディレクトリ自体は history.sqlite 等の state 込みで
-  # 既存運用があるので、ディレクトリ全体ではなく config ファイルだけ symlink する。
-  local src="$REPO/ipython/profile_default/ipython_config.py"
-  local dest_dir="$HOME/.ipython/profile_default"
-  local dest="$dest_dir/ipython_config.py"
-  if [ -e "$src" ]; then
-    mkdir -p "$dest_dir"
-    if [ -e "$dest" ] && [ ! -L "$dest" ]; then
-      backup_path "$dest"
-    fi
-    ln -sfn "$src" "$dest"
-  fi
-}
-
 link_skills() {
   local skills_src="$REPO/skills"
   [ -d "$skills_src" ] || return 0
@@ -201,7 +185,6 @@ main() {
   link_config_dir "$REPO/cz-git" "${XDG_CONFIG_HOME:-$HOME/.config}/cz-git"
   link_config_dir "$REPO/tmux" "${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
   link_starship
-  link_ipython
   link_skills
   install_czrc_template
   write_zshenv
