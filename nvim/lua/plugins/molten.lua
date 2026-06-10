@@ -6,6 +6,8 @@
 --   - **fenrir 限定**: conda env `nvim` + kernel discovery + JupyterHub 連携が fenrir 上のみセットアップ済。
 --     他ホスト (Air / mini-lab) では plugin を install しない (enabled flag で skip)。
 --   - Python provider (pynvim + jupyter_client) は conda env `nvim` 経由 (options.lua で `vim.g.python3_host_prog` 設定済)
+--   - `.ipynb` 編集には jupytext が PATH に必要: nvim env に `pip install jupytext` 済 + `~/.local/bin/jupytext`
+--     symlink で bare `jupytext` 解決 (jupytext.nvim が `vim.fn.system("jupytext …")` で呼ぶため)
 --   - kernel は jupyter で discovery される (`shared-py310`, `shared-r44` を `~/Library/Jupyter/kernels/` に登録済)
 --   - 使用 cwd: 各研究 repo (例: 12_L_pyshell_interactors/ipynb/) で nvim 起動
 --   - 画像表示前提: image.nvim plugin (image.lua) + tmux allow-passthrough on (tmux/tmux.conf)
@@ -63,7 +65,9 @@ return {
     lazy = false,
     config = function()
       require("jupytext").setup({
-        style = "markdown",   -- or "hydrogen": .ipynb cells を `# %%` 区切りの python に変換
+        style = "hydrogen",   -- .ipynb cells を `# %%` 区切りの python buffer に変換 (ft=python)。
+                              -- 検証済み .py フローと同じ `\eip` (= <localleader>e + inner-paragraph) で
+                              -- cell 実行できる。"markdown" だと ```python fence を巻き込む懸念があるため hydrogen。
         output_extension = "auto",
         force_ft = nil,
       })
