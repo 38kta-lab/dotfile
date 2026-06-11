@@ -8,11 +8,9 @@ config.use_ime = true
 config.window_background_opacity = 0.5
 config.macos_window_background_blur = 20
 
--- gui-startup の split をフルサイズで計算させるため、起動ウィンドウを大きく作る。
--- 小さい既定 (80x24) のまま split → maximize すると増分が均等再配分されず
--- col3 (35:35:30 の 30) が痩せて見えるのを防ぐ。maximize は gui-startup 末尾で実行。
-config.initial_cols = 320
-config.initial_rows = 88
+-- レイアウトは gui-startup で「先に maximize → 実最大化サイズを分割」する方式に変更。
+-- これで各 Mac が自分の全画面を同じ比率で割るため、解像度/DPI が違っても分割比が揃う
+-- (mini-home 基準)。固定 initial_cols/rows のハックは不要になったので撤去。
 
 ----------------------------------------------------
 -- Tab
@@ -115,27 +113,32 @@ wezterm.on("gui-startup", function(cmd)
 	local CTRL_J = "\x0a" -- LF = Ctrl+J → tmux-session-fzf
 
 	local tab, col1, window = wezterm.mux.spawn_window(cmd or {})
-	-- col1 を 35%、残り 65% を right に。
-	local right = col1:split({ direction = "Right", size = 0.65 })
-	-- right (65%) から col3 (30%) を切り出す。残った right が col2 (35%)。
-	local col3 = right:split({ direction = "Right", size = 30 / 65 })
-	local col2 = right
-	-- col3 (30%) を上 70% / 下 30% に分割。size は新規 (Bottom) の比率。
-	-- 右下は marp_preview の 16:9 画像用。col3 幅 (画面の30%) が上限なので、
-	-- 画面が 16:9 なら高さ ≈0.3 で画像がほぼ幅いっぱい (最大) になる。
-	local col3_bottom = col3:split({ direction = "Bottom", size = 0.3 })
-
-	-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
-	col1:send_text(SSH_ZSH) -- col1: Ctrl+J → tmux セッション選択 fzf
-	-- col2: tmux life セッションに attach (メイン作業)。
-	col2:send_text("ssh fenrir -t 'tmux a -t life'\n")
-	col3:send_text(SSH_ZSH) -- col3 上: Ctrl+G → ghq-fzf
-	-- col3 下: sub 操作用の通常 shell。
-	col3_bottom:send_text(SSH_ZSH)
+	-- 先に maximize。サイズ更新は非同期なので、少し待ってから分割する。
+	-- こうすると各 Mac の「実際の最大化サイズ」を同じ比率で割るため、解像度/DPI が
+	-- 違っても分割比が一定 (= mini-home 基準) になる。
 	window:gui_window():maximize()
-	wezterm.time.call_after(2.0, function()
-		col1:send_text(CTRL_J)
-		col3:send_text(CTRL_G)
+	wezterm.time.call_after(0.6, function()
+		-- col1 を 35%、残り 65% を right に。
+		local right = col1:split({ direction = "Right", size = 0.65 })
+		-- right (65%) から col3 (30%) を切り出す。残った right が col2 (35%)。
+		local col3 = right:split({ direction = "Right", size = 30 / 65 })
+		local col2 = right
+		-- col3 (30%) を上 70% / 下 30% に分割。size は新規 (Bottom) の比率。
+		-- 右下は marp_preview の 16:9 画像用。col3 幅 (画面の30%) が上限なので、
+		-- 画面が 16:9 なら高さ ≈0.3 で画像がほぼ幅いっぱい (最大) になる。
+		local col3_bottom = col3:split({ direction = "Bottom", size = 0.3 })
+
+		-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
+		col1:send_text(SSH_ZSH) -- col1: Ctrl+J → tmux セッション選択 fzf
+		-- col2: tmux life セッションに attach (メイン作業)。
+		col2:send_text("ssh fenrir -t 'tmux a -t life'\n")
+		col3:send_text(SSH_ZSH) -- col3 上: Ctrl+G → ghq-fzf
+		-- col3 下: sub 操作用の通常 shell。
+		col3_bottom:send_text(SSH_ZSH)
+		wezterm.time.call_after(2.0, function()
+			col1:send_text(CTRL_J)
+			col3:send_text(CTRL_G)
+		end)
 	end)
 end)
 
