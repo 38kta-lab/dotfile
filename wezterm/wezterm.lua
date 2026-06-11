@@ -120,10 +120,15 @@ wezterm.on("gui-startup", function(cmd)
 	-- right (65%) から col3 (30%) を切り出す。残った right が col2 (35%)。
 	local col3 = right:split({ direction = "Right", size = 30 / 65 })
 	local col2 = right
-	-- col3 (30%) を上 70% / 下 30% に分割。size は新規 (Bottom) の比率。
+	-- col3 (30%) を上下分割。size は新規 (Bottom) の比率。
 	-- 右下は marp_preview の 16:9 画像用。col3 幅 (画面の30%) が上限なので、
 	-- 画面が 16:9 なら高さ ≈0.3 で画像がほぼ幅いっぱい (最大) になる。
-	local col3_bottom = col3:split({ direction = "Bottom", size = 0.3 })
+	-- Air は 16:10 の小画面で縦が詰まって見えるため少し小さめ (0.26)。
+	local col3_bottom_size = 0.3
+	if wezterm.hostname():lower():find("air") then
+		col3_bottom_size = 0.26
+	end
+	local col3_bottom = col3:split({ direction = "Bottom", size = col3_bottom_size })
 
 	-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
 	col1:send_text(SSH_ZSH) -- col1: Ctrl+J → tmux セッション選択 fzf
