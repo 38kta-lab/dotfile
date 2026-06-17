@@ -81,3 +81,46 @@ meeting()    { _life_slack_status --preset meeting    ${1:+--duration $1} }
 experiment() { _life_slack_status --preset experiment ${1:+--duration $1} }
 break-time() { _life_slack_status --preset break      ${1:+--duration $1} }
 off()        { _life_slack_status --clear }
+
+# quarto: .qmd render / preview ヘルパー
+# fenrir の JupyterLab ターミナル(jupyterhub env)では `quarto` が wrapper 経由で動く。
+# PATH に quarto が無ければ fenrir の jupyterhub wrapper に fallback (他 host では未導入なら error)。
+_life_quarto_bin() {
+  command -v quarto 2>/dev/null && return 0
+  local w=/Users/kta/miniforge3/envs/jupyterhub/bin/quarto
+  [[ -x $w ]] && { echo "$w"; return 0; }
+  return 1
+}
+
+# qrender [file.qmd] [追加の quarto 引数] : self-contained revealjs HTML に render
+#   - file 省略時はカレントに .qmd が 1 つだけならそれを使う
+#   - --to が無ければ revealjs を既定にする (例: qrender deck.qmd --to html / pdf)
+#   出力 HTML は JupyterLab でダブルクリック → "Trust HTML" で Lab 内閲覧
+qrender() {
+  emulate -L zsh
+  local qbin; qbin=$(_life_quarto_bin) || { echo "qrender: quarto が見つかりません (この host には未導入)" >&2; return 127; }
+  local f
+  if [[ -n $1 && $1 != --* ]]; then f=$1; shift
+  else
+    local qmds=(*.qmd(N))
+    (( $#qmds == 1 )) && f=$qmds[1]
+  fi
+  [[ -z $f ]] && { echo "usage: qrender <file.qmd> [extra quarto args]" >&2; return 2; }
+  if [[ "$*" == *--to* ]]; then "$qbin" render "$f" "$@"
+  else "$qbin" render "$f" --to revealjs "$@"; fi
+}
+
+# qpreview [file.qmd] [port] : ターミナルで live preview (新規ブラウザタブを開かない、既定 port 4321)
+#   ※ Lab 内表示は server-proxy 経由 (/proxy/<port>/)。proxy 周りは別途調整中
+qpreview() {
+  emulate -L zsh
+  local qbin; qbin=$(_life_quarto_bin) || { echo "qpreview: quarto が見つかりません" >&2; return 127; }
+  local f
+  if [[ -n $1 && $1 != --* ]]; then f=$1; shift
+  else
+    local qmds=(*.qmd(N))
+    (( $#qmds == 1 )) && f=$qmds[1]
+  fi
+  [[ -z $f ]] && { echo "usage: qpreview <file.qmd> [port]" >&2; return 2; }
+  "$qbin" preview "$f" --no-browser --port "${1:-4321}" --host 127.0.0.1
+}
