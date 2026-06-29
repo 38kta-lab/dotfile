@@ -162,5 +162,6 @@ PJ tag (`[NN_L]` / `[A##]` / `[E##]` 等) の event は title の意味から推
 
 - night-brief 起動の理想タイミング: 夕食後〜寝る 1h 前。眠る直前は brief 見て不安が増す可能性、就寝 30 min 前で読み終えるくらい
 - carry-over の判断: 「今日中にやる予定だったが終わっていない」かつ「明日以降に効力がある」もののみ。完全に意味を失った task は drop してよい (session-wrap (6) drop と同思想)
+- **完了済みは drop (再掲しない)**: carry-over 元 (today's morning brief) で `✅ 提出済み` / `再掲不要` / 取り消し線 が付いた項目、または出所メールが `9. Done/Triage` タグ済みの締切は、**締切が未来でも**「今日やるべきこと」「締切ウォッチ」に再掲しない。brief は毎晩再生成され完了状態を持たないため、これらの done マーカーが唯一の resolved 信号 (= task-review skill の `completed-item-resurface` と対)
 - 締切ウォッチは 7 日先まで。それより先は morning brief / weekly review で扱う
 - 不確実性が高い予定 (「明日朝の体調次第」「天気依存」等) は明示的に書く。翌朝 morning brief で再判断できるように
