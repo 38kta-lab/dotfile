@@ -98,7 +98,7 @@ If it exists, treat it as the **planning baseline**, not just one more input:
 - Carry over its rough-plan time-blocks and `[status:X]` choices. Do **not** silently re-derive a different day structure and drop the night plan's blocks.
 - Reconcile against today's Calendar + Gmail: keep the night structure, layer in events / action items that appeared since the brief was written, and flag conflicts (e.g. a new Calendar event overlapping a planned focus block).
 - Honor the night brief's 「翌朝 morning brief への引継ぎ」 section — those are explicit handoff notes.
-- **完了済みの項目は drop する (再掲しない)**: carry-over 元の brief で `✅ 提出済み` / `再掲不要` / 取り消し線 (`~~...~~`) が付いた項目、または出所メールが `9. Done/Triage` タグ済みの締切は、**締切が未来でも** `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。brief は毎朝ゼロから再生成され「完了」を持たないため、これらの done マーカーが唯一の resolved 信号 (= `completed-item-resurface` 対策、下記 Known Judgment Errors)。
+- **完了済みの項目は drop する (再掲しない)**: carry-over 元の brief で `✅ 提出済み` / `再掲不要` / 取り消し線 (`~~...~~`) が付いた項目、または**出所メールが `9. Done/Triage` タグ済み**の締切/依頼は、**締切が未来でも** `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。Done/Triage 済みか否かは **`latest.json` の `recently_done`** (Done/Triage タグ済みスレッドの件名/差出人一覧) で判定する — carry-over 項目 (例: 業者見積の返信、口頭で対応済でメール返信は無いケース) の件名/差出人がここに一致したら resolved とみなし drop。通常 query は Done/Triage を除外するため、この一覧が「完了したが返信の無い」項目の唯一の可視信号。brief は毎朝ゼロから再生成され「完了」を持たないため、これらの done マーカーが唯一の resolved 信号 (= `completed-item-resurface` 対策、下記 Known Judgment Errors)。
 - If new Calendar/Gmail items make the night plan clearly stale, adjust and **say what changed and why** rather than overwriting without trace.
 
 If no night brief exists for today, plan from Calendar + Gmail + inbox/hubs as usual.
@@ -211,7 +211,7 @@ rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/ju
 
 - **archived-pj-action**: `projects/archive/` 配下 PJ や `status: done` hub に対する action 提案を出さない。Gmail で関連する subject が出ても、archive 化済みの PJ なら action_required から外す。
 - **self-sent-misread**: From が user 自身のメール (`USER_EMAIL` 一致) を upcoming task と解釈しない。状態追跡 (返信待ち / 提出済) と捉えて action_required に入れない。
-- **completed-item-resurface**: 完了済みの項目を、締切が未来でも `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。完了の信号は ⓐ carry-over 元 brief の `✅ 提出済み` / `再掲不要` / 取り消し線、ⓑ 出所メールの `9. Done/Triage` タグ、の 2 つ。brief は毎朝再生成され session task の完了状態を持たないため、この 2 信号だけを resolved の根拠にする (例: 月次の勤務状況等申告書を提出後も締切日まで毎朝再掲してしまった、2026-06-29)。
+- **completed-item-resurface**: 完了済みの項目を、締切が未来でも `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。完了の信号は ⓐ carry-over 元 brief の `✅ 提出済み` / `再掲不要` / 取り消し線、ⓑ 出所メールの `9. Done/Triage` タグ (= `latest.json` の `recently_done` に件名/差出人が一致)、の 2 つ。brief は毎朝再生成され session task の完了状態を持たないため、この 2 信号だけを resolved の根拠にする (例: 月次の勤務状況等申告書を提出後も締切日まで毎朝再掲してしまった、2026-06-29)。
 
 新しい判断ミスを user から訂正された場合は、その場で `outputs/skill-improvements/judgment-errors.md` に 1 行 append する (Date / Skill / Category / Bad / Correction / Root Cause / Status=open)。
 
@@ -242,6 +242,7 @@ Gmail triage:
 - Read only the structured output. Do not rely on raw Gmail bodies here.
 - Use `action_required` as task candidates.
 - Use `review_queue` only for category-level counts such as `締切・依頼系: 12件`.
+- Use `recently_done` (Done/Triage タグ済みスレッドの件名/差出人/日付) for **carry-over 完了判定**: night brief から引き継いだ Gmail 由来タスク (業者見積・依頼返信 等) の件名/差出人がここに一致したら、完了として drop する (再掲しない)。通常 query が Done/Triage を除外するため、完了したが返信の無いスレッドはここにしか現れない。
 - If `latest.json` is missing or stale, continue without Gmail and say so briefly.
 
 ## Planning Rules
