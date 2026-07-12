@@ -87,6 +87,13 @@ return {
     -- 選択中のPaneのみ表示
     { key = "z", mods = "LEADER", action = act.TogglePaneZoomState },
 
+    -- Pane番号ジャンプ leader + 1..4 (gui-startup の生成順 = 画面左→右・上→下):
+    --   1 = col1 / 2 = col2 / 3 = col3上 (tmux life) / 4 = col3下 (sub shell)
+    { key = "1", mods = "LEADER", action = act.ActivatePaneByIndex(0) },
+    { key = "2", mods = "LEADER", action = act.ActivatePaneByIndex(1) },
+    { key = "3", mods = "LEADER", action = act.ActivatePaneByIndex(2) },
+    { key = "4", mods = "LEADER", action = act.ActivatePaneByIndex(3) },
+
     -- フォントサイズ切替
     { key = "+", mods = "CTRL", action = act.IncreaseFontSize },
     { key = "-", mods = "CTRL", action = act.DecreaseFontSize },
