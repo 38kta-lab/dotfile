@@ -85,15 +85,36 @@ cd "$(ghq root)/github.com/38kta-lab/dotfile"
 `gh auth refresh -s project` is required on each machine where Codex or `gh`
 updates GitHub Projects, such as the `Life` project Status field.
 
-## Codex / Gemini CLI
+## Codex / Antigravity (Gemini) CLI
 
 ```sh
+# Codex CLI
 npm install -g @openai/codex
 mkdir -p ~/.config/codex
 mv ~/.codex/* ~/.config/codex/
 codex sign-in
-npm install -g @google/gemini-cli
 ```
+
+### Antigravity CLI (`agy`) — Gemini CLI の後継
+
+Google は 2026-06-18 に個人 Google アカウント向けの Gemini CLI ログインを
+サーバ側で打ち切った（`This client is no longer supported for Gemini Code
+Assist for individuals` エラー）。後継の Antigravity CLI (`agy`) に移行する。
+
+```sh
+# 旧 gemini CLI が残っていれば削除
+npm uninstall -g @google/gemini-cli 2>/dev/null; rm -rf ~/.gemini
+
+# Antigravity CLI をインストール (Go 製 single binary、~/.local/bin/agy)
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+
+# 初回起動でブラウザ認証 (要 Google アカウント。Pro 系モデルはサブスク必要)
+agy
+```
+
+- `~/.local/bin` は `zsh/env.zsh` で既に PATH 追加済み → 追加設定不要。
+- 使い方: 対話 `agy` / 非対話 `agy -p "プロンプト"` / モデル指定 `agy --model <id> -p ...` / 一覧 `agy models` / 継続 `agy -c`。
+- 認証は初回ブラウザ OAuth のみ、以降は OS keyring から自動サインイン。
 
 ## Miniforge / Conda
 
