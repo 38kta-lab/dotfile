@@ -12,87 +12,56 @@ end)
 
 return {
   keys = {
-    {
-      -- workspaceの切り替え
-      key = "w",
-      mods = "LEADER",
-      action = act.ShowLauncherArgs({ flags = "WORKSPACES", title = "Select workspace" }),
-    },
-    {
-      --workspaceの名前変更
-      key = "$",
-      mods = "LEADER",
-      action = act.PromptInputLine({
-        description = "(wezterm) Set workspace title:",
-        action = wezterm.action_callback(function(win, pane, line)
-          if line then
-            wezterm.mux.rename_workspace(wezterm.mux.get_active_workspace(), line)
-          end
-        end),
-      }),
-    },
-    {
-      key = "W",
-      mods = "LEADER|SHIFT",
-      action = act.PromptInputLine({
-        description = "(wezterm) Create new workspace:",
-        action = wezterm.action_callback(function(window, pane, line)
-          if line then
-            window:perform_action(
-              act.SwitchToWorkspace({
-                name = line,
-              }),
-              pane
-            )
-          end
-        end),
-      }),
-    },
+    -- ============================================================
+    -- herdr 一本化 (2026-08-17):
+    --   pane/tab/workspace の prefix 操作は herdr (prefix = Ctrl+q) に移譲。
+    --   wezterm は Ctrl+q を掴まない (wezterm.lua で config.leader 撤去)。
+    --   以下は leader 無しの直接 chord。workspace/tab 移動などマルチプレクサ本来の
+    --   仕事は herdr 側へ寄せ、ここには「fenrir gui-startup の4分割 (wezterm-native
+    --   pane) を併存期に触る最小限」だけを Cmd+Alt 系で残す。
+    -- ============================================================
+
     -- コマンドパレット表示
     { key = "p", mods = "SUPER", action = act.ActivateCommandPalette },
     -- Tab移動
     { key = "Tab", mods = "CTRL", action = act.ActivateTabRelative(1) },
     { key = "Tab", mods = "SHIFT|CTRL", action = act.ActivateTabRelative(-1) },
-    -- Tab入れ替え
-    { key = "{", mods = "LEADER", action = act({ MoveTabRelative = -1 }) },
     -- Tab新規作成
     { key = "t", mods = "SUPER", action = act({ SpawnTab = "CurrentPaneDomain" }) },
     -- Tabを閉じる
     { key = "w", mods = "SUPER", action = act({ CloseCurrentTab = { confirm = true } }) },
-    { key = "}", mods = "LEADER", action = act({ MoveTabRelative = 1 }) },
 
     -- 画面フルスクリーン切り替え
     { key = "Enter", mods = "ALT", action = act.ToggleFullScreen },
 
-    -- コピーモード
-    -- { key = 'X', mods = 'LEADER', action = act.ActivateKeyTable{ name = 'copy_mode', one_shot =false }, },
-    { key = "[", mods = "LEADER", action = act.ActivateCopyMode },
+    -- コピーモード (wezterm-native pane 用): Cmd+Alt+[
+    { key = "[", mods = "SUPER|ALT", action = act.ActivateCopyMode },
     -- コピー
     { key = "c", mods = "SUPER", action = act.CopyTo("Clipboard") },
     -- 貼り付け
     { key = "v", mods = "SUPER", action = act.PasteFrom("Clipboard") },
 
-    -- Pane作成 leader + r or d
-    { key = "d", mods = "LEADER", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
-    { key = "r", mods = "LEADER", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
-    -- Paneを閉じる leader + x
-    { key = "x", mods = "LEADER", action = act({ CloseCurrentPane = { confirm = true } }) },
-    -- Pane移動 leader + hlkj
-    { key = "h", mods = "LEADER", action = act.ActivatePaneDirection("Left") },
-    { key = "l", mods = "LEADER", action = act.ActivatePaneDirection("Right") },
-    { key = "k", mods = "LEADER", action = act.ActivatePaneDirection("Up") },
-    { key = "j", mods = "LEADER", action = act.ActivatePaneDirection("Down") },
+    -- wezterm-native pane 分割 (ad-hoc): Cmd+Alt+d / Cmd+Alt+r
+    { key = "d", mods = "SUPER|ALT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+    { key = "r", mods = "SUPER|ALT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+    -- wezterm-native pane を閉じる: Cmd+Alt+x
+    { key = "x", mods = "SUPER|ALT", action = act({ CloseCurrentPane = { confirm = true } }) },
+    -- wezterm-native pane 移動: Cmd+Alt+hjkl
+    { key = "h", mods = "SUPER|ALT", action = act.ActivatePaneDirection("Left") },
+    { key = "l", mods = "SUPER|ALT", action = act.ActivatePaneDirection("Right") },
+    { key = "k", mods = "SUPER|ALT", action = act.ActivatePaneDirection("Up") },
+    { key = "j", mods = "SUPER|ALT", action = act.ActivatePaneDirection("Down") },
     -- Pane選択
     { key = "[", mods = "CTRL|SHIFT", action = act.PaneSelect },
-    -- 選択中のPaneのみ表示
-    { key = "z", mods = "LEADER", action = act.TogglePaneZoomState },
+    -- 選択中のPaneのみ表示 (zoom): Cmd+Alt+z
+    { key = "z", mods = "SUPER|ALT", action = act.TogglePaneZoomState },
 
-    -- Pane番号ジャンプ leader + 1..4 (gui-startup の生成順 = 画面左→右・上→下):
+    -- Pane番号ジャンプ Cmd+Alt+1..4 (gui-startup の生成順 = 画面左→右・上→下):
     --   1 = col1 / 2 = col2 / 3 = col3上 (tmux life) / 4 = col3下 (sub shell)
-    { key = "1", mods = "LEADER", action = act.ActivatePaneByIndex(0) },
-    { key = "2", mods = "LEADER", action = act.ActivatePaneByIndex(1) },
-    { key = "3", mods = "LEADER", action = act.ActivatePaneByIndex(2) },
-    { key = "4", mods = "LEADER", action = act.ActivatePaneByIndex(3) },
+    { key = "1", mods = "SUPER|ALT", action = act.ActivatePaneByIndex(0) },
+    { key = "2", mods = "SUPER|ALT", action = act.ActivatePaneByIndex(1) },
+    { key = "3", mods = "SUPER|ALT", action = act.ActivatePaneByIndex(2) },
+    { key = "4", mods = "SUPER|ALT", action = act.ActivatePaneByIndex(3) },
 
     -- フォントサイズ切替
     { key = "+", mods = "CTRL", action = act.IncreaseFontSize },
@@ -115,13 +84,9 @@ return {
     { key = "p", mods = "SHIFT|CTRL", action = act.ActivateCommandPalette },
     -- 設定再読み込み
     { key = "r", mods = "SHIFT|CTRL", action = act.ReloadConfiguration },
-    -- キーテーブル用
-    { key = "s", mods = "LEADER", action = act.ActivateKeyTable({ name = "resize_pane", one_shot = false }) },
-    {
-      key = "a",
-      mods = "LEADER",
-      action = act.ActivateKeyTable({ name = "activate_pane", timeout_milliseconds = 1000 }),
-    },
+    -- キーテーブル用: resize は Cmd+Alt+s (wezterm-native pane 用)。
+    -- activate_pane テーブルは Cmd+Alt+hjkl の直接 chord で代替できるため撤去。
+    { key = "s", mods = "SUPER|ALT", action = act.ActivateKeyTable({ name = "resize_pane", one_shot = false }) },
   },
   -- キーテーブル
   -- https://wezfurlong.org/wezterm/config/key-tables.html

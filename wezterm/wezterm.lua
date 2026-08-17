@@ -91,7 +91,9 @@ end)
 config.disable_default_key_bindings = true
 config.keys = require("keybinds").keys
 config.key_tables = require("keybinds").key_tables
-config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
+-- leader は撤去 (2026-08-17)。Ctrl+q は herdr(内側マルチプレクサ)の prefix に譲渡。
+-- wezterm 側の pane/tab 操作は leader 無しの直接 chord (Cmd+Alt 系) に移設した (keybinds.lua)。
+-- config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
 -- 起動時のペイン構成 (fenrir 主作業先方針、2026-06-08 更新で 35:35:30 + 30 を上下分割):
 --   col1 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開
