@@ -5,8 +5,9 @@ config.automatically_reload_config = true
 config.font = wezterm.font("HackGen Console NF")
 config.font_size = 10.0
 config.use_ime = true
-config.window_background_opacity = 0.5
-config.macos_window_background_blur = 20
+-- 背景透過を控えめに調整 (2026-08-18)。旧=0.5/20、完全offなら1.0/0。
+config.window_background_opacity = 0.75
+config.macos_window_background_blur = 10
 
 -- レイアウトは gui-startup で「先に maximize → 実最大化サイズを分割」する方式に変更。
 -- これで各 Mac が自分の全画面を同じ比率で割るため、解像度/DPI が違っても分割比が揃う
