@@ -96,53 +96,18 @@ config.key_tables = require("keybinds").key_tables
 -- wezterm 側の pane/tab 操作は leader 無しの直接 chord (Cmd+Alt 系) に移設した (keybinds.lua)。
 -- config.leader = { key = "q", mods = "CTRL", timeout_milliseconds = 2000 }
 
--- 起動時のペイン構成 (fenrir 主作業先方針、2026-06-08 更新で 35:35:30 + 30 を上下分割):
---   col1 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開
---   col2 (35%)        : ssh fenrir + 対話 zsh → Ctrl+J (tmux セッション選択 fzf) 展開 (col1 と同じ)
---   col3 上 (30 の 80%): ssh fenrir + tmux attach -t life (Claude Code メイン作業)
---   col3 下 (30 の 20%): ssh fenrir + cd life + clear + shell (sub 操作用)
--- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir で Tailscale 直 IP に解決)
--- PATH (brew shellenv + ~/.local/bin) は env.zsh が ~/.zshenv 経由で必ず投入されるため、
--- 非対話 ssh でも tmux / nvim / claude にパスが通る (zsh -lc wrapping 不要)
--- Ctrl+J = tmux-session-fzf (~/.config/zsh/fzf.zsh の bindkey)。
--- 制御文字 (\x0a=Ctrl+J) を対話 zsh 起動後に送って展開する。
--- 送出は call_after で遅延。ssh 起動直後は端末が cooked モードで、特に \x0a (Ctrl+J)
--- は改行として line discipline に食われて zle に届かない。zle (raw モード) が立ち上がる
--- 頃に送るため 2 秒待つ。
+-- 起動時 (2026-08-18): herdr 基準運用に移行し、単一 pane で fenrir に ssh → herdr に attach。
+-- wezterm 側の複数 pane 分割・tmux 連携 (旧 col1-3 / Ctrl+J fzf) は廃止。
+-- pane/tab/workspace の管理は接続先 fenrir の herdr (prefix=Ctrl+q) が担う。
+--   - `herdr` は既存の永続 session に attach (無ければ起動)。
+--   - detach (Ctrl+q q) 後は fenrir のログインシェルに落ちる → 再 attach は `herdr`、
+--     Air/mini-lab に戻るなら `exit`。
+-- すべて Tailscale 経由 (`~/.ssh/config` の Host fenrir)。PATH は env.zsh が ~/.zshenv 経由で
+-- 投入するため非対話 ssh でも herdr にパスが通る。
 wezterm.on("gui-startup", function(cmd)
-	-- ssh fenrir で対話 zsh を起動 (cd life + clear)。split の size は新規ペインの比率。
-	local SSH_ZSH = "ssh fenrir -t 'cd ~/src/github.com/38kta-lab/life && clear && exec zsh -l'\n"
-	local CTRL_J = "\x0a" -- LF = Ctrl+J → tmux-session-fzf
-
-	local tab, col1, window = wezterm.mux.spawn_window(cmd or {})
-	-- 先に maximize。サイズ更新は非同期なので、少し待ってから分割する。
-	-- こうすると各 Mac の「実際の最大化サイズ」を同じ比率で割るため、解像度/DPI が
-	-- 違っても分割比が一定 (= mini-home 基準) になる。
+	local tab, pane, window = wezterm.mux.spawn_window(cmd or {})
 	window:gui_window():maximize()
-	wezterm.time.call_after(0.6, function()
-		-- col1 を 35%、残り 65% を right に。
-		local right = col1:split({ direction = "Right", size = 0.65 })
-		-- right (65%) から col3 (30%) を切り出す。残った right が col2 (35%)。
-		local col3 = right:split({ direction = "Right", size = 30 / 65 })
-		local col2 = right
-		-- col3 (30%) を上 70% / 下 30% に分割。size は新規 (Bottom) の比率。
-		-- 右下は marp_preview の 16:9 画像用。col3 幅 (画面の30%) が上限なので、
-		-- 画面が 16:9 なら高さ ≈0.3 で画像がほぼ幅いっぱい (最大) になる。
-		local col3_bottom = col3:split({ direction = "Bottom", size = 0.3 })
-
-		-- fzf ペイン: 先に ssh+zsh を起動し、zle が立ち上がる頃に制御文字を遅延送出する。
-		col1:send_text(SSH_ZSH) -- col1: Ctrl+J → tmux セッション選択 fzf
-		-- col2: col1 と同じ (Ctrl+J → tmux セッション選択 fzf)。
-		col2:send_text(SSH_ZSH)
-		-- col3 上: tmux life セッションに attach (Claude Code メイン作業)。
-		col3:send_text("ssh fenrir -t 'tmux a -t life'\n")
-		-- col3 下: sub 操作用の通常 shell。
-		col3_bottom:send_text(SSH_ZSH)
-		wezterm.time.call_after(2.0, function()
-			col1:send_text(CTRL_J)
-			col2:send_text(CTRL_J)
-		end)
-	end)
+	pane:send_text("ssh fenrir -t 'herdr; exec zsh -l'\n")
 end)
 
 return config
