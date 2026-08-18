@@ -184,6 +184,7 @@ main() {
   link_config_dir "$REPO/czg" "${XDG_CONFIG_HOME:-$HOME/.config}/czg"
   link_config_dir "$REPO/cz-git" "${XDG_CONFIG_HOME:-$HOME/.config}/cz-git"
   link_config_dir "$REPO/tmux" "${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+  link_config_dir "$REPO/ghostty" "${XDG_CONFIG_HOME:-$HOME/.config}/ghostty"
   link_starship
   link_skills
   install_czrc_template

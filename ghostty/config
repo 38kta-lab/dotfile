@@ -1,0 +1,23 @@
+# Ghostty config — managed by dotfile/init.sh (symlinked to ~/.config/ghostty/)
+# 2026-08-18 追加。目的: herdr 内での Kitty graphics 表示を可能にする
+# (WezTerm は herdr の virtual placeholder 方式を未実装のため画像が出ない。Ghostty は対応)。
+# herdr 基準運用: 起動時に fenrir へ ssh し herdr に attach (wezterm と同思想)。
+# Ctrl+q は Ghostty が掴まない(既定は Cmd 系)ので herdr(prefix=Ctrl+q)へ素通しする。
+
+# --- font (wezterm と同一) ---
+font-family = HackGen Console NF
+font-size = 10
+
+# --- 背景 (wezterm と同値: 透過 0.75 / blur 10) ---
+background-opacity = 0.75
+background-blur-radius = 10
+
+# --- ssh 経路の terminfo 事故防止 ---
+# fenrir に xterm-ghostty terminfo が無いと ssh 先でエラーになりうるため 256color を名乗る。
+# Kitty graphics は TERM ではなく capability probe で検出されるので画像表示には影響しない。
+term = xterm-256color
+
+# --- 起動コマンド: fenrir の herdr に attach ---
+# detach (Ctrl+q q) 後は fenrir の login zsh に落ちる。再attach=herdr / Air戻り=exit。
+# もし起動直後にウィンドウが閉じる等あれば、この行を # で無効化して素の shell で検証する。
+command = /Users/kta/.config/ghostty/attach-fenrir.sh
