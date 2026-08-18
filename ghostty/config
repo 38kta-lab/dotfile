@@ -18,6 +18,8 @@ background-blur-radius = 10
 term = xterm-256color
 
 # --- 起動コマンド: fenrir の herdr に attach ---
+# 引数付き command は Ghostty が /bin/sh -c 経由で実行するため、ssh を直書きできる
+# (ホーム依存の絶対パス不要 = kta / kta38-mini-lab など機ごとの $HOME 差を回避)。
 # detach (Ctrl+q q) 後は fenrir の login zsh に落ちる。再attach=herdr / Air戻り=exit。
 # もし起動直後にウィンドウが閉じる等あれば、この行を # で無効化して素の shell で検証する。
-command = /Users/kta/.config/ghostty/attach-fenrir.sh
+command = ssh fenrir -t "herdr; exec zsh -l"
