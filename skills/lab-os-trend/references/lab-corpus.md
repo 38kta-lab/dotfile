@@ -18,13 +18,13 @@ lab-os-trend は **user 個人の興味ではなく、この研究室（増田�
 ## 検索キーワード（fetch_papers.py 用・カンマ区切り・単一ソース）
 
 > **これが検索の唯一の定義**。SKILL.md では重複させず、この行を読んで `--keywords` に渡す。
-> 由来：過去15論文の PubMed MeSH 用語＋著者キーワードを集計し、ラボ固有で recall/precision の良い語を採用（2026-09-10）。
-> 除外：Arabidopsis / Gene Expression Regulation, Plant 等は広すぎて洪水になるため検索には入れない（採点コーパス側でカバー）。
-> `polysulfide` は電池/材料化学の論文を大量に拾う（生物の SqrR/硫黄代謝ではない）ため検索から除外し、`persulfide`+`SqrR` でラボ文脈をカバー（2026-09-10 の実測で判明・iterate）。
+> 設計＝daily-search-trend に倣い「**広い anchor 語（毎日の量を確保）＋焦点語（ニッチを射抜く）**」の二層。過広は関連度採点で沈める。
+> 由来：過去15論文の PubMed MeSH＋著者キーワード集計（2026-09-10）＋ daily-trend の broad/focused 設計。
+> **実測チューニング（2026-09-10）**: 単日 broad+focus で ~36件/日と十分。ただし `molecular evolution`（汎用すぎ・ラボ外進化論文を大量）と `polysulfide`（電池/材料化学を大量）は**検索から除外**し採点コーパス側でカバー。Arabidopsis / Gene Expression Regulation も広すぎるため不採用。
 
-phycobilin, phycocyanobilin, phycobiliprotein, phycoerythrobilin, bilin reductase, ferredoxin-dependent bilin reductase, biliverdin, tetrapyrrole biosynthesis, heme oxygenase, heme-binding protein, phytochrome, cyanobacteriochrome, chromatic acclimation, chlorophyll f, far-red light photoacclimation, persulfide, SqrR, stercobilin, bilirubin reductase
+photosynthesis, cyanobacteria, photoreceptor, tetrapyrrole, phycobilin, phycocyanobilin, phycobiliprotein, phycoerythrobilin, bilin reductase, ferredoxin-dependent bilin reductase, biliverdin, heme oxygenase, heme-binding protein, phytochrome, cyanobacteriochrome, chromatic acclimation, chlorophyll f, far-red light photoacclimation, Acaryochloris, persulfide, SqrR, stercobilin, bilirubin reductase, GUN1
 
-（MeSH集計の主要語：Phycobilins / Phycocyanin / Phytochrome / Tetrapyrroles / Heme / Heme-Binding Proteins / Heme Oxygenase-1 / Chloroplasts / Photosynthesis / Sulfides。著者kw：chloroplast / retrograde signaling / polysulfide / redox signaling / transcriptional regulation。論文が増えたら再集計して更新する。）
+（先頭4つ = 広い anchor（ラボ隣接）／以降 = 焦点語。MeSH主要語：Phycobilins/Phycocyanin/Phytochrome/Tetrapyrroles/Heme/Heme Oxygenase-1/Chloroplasts/Photosynthesis/Sulfides。著者kw：chloroplast/retrograde signaling/polysulfide/redox signaling。論文が増えたら再集計。）
 
 ## 過去論文（近年・関連度の錨。タイトルの近さで採点の目安に）
 

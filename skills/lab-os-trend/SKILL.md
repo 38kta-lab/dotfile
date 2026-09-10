@@ -11,9 +11,10 @@ user's personal `portfolio/`). Here, score by **relevance to the lab's past pape
 
 ## What is different from daily-search-trend
 
-- **Scope**: papers/preprints only. No Nature/Science/ナゾロジー news, no HTML render, no portal index.
-- **Scoring basis**: `references/lab-corpus.md` (lab themes + past-paper titles) — NOT `portfolio/`.
-- **Output**: a Japanese Markdown digest + a 1-line highlight, **POSTed to lab-OS** (not written to ideas/daily/).
+- **Sources**: PubMed (NCBI E-utilities) **＋ Europe PMC の bioRxiv プレプリント（SRC:PPR）** — fetch_papers.py が両方を叩く。NCBI 単独ではない。Nature/Science/ナゾロジーの news は含めない（論文トレンドに特化）。HTML/portal も無し。
+- **Keywords**: 広い anchor 語＋焦点語の二層（`references/lab-corpus.md`）。広い語が毎日の量を確保し、焦点語がニッチを射抜く。過広な当たりは関連度採点で沈む。
+- **Scoring basis**: `references/lab-corpus.md`（ラボのテーマ＋過去論文）— NOT `portfolio/`.
+- **Output**: 日本語 Markdown digest ＋ 1行ハイライトを **lab-OS へ POST**（ideas/daily/ には書かない）。
 
 ## Dates (newspaper model)
 
@@ -43,10 +44,10 @@ So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fet
    - `★★★☆☆` generally related background.
    - `★★☆☆☆` / `★☆☆☆☆` weak. Do **not** silently drop low items; keep a short tail.
    - Judge relevance to the LAB, not to the reader.
-6. **Write** the digest as Markdown (Japanese). **List ALL fetched papers, sorted by relevance (highest ★ first) — do not drop any.** The 研究トレンド page shows the full ranked list.
-   - Format each as one list item: `★スコア` ＋ **日本語タイトル** ＋ なぜラボに関連するか一言 ＋ `[PubMed](url)`（あれば `[DOI](https://doi.org/…)`）。
-   - Optionally put a short `## 注目` heading before the top ★★★★+ items and `## その他` before the rest, but every fetched paper must appear somewhere in relevance order.
-   - 該当が無い日は `本日はラボ関連の新着はありませんでした。` の1行のみ。
+6. **Write** the digest as Markdown (Japanese), **relevance order (highest ★ first)**. 広い anchor 語で取得数が多い日（数十件）でも読めるよう、関連度で 2 段に：
+   - `## 注目`（★★★ 以上）: 各 1–2 行。`★スコア` ＋ **日本語タイトル** ＋ なぜラボに関連するか一言 ＋ `[PubMed](url)`（あれば `[DOI](https://doi.org/…)`）。ラボの過去論文テーマに近いものはここ。
+   - `## その他`（★★ 以下・広い語での一般ヒット）: `★` ＋ 日本語タイトル ＋ リンク の**1行**箇条書き（コメント無しで簡潔に）。**取りこぼさず全件ここに載せる**（研究トレンドページは全件を見せる）。件数が非常に多い日は ★★ を注目寄り、★☆ を末尾へ。
+   - 該当（★★★以上）が無い日は「本日はラボ関連の注目新着はありませんでした。」＋その他に一般ヒットを列挙。
    - Footer 行に対象日（fetch 日）を明記。保守的に、1本から過度に一般化しない。
 7. **Highlight**: choose a single one-line Japanese highlight = the most lab-relevant finding of the day (shown in lab-OS お知らせ). If nothing notable, use a neutral one-liner.
 8. **Push** to lab-OS with the **generation date (today)**, not the fetch date. Write the digest to a temp file and POST:
