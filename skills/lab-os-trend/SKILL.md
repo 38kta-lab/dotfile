@@ -44,11 +44,17 @@ So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fet
    - `★★★☆☆` generally related background.
    - `★★☆☆☆` / `★☆☆☆☆` weak. Do **not** silently drop low items; keep a short tail.
    - Judge relevance to the LAB, not to the reader.
-6. **Write** the digest as Markdown (Japanese), **relevance order (highest ★ first)**. 広い anchor 語で取得数が多い日（数十件）でも読めるよう、関連度で 2 段に：
-   - `## 注目`（★★★ 以上）: 各 1–2 行。`★スコア` ＋ **日本語タイトル** ＋ なぜラボに関連するか一言 ＋ `[PubMed](url)`（あれば `[DOI](https://doi.org/…)`）。ラボの過去論文テーマに近いものはここ。
-   - `## その他`（★★ 以下・広い語での一般ヒット）: `★` ＋ 日本語タイトル ＋ リンク の**1行**箇条書き（コメント無しで簡潔に）。**取りこぼさず全件ここに載せる**（研究トレンドページは全件を見せる）。件数が非常に多い日は ★★ を注目寄り、★☆ を末尾へ。
+6. **Write** the digest as Markdown, **relevance order (highest ★ first)**. **各項目は「英語の原文タイトルをそのまま（リンク）＋★関連度」を見出しにし、その下に日本語訳を置く**（daily-trend の 原文タイトル/タイトル訳 方式）。勝手に和文へ言い換えず、原題を verbatim で出す。
+   - 各項目の形（1件）：
+     ```
+     - **[<original English title verbatim>](<pubmed url>)** ★★★★☆
+       訳: <日本語訳>
+       — <なぜラボに関連するか一言>（★★★以上のみ・任意）  ・ [DOI](https://doi.org/…)
+     ```
+   - `## 注目`（★★★ 以上・ラボ過去論文に近い）: 上記の完全形（訳＋一言）。
+   - `## その他`（★★ 以下・広い語での一般ヒット）: `- **[<English title>](<url>)** ★★ ／ 訳: <日本語訳>` の**簡潔2行**（一言コメント無し）。**取りこぼさず全件**載せる（研究トレンドページは全件を見せる）。件数が非常に多い日は ★☆ を末尾へ。
    - 該当（★★★以上）が無い日は「本日はラボ関連の注目新着はありませんでした。」＋その他に一般ヒットを列挙。
-   - Footer 行に対象日（fetch 日）を明記。保守的に、1本から過度に一般化しない。
+   - 原文が日本語の記事はそのまま（訳は省略）。Footer 行に対象日（fetch 日）を明記。保守的に、1本から過度に一般化しない。
 7. **Highlight**: choose a single one-line Japanese highlight = the most lab-relevant finding of the day (shown in lab-OS お知らせ). If nothing notable, use a neutral one-liner.
 8. **Push** to lab-OS with the **generation date (today)**, not the fetch date. Write the digest to a temp file and POST:
    ```bash
