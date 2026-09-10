@@ -29,13 +29,13 @@ So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fet
 
 1. **Dates**: fetch = previous day, label/push = today (see above). Accept explicit overrides if given.
 2. **Read** `references/lab-corpus.md` for the lab keyword set and the past-paper corpus. Use ONLY this to judge relevance.
-3. **Fetch** candidates with the shared fetcher (reuse daily-search-trend's script):
+3. **Fetch** candidates with the shared fetcher. **The keyword list lives ONLY in `references/lab-corpus.md`** (the "検索キーワード" line) — read it from there and pass it verbatim (do not hardcode a copy here):
    ```bash
    python3 ~/.claude/skills/daily-search-trend/scripts/fetch_papers.py \
-     --keywords "phycobilin,bilin reductase,ferredoxin-dependent bilin reductase,phytochrome,cyanobacteriochrome,phycobiliprotein,chromatic acclimation,chlorophyll f,far-red light photoacclimation,tetrapyrrole biosynthesis,heme oxygenase,biliverdin,phycocyanobilin,stercobilin,bilirubin reductase" \
-     --target-date YYYY-MM-DD
+     --keywords "<comma-joined keywords from references/lab-corpus.md>" \
+     --target-date <fetch>
    ```
-   (Keep the keyword list in sync with `references/lab-corpus.md`.) An NCBI API key in `~/.config/life/ncbi.env` (if present) raises the rate limit.
+   An NCBI API key in `~/.config/life/ncbi.env` (if present) raises the rate limit.
 4. **Deduplicate** by DOI / title / URL.
 5. **Score each** candidate 0–5 by closeness to the lab corpus (themes + past-paper titles):
    - `★★★★★` core lab topic (e.g. a new FDBR / bilin reductase structure, phycobilin/phytochrome mechanism, Acaryochloris/far-red photoacclimation, iBR/gut bilin).
@@ -43,11 +43,11 @@ So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fet
    - `★★★☆☆` generally related background.
    - `★★☆☆☆` / `★☆☆☆☆` weak. Do **not** silently drop low items; keep a short tail.
    - Judge relevance to the LAB, not to the reader.
-6. **Write** the digest as Markdown (Japanese), ranked by relevance:
-   - `## 注目`（★★★★ 以上）: 各項目 1–2 行。**日本語タイトル** — なぜラボに関連するか一言、`★`、DOI/URL リンク。
-   - `## その他`（★★★ 以下）: タイトル＋`★`＋リンクの短い箇条書き。
+6. **Write** the digest as Markdown (Japanese). **List ALL fetched papers, sorted by relevance (highest ★ first) — do not drop any.** The 研究トレンド page shows the full ranked list.
+   - Format each as one list item: `★スコア` ＋ **日本語タイトル** ＋ なぜラボに関連するか一言 ＋ `[PubMed](url)`（あれば `[DOI](https://doi.org/…)`）。
+   - Optionally put a short `## 注目` heading before the top ★★★★+ items and `## その他` before the rest, but every fetched paper must appear somewhere in relevance order.
    - 該当が無い日は `本日はラボ関連の新着はありませんでした。` の1行のみ。
-   - 保守的に。1本の論文から過度に一般化しない。
+   - Footer 行に対象日（fetch 日）を明記。保守的に、1本から過度に一般化しない。
 7. **Highlight**: choose a single one-line Japanese highlight = the most lab-relevant finding of the day (shown in lab-OS お知らせ). If nothing notable, use a neutral one-liner.
 8. **Push** to lab-OS with the **generation date (today)**, not the fetch date. Write the digest to a temp file and POST:
    ```bash
