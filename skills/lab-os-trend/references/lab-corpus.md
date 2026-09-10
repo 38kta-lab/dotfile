@@ -15,9 +15,16 @@ lab-os-trend は **user 個人の興味ではなく、この研究室（増田�
 - 腸内細菌のビリン代謝（stercobilin / urobilinogen / bilirubin reductase, ヒト便色素）と iBR
 - 構造ベースの酵素探索・タンパク質構造進化（Foldseek/AFDB, 収斂進化）
 
-## キーワード（fetch_papers.py 用・カンマ区切り）
+## 検索キーワード（fetch_papers.py 用・カンマ区切り・単一ソース）
 
-phycobilin, bilin reductase, ferredoxin-dependent bilin reductase, phytochrome, cyanobacteriochrome, phycobiliprotein, chromatic acclimation, chlorophyll f, far-red light photoacclimation, tetrapyrrole biosynthesis, heme oxygenase, biliverdin, phycocyanobilin, stercobilin, bilirubin reductase
+> **これが検索の唯一の定義**。SKILL.md では重複させず、この行を読んで `--keywords` に渡す。
+> 由来：過去15論文の PubMed MeSH 用語＋著者キーワードを集計し、ラボ固有で recall/precision の良い語を採用（2026-09-10）。
+> 除外：Arabidopsis / Gene Expression Regulation, Plant 等は広すぎて洪水になるため検索には入れない（採点コーパス側でカバー）。
+> `polysulfide` は電池/材料化学の論文を大量に拾う（生物の SqrR/硫黄代謝ではない）ため検索から除外し、`persulfide`+`SqrR` でラボ文脈をカバー（2026-09-10 の実測で判明・iterate）。
+
+phycobilin, phycocyanobilin, phycobiliprotein, phycoerythrobilin, bilin reductase, ferredoxin-dependent bilin reductase, biliverdin, tetrapyrrole biosynthesis, heme oxygenase, heme-binding protein, phytochrome, cyanobacteriochrome, chromatic acclimation, chlorophyll f, far-red light photoacclimation, persulfide, SqrR, stercobilin, bilirubin reductase
+
+（MeSH集計の主要語：Phycobilins / Phycocyanin / Phytochrome / Tetrapyrroles / Heme / Heme-Binding Proteins / Heme Oxygenase-1 / Chloroplasts / Photosynthesis / Sulfides。著者kw：chloroplast / retrograde signaling / polysulfide / redox signaling / transcriptional regulation。論文が増えたら再集計して更新する。）
 
 ## 過去論文（近年・関連度の錨。タイトルの近さで採点の目安に）
 
