@@ -15,9 +15,19 @@ user's personal `portfolio/`). Here, score by **relevance to the lab's past pape
 - **Scoring basis**: `references/lab-corpus.md` (lab themes + past-paper titles) — NOT `portfolio/`.
 - **Output**: a Japanese Markdown digest + a 1-line highlight, **POSTed to lab-OS** (not written to ideas/daily/).
 
+## Dates (newspaper model)
+
+Two distinct dates:
+
+- **Fetch date** = the **previous calendar day** (`date -v-1d +%F`) — the papers to collect.
+- **Generation / label date** = **today** (`date +%F`) — the date the digest is filed under in lab-OS.
+
+So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fetch>`, but push with
+`--date <today>`. The lab-OS entry slug becomes `trend-<today>`. Mention the coverage day in the digest footer.
+
 ## Workflow
 
-1. **Target day**: default = previous calendar day (`date +%F` minus 1). Accept an explicit `YYYY-MM-DD` if given.
+1. **Dates**: fetch = previous day, label/push = today (see above). Accept explicit overrides if given.
 2. **Read** `references/lab-corpus.md` for the lab keyword set and the past-paper corpus. Use ONLY this to judge relevance.
 3. **Fetch** candidates with the shared fetcher (reuse daily-search-trend's script):
    ```bash
@@ -39,10 +49,10 @@ user's personal `portfolio/`). Here, score by **relevance to the lab's past pape
    - 該当が無い日は `本日はラボ関連の新着はありませんでした。` の1行のみ。
    - 保守的に。1本の論文から過度に一般化しない。
 7. **Highlight**: choose a single one-line Japanese highlight = the most lab-relevant finding of the day (shown in lab-OS お知らせ). If nothing notable, use a neutral one-liner.
-8. **Push** to lab-OS. Write the digest to a temp file and POST:
+8. **Push** to lab-OS with the **generation date (today)**, not the fetch date. Write the digest to a temp file and POST:
    ```bash
-   python3 <skill-dir>/scripts/push_trend.py --date YYYY-MM-DD \
-     --highlight "<1行ハイライト>" --md /tmp/labos-trend-YYYY-MM-DD.md
+   python3 <skill-dir>/scripts/push_trend.py --date <today> \
+     --highlight "<1行ハイライト>" --md /tmp/labos-trend-<today>.md
    ```
    `push_trend.py` needs `LABOS_INGEST_TOKEN` (and optionally `LABOS_URL`) in the environment — the cron
    wrapper sources `~/.config/life/labos.env`. On success it prints `200 {"ok": true, ...}`.
