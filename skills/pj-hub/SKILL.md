@@ -40,11 +40,15 @@ Use `quick-capture` for quick unstructured notes. Use `issue-capture` when the u
 
 ## File Naming
 
-Use lowercase kebab-case English or romanized slugs:
+Follow the repo's documented naming convention first; use lowercase kebab-case English or romanized slugs only when the repo defines none:
 
 ```text
 projects/active/project-slug.md
 ```
+
+**For the `life` repository**, slugs carry a Tier prefix (`Rules.md`「PJ Hub slug 命名規則」2026-06-04 制定, summarized in `projects/README.md`):
+`NN_L` = Research / `A##` = Application / `C##` = Collaboration / `E##` = Education / `X##` = Cross-cutting / `M##` = Misc.
+Examples: `projects/active/02_B_bilin-synthesis.md`, `A06-kakenhi.md`, `E04-lab-infra.md`, `M05-ai-side-business.md`.
 
 When archiving, move to:
 

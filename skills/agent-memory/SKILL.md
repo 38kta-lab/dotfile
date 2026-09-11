@@ -15,7 +15,9 @@ Before saving, listing, or recalling memories:
 2. Find the documented working-memory location.
 3. Use that path as the memory directory.
 
-For this `life` repository, `Rules.md` defines `.agent/memories/`.
+Repos differ — always follow the repo's own `Rules.md`.
+
+**For the `life` repository (2026-06-10 方針更新)**: the canonical store is the **Claude Code harness auto-memory** at `~/.claude/projects/<project>/memory/` (1 fact = 1 file, frontmatter `name`/`description`/`metadata.type`, index `MEMORY.md`). The git-tracked `.agent/memories/` is a **frozen read-only archive** — do not add or modify files there. **This skill is therefore deprecated in `life`**; use the harness memory instead. See `Rules.md`「作業記憶」.
 
 If `Rules.md` does not define a memory directory, ask the user where to store memories. Do not silently choose a global location.
 
@@ -28,7 +30,9 @@ Treat repository memories as git-shared notes. Do not store secrets, directly ab
 Claude Code may also maintain per-machine auto memories under `~/.claude/projects/<project>/memory/`. These two systems are complementary:
 
 - `agent-memory` skill (this skill): git-shared, multi-machine, curated. Triggered by explicit user requests like 「記憶して」「思い出して」.
-- Claude Code auto memory: per-machine, written automatically by Claude. Carries conversation context across sessions on the same machine.
+- Claude Code auto memory: per-machine, written by Claude. Carries facts across sessions on the same machine.
+
+**Which one is canonical depends on the repo.** In `life` the auto-memory is canonical and this skill is deprecated (see above); in other repos this skill remains the default. Never write to both for the same fact.
 
 Use `agent-memory` for facts that should follow the repo across machines and be visible in git.
 Use Claude Code auto memory for ephemeral conversation context private to this machine. The two do not need to be kept in sync.
@@ -149,6 +153,8 @@ When the user asks to remember or check prior notes:
 - Promote durable, shareable knowledge to normal repository areas when appropriate.
 
 ## Auto-finalize
+
+Applies **only to repos where memories live inside the repo**. It does **not** apply to `life` (memories are in the harness auto-memory, outside git — nothing to commit).
 
 After saving, updating, or consolidating memory files, run the shared finalize script. It is a no-op unless `AGENT_AUTO_COMMIT=1` is exported in the shell. On `fenrir` this is the default; on Air / mini-lab it is unset, so this call has no effect.
 
