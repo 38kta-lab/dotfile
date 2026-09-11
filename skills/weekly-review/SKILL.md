@@ -50,16 +50,16 @@ Primary source files:
 - `ideas/inbox/YYYY-MM-DD.md` files whose date is inside the review window.
 - `ideas/daily/md/YYYY-MM-DD-digest.md` files whose date is inside the review window.
 - `projects/active/*.md` files with active, pending, blocked, upcoming checkpoint, or updated content relevant to the review window.
-- `.agent/memories/*.md` files with `created` or `updated` inside the review window.
+- 作業記憶の正本 = Claude Code auto-memory (`~/.claude/projects/<project>/memory/`)。索引 `MEMORY.md` を見て、レビュー期間内に追加/更新された memory だけを開く。（git 管理の `.agent/memories/` は 2026-05-19 までの凍結アーカイブ。通常は見ない）
 
 Optional source files:
 
 - Read `ideas/daily/md/YYYY-MM-DD-trend.md` only if the user explicitly asks to include trend tables, or if digest coverage is absent and a short source index is needed. When using trend files, summarize only high-level signals from titles, categories, and interest scores; do not reproduce every row.
 
-Do not read unrelated memory bodies. Search memory frontmatter first, then read only relevant files:
+Do not read unrelated memory bodies. Read the index first, then open only relevant files:
 
 ```bash
-rg "^(summary|created|updated|status|tags):" .agent/memories -n
+cat ~/.claude/projects/-Users-kta-src-github-com-38kta-lab-life/memory/MEMORY.md
 ```
 
 Find daily source files by date:

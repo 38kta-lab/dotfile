@@ -23,7 +23,7 @@ For the `life` repo, the main inputs are:
 ideas/inbox/YYYY-MM-DD.md
 ideas/task-review/md/night-YYYY-MM-DD.md   # 前夜の計画 (今日モード時の baseline、下「Night Brief Carry-Over」)
 projects/active/*.md
-.agent/memories/*.md
+~/.claude/projects/-Users-kta-src-github-com-38kta-lab-life/memory/MEMORY.md   # 作業記憶の正本(auto-memory)の索引
 scripts/google_calendar_read.py
 scripts/google_calendar_create.py
 scripts/gmail_task_review.py
@@ -181,10 +181,11 @@ brief での扱い:
 Memory:
 
 ```bash
-rg "^(summary|created|updated|status|tags):" .agent/memories -n
+cat ~/.claude/projects/-Users-kta-src-github-com-38kta-lab-life/memory/MEMORY.md
 ```
 
-Read only memories with recent or explicitly relevant task-planning context, such as "tomorrow", "next action", "Calendar", or "weekly-review".
+作業記憶の正本は **Claude Code auto-memory**（`~/.claude/projects/<project>/memory/`、`Rules.md`「作業記憶」）。索引 `MEMORY.md` は harness が毎セッション読み込むので、**索引の1行で足りるなら本文は開かない**。タスク計画に直接効くもの（"tomorrow" / "next action" / Calendar / weekly-review 等）だけ個別ファイルを読む。
+※ git 管理の `.agent/memories/` は 2026-05-19 までの**凍結アーカイブ**。過去の判断履歴を辿るときだけ `rg ... .agent/memories -n` で参照する。
 
 PJ Activity Feed (案 3 / life#81 で実装、`/Users/kta/.local/share/life/_life/task-review/pj_activity.json`):
 
