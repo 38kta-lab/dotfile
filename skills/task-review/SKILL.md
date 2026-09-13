@@ -199,6 +199,13 @@ cat /Users/kta/.local/share/life/_life/task-review/pj_activity.json
 - `inferred_last_done` 以降の `[ ]` から「今日のタスク」を選ぶ
 - `stale_days >= 5` の hub は出力で `⚠️ PJ hub stale` 併記
 - ファイル不在の場合は無視して進めて、出力に `(pj_activity.json absent)` を一言入れる
+- **`generated_at` を必ず見る。今日でなければ stale として扱う**: このフィードは NFS(`/data`) が
+  応答しないと生成に失敗することがあり、失敗しても**古い json がそのまま残る**（消えない）。
+  古い mtime を「今日の実態」として引用すると、終わっている作業を毎朝 carry-over し続ける
+  （2026-09-12〜13 に 07_G で実際に 2 日連続発生。note1.md の mtime を 3 日前の値で報告した）。
+  - `generated_at` が今日でない → 出力に `⚠️ pj_activity.json は <日付> 生成（stale）` と明記し、
+    **mtime 系の主張はそのまま使わず**、hub MD の `updated:` と `git log` を直接見て裏を取る
+  - 復旧は `python3 scripts/automation/pj_activity_feed.py` を手で 1 回走らせるだけ
 
 ## Known Judgment Errors
 
@@ -212,7 +219,14 @@ rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/ju
 
 - **archived-pj-action**: `projects/archive/` 配下 PJ や `status: done` hub に対する action 提案を出さない。Gmail で関連する subject が出ても、archive 化済みの PJ なら action_required から外す。
 - **self-sent-misread**: From が user 自身のメール (`USER_EMAIL` 一致) を upcoming task と解釈しない。状態追跡 (返信待ち / 提出済) と捉えて action_required に入れない。
-- **completed-item-resurface**: 完了済みの項目を、締切が未来でも `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。完了の信号は ⓐ carry-over 元 brief の `✅ 提出済み` / `再掲不要` / 取り消し線、ⓑ 出所メールの `9. Done/Triage` タグ (= `latest.json` の `recently_done` に件名/差出人が一致)、の 2 つ。brief は毎朝再生成され session task の完了状態を持たないため、この 2 信号だけを resolved の根拠にする (例: 月次の勤務状況等申告書を提出後も締切日まで毎朝再掲してしまった、2026-06-29)。
+- **completed-item-resurface**: 完了済みの項目を、締切が未来でも `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。完了の信号は ⓐ carry-over 元 brief の `✅ 提出済み` / `再掲不要` / 取り消し線、ⓑ 出所メールの `9. Done/Triage` タグ (= `latest.json` の `recently_done` に件名/差出人が一致)、ⓒ **PJ hub の Current State / Next Actions に完了記録（`✅` / 「済」/ 日付つきの完了行）がある**、の 3 つ。brief は毎朝再生成され session task の完了状態を持たないため、この 3 信号を resolved の根拠にする (例: 月次の勤務状況等申告書を提出後も締切日まで毎朝再掲してしまった、2026-06-29)。
+- **mail-only-completion**: **メールに痕跡が無いことを「未完了」の根拠にしない。** 受け渡し・依頼・回答は
+  Slack / 口頭 / 手渡し / 共有ドライブのコメントでも成立する。Gmail に完了メールが無いときは
+  「未完了」と断定せず、**ⓒ の PJ hub を必ず確認**し、それでも分からなければ
+  「メール上は確認できず（Slack 等の可能性）」と**不確実性を明示**して挙げる。
+  (例: 02_B で三宅→今野くんの Word 受け渡しを **Slack** で済ませたのに、
+  「Word 受け渡しを示す新着メールが無い → 未完了として扱う」と断定し、9/12・9/13 の 2 日連続で
+  完了済みタスクを再掲した。02_B hub の共同研究者節に「連絡・ファイル受け渡しは Slack」と明記済み。)
 
 新しい判断ミスを user から訂正された場合は、その場で `outputs/skill-improvements/judgment-errors.md` に 1 行 append する (Date / Skill / Category / Bad / Correction / Root Cause / Status=open)。
 
