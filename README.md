@@ -41,30 +41,8 @@ auto-activating `base`.
 echo "" >> "$HOME/.zprofile"
 echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> "$HOME/.zprofile"
 eval "$(/opt/homebrew/bin/brew shellenv zsh)"
-brew tap jesseduffield/lazygit
-brew tap olets/tap
-brew install antigen
-brew install zsh-abbr
-brew install --cask wezterm@nightly
-brew install --cask font-hackgen-nerd
-brew install starship
-brew install neovim
-brew install fzf
-brew install bat
-brew install zoxide
-brew install fd
-brew install ripgrep
-brew install gh
-brew install ghq
-brew install jesseduffield/lazygit/lazygit
-brew install git-delta
-brew install ghostscript
-brew install imagemagick
-brew install node
-brew install mermaid-cli
-brew install tectonic
-brew install tree-sitter
-brew install tree-sitter-cli
+# パッケージの一覧は Brewfile が正本（個別の brew install をここに増やさない）
+brew bundle --file=./Brewfile
 npm install -g git-cz czg cz-git
 npx -y czg --api-key="sk-XXXX"
 ```

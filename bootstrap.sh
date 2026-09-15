@@ -13,34 +13,13 @@ if ! grep -q 'brew shellenv zsh' "$HOME/.zprofile" 2>/dev/null; then
 fi
 eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 
-brew tap jesseduffield/lazygit
-brew tap olets/tap
+DOTFILE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-brew install antigen
-brew install zsh-abbr
-brew install --cask wezterm@nightly
-brew install --cask font-hackgen-nerd
-brew install starship
-brew install neovim
-brew install fzf
-brew install bat
-brew install zoxide
-brew install fd
-brew install ripgrep
-brew install gh
-brew install ghq
-brew install jesseduffield/lazygit/lazygit
-brew install git-delta
-brew install ghostscript
-brew install imagemagick
-brew install node
-brew install mermaid-cli
-brew install tectonic
-brew install tmux
-brew install tree-sitter
-brew install tree-sitter-cli
+# パッケージの一覧は Brewfile が正本。ここに個別の brew install を増やさないこと
+# （2箇所に書くと必ずずれる。実際 herdr/ghostty と zoxide がずれていた）。
+brew bundle --file="$DOTFILE_DIR/Brewfile"
 
-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"/install_miniforge.sh
+"$DOTFILE_DIR"/install_miniforge.sh
 
 if command -v npm >/dev/null 2>&1; then
   npm install -g git-cz czg cz-git
