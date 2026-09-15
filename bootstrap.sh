@@ -15,6 +15,10 @@ eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 
 DOTFILE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Homebrew 7 から公式以外の tap は明示的に信頼しないと formula を読めない。
+# 信頼情報は ~/.homebrew/trust.json（マシンごと）なので、この repo では持てない。
+brew trust olets/tap
+
 # パッケージの一覧は Brewfile が正本。ここに個別の brew install を増やさないこと
 # （2箇所に書くと必ずずれる。実際 herdr/ghostty と zoxide がずれていた）。
 brew bundle --file="$DOTFILE_DIR/Brewfile"

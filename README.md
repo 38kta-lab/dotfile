@@ -30,6 +30,13 @@ mkdir -p "$HOME/.config/zsh" "$HOME/.config/wezterm" "$HOME/.config/codex/skills
 ./init.sh
 ```
 
+既にあるマシンへ **追加分だけ** 取り込むときは `--no-upgrade` を付ける。
+付けないと `brew bundle` は古い formula をまとめて `upgrade` する。
+
+```sh
+git pull && brew bundle --file=./Brewfile --no-upgrade
+```
+
 `./bootstrap.sh` also installs Miniforge3 into `~/miniforge3` when missing.
 `./init.sh` links `zsh/env.zsh`, which loads conda shell support without
 auto-activating `base`.
@@ -41,6 +48,8 @@ auto-activating `base`.
 echo "" >> "$HOME/.zprofile"
 echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> "$HOME/.zprofile"
 eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+# 公式以外の tap は Homebrew 7 から明示的な信頼が要る（~/.homebrew/trust.json, マシンごと）
+brew trust olets/tap
 # パッケージの一覧は Brewfile が正本（個別の brew install をここに増やさない）
 brew bundle --file=./Brewfile
 npm install -g git-cz czg cz-git
