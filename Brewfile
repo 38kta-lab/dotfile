@@ -1,4 +1,3 @@
-tap "jesseduffield/lazygit"
 tap "olets/tap"
 brew "antigen"
 brew "bat"
