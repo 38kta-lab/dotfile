@@ -3,9 +3,11 @@ alias ls='ls -F --color=auto'
 alias vim='nvim'
 
 if command -v abbr >/dev/null 2>&1; then
-  abbr -S ll='ls -l' >>/dev/null
-  abbr -S la='ls -A' >>/dev/null
-  abbr -S lla='ls -l -A' >>/dev/null
+  # 再 source すると「already has an expansion」を **stderr** に出す。
+  # 元は >>/dev/null で stdout だけ捨てていて消せていなかった。
+  abbr -S ll='ls -l'      >/dev/null 2>&1
+  abbr -S la='ls -A'      >/dev/null 2>&1
+  abbr -S lla='ls -l -A'  >/dev/null 2>&1
 fi
 
 # gh: PR helpers (secondary PC の緊急退避から main へ取り込むためのもの)
