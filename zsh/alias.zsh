@@ -124,3 +124,54 @@ qpreview() {
   [[ -z $f ]] && { echo "usage: qpreview <file.qmd> [port]" >&2; return 2; }
   "$qbin" preview "$f" --no-browser --port "${1:-4321}" --host 127.0.0.1
 }
+
+# chafa: ターミナルで画像を見る (herdr の kitty_graphics 経由)
+#   img                 カレントで一番新しい画像
+#   img fig/            そのディレクトリで一番新しい画像
+#   img a.png b.png     指定したものを順に
+#   img out/*.png       glob もそのまま
+#   img -b fig.png      Unicode ブロックで描く (kitty graphics が通らない端末用)
+#   img -s 60x30 fig.png  chafa の引数はそのまま渡る
+#
+# **既定は -f kitty**。herdr のペインは TERM=xterm-256color のままなので chafa の
+# 自動判定が効かず、明示しないとブロック描画に落ちる (2026-09-15 に実測)。
+# kitty graphics が出ない端末では -b、恒久的に変えたいときは IMG_FORMAT=symbols。
+img() {
+  emulate -L zsh
+  setopt local_options null_glob
+  command -v chafa >/dev/null 2>&1 || {
+    echo "img: chafa が無い。brew bundle --file=~/src/github.com/38kta-lab/dotfile/Brewfile" >&2
+    return 127
+  }
+  local fmt=${IMG_FORMAT:-kitty}
+  local -a targets args
+  local a
+  for a in "$@"; do
+    case $a in
+      -b|--blocks) fmt=symbols ;;
+      *) if [[ -e $a ]]; then targets+=("$a"); else args+=("$a"); fi ;;
+    esac
+  done
+  (( $#targets )) || targets=(.)
+
+  local -a files
+  local t
+  for t in "$targets[@]"; do
+    if [[ -d $t ]]; then
+      # ディレクトリは「一番新しい画像1枚」。作図しながら確認する用途を想定。
+      local -a latest=( $t/*.(png|jpg|jpeg|gif|webp|svg)(.om[1]) )
+      (( $#latest )) || { echo "img: $t に画像がありません" >&2; continue; }
+      files+=("$latest[1]")
+    else
+      files+=("$t")
+    fi
+  done
+  (( $#files )) || return 1
+
+  local f
+  for f in "$files[@]"; do
+    # 複数枚のときだけ、どれがどれか分かるようにファイル名を出す
+    (( $#files > 1 )) && print -r -- "── ${f:t}"
+    chafa -f "$fmt" "$args[@]" -- "$f" || return $?
+  done
+}
