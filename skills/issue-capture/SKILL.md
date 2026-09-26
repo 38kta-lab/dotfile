@@ -56,7 +56,7 @@ Create or suggest a GitHub Issue when the work has any of these:
 
 Do not create an Issue for trivial one-line reminders or immediately finished tasks unless the user explicitly asks.
 
-If the task is not ready for an Issue, save it as a Markdown candidate under the location described in `README.md`, usually `ideas/weekly/` for review candidates.
+If the task is not ready for an Issue, save it as a Markdown candidate under the location described in `README.md` (`ideas/inbox/`). ⚠️ Nothing sweeps `ideas/inbox/` automatically — `weekly-review` was retired on 2026-09-26. If the item must resurface, it needs an Issue, a hub `Next Actions` line, or a Calendar event instead.
 
 ## Issue Shape
 

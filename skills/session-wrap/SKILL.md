@@ -82,4 +82,4 @@ drop した item の理由メモは summary 内 (人間が読む 1 行) にの�
 
 - 既に Issue や Calendar 化済の item は `(6) drop` を user に提案するのが自然 (重複追跡を避けるため、session task は役目を終えている)。
 - `(5) keep-session` を選んだ item は、その session を `/clear` せず継続する前提。`/clear` してしまうと結局失われるので summary で「(5) を選んだ item があるので `/clear` は推奨しません」と明示する。
-- 直近で morning-brief が同じ item を翌朝に再 surface するルートは: **Issue / hub Tasks / Calendar event** のいずれかに置けば OK。inbox は weekly-review でしか拾われないことに注意。
+- 直近で morning-brief が同じ item を翌朝に再 surface するルートは: **Issue / hub Tasks / Calendar event** のいずれかに置けば OK。⚠️ **`ideas/inbox/` に置いても二度と surface されない**（それを拾っていた weekly-review は 2026-09-26 に廃止）。残す必要があるものは必ず上の3つのどれかへ。
