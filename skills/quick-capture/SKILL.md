@@ -33,7 +33,7 @@ Use this skill for lightweight, not-yet-structured items:
 - questions to revisit
 - tool or automation ideas
 - research thoughts that are not ready for a project file
-- possible future issues that should first pass through weekly review
+- possible future issues that are not worth an Issue yet
 
 Do not use this skill for durable agent working memory. Use `agent-memory` when the note is mainly for the agent to resume later.
 
@@ -72,7 +72,7 @@ Use this shape:
 ```markdown
 - HH:MM メモ本文
   - tags: #tag-one #tag-two
-  - next: 週次レビューでIssue化するか判断
+  - next: `/issue-capture` でIssue化するか判断
 ```
 
 Omit `tags` or `next` if they would be forced.
@@ -112,7 +112,7 @@ When both could apply, prefer `pj-hub` for broad project shaping and `issue-capt
 When the next step is unclear, omit `next:` or use:
 
 ```markdown
-  - next: 週次レビューで整理
+  - next: 未定（拾い直す仕組みは無い）
 ```
 
 ## Reporting

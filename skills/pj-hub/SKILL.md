@@ -122,7 +122,7 @@ related: []
 ## Notes
 ```
 
-Omit empty sections only when they are clearly irrelevant. Keep enough structure for weekly review and future updates.
+Omit empty sections only when they are clearly irrelevant. Keep enough structure for future updates and for the stale-hub sweep (`Rules.md`).
 
 ## Workflow
 
@@ -168,6 +168,8 @@ When asked to connect to repos:
 - do not scan private repo contents unless the user asks
 - do not copy sensitive contents into the project file
 
-## Weekly Review
+## Stale Hub Sweep
 
-Project files under `projects/active/` are valid inputs for `weekly-review`. Keep `Next Actions`, `Blockers`, and `Meetings / Checkpoints` current enough to be summarized weekly.
+`weekly-review` was retired on 2026-09-26; there is no scheduled review pass. Instead, when the user asks to take stock, look only at hubs with `status: active` whose `updated:` is old, and decide archive / shrink / continue. `status: standing` hubs have no completion condition and are out of scope even when untouched for months (`Rules.md`).
+
+Keep `Next Actions`, `Blockers`, and `Meetings / Checkpoints` current enough that such a sweep can read the hub cold.

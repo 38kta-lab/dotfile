@@ -123,7 +123,7 @@ The script must be invoked **from the repo root** so relative paths resolve corr
 
 3. **Output sections**: for the run's target day (`YYYY-MM-DD` = today by default), append one section per file to `ideas/daily/md/YYYY-MM-DD-digest.md`. Use the shape below.
 
-4. **Render HTML**: if the daily digest already has rendering (via `url-digest` style), the existing renderer can be reused. Otherwise, leave HTML rendering for the next `url-digest`/`weekly-review` invocation; do not auto-render here.
+4. **Render HTML**: if the daily digest already has rendering (via `url-digest` style), the existing renderer can be reused. Otherwise, leave HTML rendering for the next `url-digest` invocation; do not auto-render here.
 
 5. **Auto-finalize**: after writing, run the shared finalize script (see below).
 
