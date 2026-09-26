@@ -79,6 +79,26 @@ In the `life` repo, Calendar reads should by default cover both:
 
 Use `--calendar-id` only when the user explicitly wants to limit or switch the target calendars.
 
+### ⚠️ 予定済みの項目を今日のタスクに出さない (scheduled-item-resurface)
+
+**レビュー窓 (=今日) だけでなく、先 14 日分の Calendar も必ず読む。**
+
+```bash
+python scripts/google_calendar_read.py --format json \
+  --start <today>T00:00:00 --end <today+14d>T00:00:00
+```
+
+carry-over 項目や締切つきの項目が **未来の Calendar ブロックを既に持っている**なら、
+それは「未着手で放置されているもの」ではなく **着手日が決まっているもの**である。
+`## 今日やるべきこと` に挙げてはいけない。`## 締切ウォッチ` に
+「9/28 10:00 に着手予定」と**予定日つきで 1 行**書くだけにする。
+
+完了信号 (`completed-item-resurface`) と混同しないこと。**未完了だが予定済み**という
+第三の状態であり、`recently_done` にも hub の `✅` にも現れない。Calendar でしか分からない。
+
+判定はタイトルの素直な一致でよい (例: Gmail 由来の「BMB2026 早期参加登録の参加要否判断」に対し
+TimeBlock「BMB2026 早期参加登録の手続き」)。厳密一致にこだわらない。
+
 Default Calendar reads must not include location, attendee, or URL details. Do not pass `--show-location` unless the user explicitly asks.
 
 If Calendar read fails because auth is missing, continue using repo notes and report that Calendar was unavailable.
@@ -220,6 +240,11 @@ rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/ju
 - **archived-pj-action**: `projects/archive/` 配下 PJ や `status: done` hub に対する action 提案を出さない。Gmail で関連する subject が出ても、archive 化済みの PJ なら action_required から外す。
 - **self-sent-misread**: From が user 自身のメール (`USER_EMAIL` 一致) を upcoming task と解釈しない。状態追跡 (返信待ち / 提出済) と捉えて action_required に入れない。
 - **completed-item-resurface**: 完了済みの項目を、締切が未来でも `## 今日やるべきこと`・`## 締切ウォッチ` に再掲しない。完了の信号は ⓐ carry-over 元 brief の `✅ 提出済み` / `再掲不要` / 取り消し線、ⓑ 出所メールの `9. Done/Triage` タグ (= `latest.json` の `recently_done` に件名/差出人が一致)、ⓒ **PJ hub の Current State / Next Actions に完了記録（`✅` / 「済」/ 日付つきの完了行）がある**、の 3 つ。brief は毎朝再生成され session task の完了状態を持たないため、この 3 信号を resolved の根拠にする (例: 月次の勤務状況等申告書を提出後も締切日まで毎朝再掲してしまった、2026-06-29)。
+- **scheduled-item-resurface**: **未来の Calendar ブロックを持つ項目を `## 今日やるべきこと` に挙げない。**
+  完了していなくても、着手日が決まっているものは「持ち越し N 日目」ではない。
+  先 14 日分の Calendar を読み、ブロックがあれば `## 締切ウォッチ` に予定日つきで 1 行だけ。
+  (例: BMB2026 早期参加登録は 9/28 10:00 に TimeBlock があるのに、当日分の Calendar しか
+  読んでいなかったため 9/27 の brief が「持ち越し4日目」として再掲した、2026-09-27)
 - **mail-only-completion**: **メールに痕跡が無いことを「未完了」の根拠にしない。** 受け渡し・依頼・回答は
   Slack / 口頭 / 手渡し / 共有ドライブのコメントでも成立する。Gmail に完了メールが無いときは
   「未完了」と断定せず、**ⓒ の PJ hub を必ず確認**し、それでも分からなければ
