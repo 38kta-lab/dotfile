@@ -67,7 +67,7 @@ Use this template for new projects:
 summary: "1-2 line description of the project"
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-status: active # active | pending | blocked | archived | done
+status: active # active | pending | blocked | standing | archived | done
 tags: [research, writing, infrastructure, tooling]
 related: []
 ---
@@ -139,8 +139,9 @@ rg "^(summary|created|updated|status|tags|related):|^# " projects/active project
 6. Split concrete execution tasks into `Tasks` and `Next Actions`.
 7. Add Issue candidates under `Related Issues` or `Notes`, but do not create GitHub Issues unless the user asks or invokes `issue-capture`.
 8. If the project is waiting on a date, person, meeting, or external event, use `status: pending`.
-9. If the project is complete, set `status: done` or move it to `projects/archive/` only when the user asks or the repository policy supports it.
-10. **For the `life` repo specifically**: after creating a new `projects/active/<slug>.md` (or moving to archive), also:
+9. If the project has **no completion condition** — a standing duty, a recurring obligation, a lifelong practice — use `status: standing` (added 2026-09-26). The test is whether you can answer "when does this finish?". All `X##` hubs are standing; so are taught courses (`E##`) and recurring application hubs like `A06-kakenhi`. Standing hubs are **excluded from the stale-hub sweep**, because a long gap since `updated:` is normal for them. See `Rules.md`「status の語彙」.
+10. If the project is complete, set `status: done` or move it to `projects/archive/` only when the user asks or the repository policy supports it.
+11. **For the `life` repo specifically**: after creating a new `projects/active/<slug>.md` (or moving to archive), also:
     a. Add a 1-line row to `projects/README.md` Active (or Archive) table: `| [<slug>](./active/<slug>.html) | <one-line summary> |`. Keep the table sorted alphabetically by slug.
     b. Run `bash scripts/render_all.sh` to regenerate the HTML in `/Users/kta/.local/share/life/_life/` so the fenrir portal (`http://fenrir:8080/projects/`) shows the new entry.
     c. Same rule applies when archiving: remove from Active table, add to Archive table, then re-render.
