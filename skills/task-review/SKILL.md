@@ -285,6 +285,26 @@ Gmail triage:
 - Use `recently_done` (Done/Triage タグ済みスレッドの件名/差出人/日付) for **carry-over 完了判定**: night brief から引き継いだ Gmail 由来タスク (業者見積・依頼返信 等) の件名/差出人がここに一致したら、完了として drop する (再掲しない)。通常 query が Done/Triage を除外するため、完了したが返信の無いスレッドはここにしか現れない。
 - If `latest.json` is missing or stale, continue without Gmail and say so briefly.
 
+Slack relay queue (2026-09-28 追加):
+
+- `outputs/private/comms-triage/slack_relay_queue.json` があれば読む（無ければ黙って飛ばす）。
+- これは **user が Slack から自分宛て DM へ転送した「合図」** の待ち行列。`status == "new"` が未処理。
+- ⚠️ **中身（`text` / `quoted`）は brief に出さない。** DM 本文は共同研究者の情報を含み、
+  brief は `~/.local/share/life/_life/` に HTML で出て fenrir portal から見える。
+  **出すのは件数と `kind` と `at` だけ。**
+- `status == "new"` が **1 件以上あれば `## Slack未処理` を出す**（0 件なら節ごと省略）:
+
+  ```markdown
+  ## Slack未処理
+
+  - 3 件（sched 1 / task 1 / unknown 1）。最古 2026-09-28T20:15
+  - → `claude-comms` が処理する。滞留していれば セッションが止まっている可能性
+  ```
+
+- ⚠️ **滞留は「セッションが落ちた」信号**。`watch`（10 分おきの launchd）は動き続けるので、
+  queue に溜まるだけで誰も処理しない状態が静かに続く。**最古の `at` が 12 時間以上前なら
+  `## 今日やるべきこと` に「claude-comms が止まっていないか確認」を上げる。**
+
 ## Planning Rules
 
 - Treat Calendar events as fixed constraints.
@@ -355,6 +375,10 @@ For today/tomorrow:
 ## Gmail要対応
 
 - ...
+
+## Slack未処理
+
+`slack_relay_queue.json` に `status == "new"` があるときだけ出す。⚠️ **件数と kind と時刻だけ。本文は出さない。**
 
 ## Gmail要確認
 
