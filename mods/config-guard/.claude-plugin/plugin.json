@@ -1,0 +1,14 @@
+{
+  "name": "config-guard",
+  "version": "0.1.0",
+  "author": { "name": "38kta-lab" },
+  "description": "Ask the person before Claude edits Claude Code's own config, instruction files or this guard, and before a known-format secret is written.",
+  "userConfig": {
+    "extra_paths": {
+      "type": "string",
+      "title": "Extra protected paths",
+      "description": "Comma-separated path substrings to protect on this machine only (kept out of git). Example: /srv/private-repo/,.envrc",
+      "default": ""
+    }
+  }
+}
