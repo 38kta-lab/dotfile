@@ -24,6 +24,8 @@ const PREFIX = 'ops-dash:session:'
 const DISPATCH = 'ops-dash:dispatch:'
 const LIMITS = 'ops-dash:limits'
 const PANE = 'peers'
+// `/peers` is the built-in alias of /list-agents, so the command is /dash.
+const COMMAND = 'dash'
 
 type Me = { name: string; role: string; pj?: string }
 
@@ -103,33 +105,53 @@ async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: 
   return { records, dispatches, limits: (await $.store.get(LIMITS)) as Limits | undefined }
 }
 
+// Who this session is, read once per load. Every hook asks, so a skipped
+// session.start (or a reload) never leaves the session silent.
+let self: Me | undefined
+let resolved = false
+
+async function who($: any): Promise<Me | undefined> {
+  if (!resolved) {
+    self = await whoAmI($)
+    resolved = true
+  }
+  return self
+}
+
 export const register: Register = on => {
-  let me: Me | undefined
+  resolved = false
 
   on('session.start', async ($, e, next) => {
-    me = await whoAmI($)
+    const me = await who($)
     if (me) {
       await write($, me, { busy: false })
       if (me.role === 'ops') {
-        await $.command.register({ name: 'peers', description: 'Show every session with a role: busy or idle, context, last turn, last report, last dispatch' })
-        $.clock.every(30000, () => $.ui.invalidate('ui.render'))
+        try {
+          await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
+          $.clock.every(30000, () => $.ui.invalidate('ui.render'))
+        } catch (err) {
+          $.ui.log(`ops-dash: could not register /${COMMAND}: ${String(err)}`)
+        }
       }
     }
     return next(e)
   })
 
   on('turn.start', async ($, e, next) => {
+    const me = await who($)
     if (me) await write($, me, { busy: true, turnStartedAt: await $.clock.now() })
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     const ran = await next(e)
+    const me = await who($)
     if (me) await write($, me, { busy: false, lastTurnEndAt: await $.clock.now() })
     return ran
   })
 
   on('session.measure', async ($, e, next) => {
+    const me = await who($)
     if (me) {
       await write($, me, { contextPercent: e.context.percent, costUsd: e.cost?.usd })
       if (e.rateLimits.length > 0) {
@@ -150,6 +172,7 @@ export const register: Register = on => {
   // ops: remember who was sent what. Others: remember when they last reported to ops.
   on('session.send', async ($, e, next) => {
     const ran = await next(e)
+    const me = await who($)
     if (me && ran.isDelivered !== false) {
       const now = await $.clock.now()
       if (me.role === 'ops') {
@@ -166,9 +189,9 @@ export const register: Register = on => {
     return ran
   })
 
-  on('command.run', { command: 'peers' }, async $ => {
+  on('command.run', { command: COMMAND }, async $ => {
     await $.ui.open({ id: PANE, title: 'peers' })
-    return { text: 'peers pane opened.' }
+    return { text: 'ops-dash opened.' }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
