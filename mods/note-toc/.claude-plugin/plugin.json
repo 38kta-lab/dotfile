@@ -1,0 +1,10 @@
+{
+  "name": "note-toc",
+  "version": "0.1.0",
+  "author": { "name": "38kta-lab" },
+  "description": "After a write to a research repo's note/note.md, checks its generated table of contents and heading shape, and tells the model to rebuild the contents when stale.",
+  "userConfig": {
+    "python": { "type": "string", "title": "Python", "description": "The python that runs note_toc.py (standard library only).", "default": "python3" },
+    "life_repo": { "type": "string", "title": "life repo", "description": "Absolute path of the repo holding scripts/note_toc.py. Empty: the check is off.", "default": "" }
+  }
+}
