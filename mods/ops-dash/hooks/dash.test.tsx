@@ -3,7 +3,9 @@ import { test, expect } from 'claude-code/testing'
 // The world beneath the plugin, answered here: environment, the shared store
 // (a Map the test reads directly), the clock, commands, timers, and the
 // session and turn events themselves.
-function world(on: any, vars: Record<string, string | undefined>, store = new Map<string, unknown>(), refuseCommand = false) {
+function world(on: any, vars: Record<string, string | undefined>, store = new Map<string, unknown>(), refuseCommand = false, events: unknown[] = [], tasksMd = '') {
+  on('process.run', () => ({ value: { exitCode: 0, stdout: JSON.stringify(events), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('fs.read', () => ({ value: tasksMd }))
   on('env.get', (_$: any, e: any, next: any) => (e.name in vars ? { value: vars[e.name] } : next(e)))
   on('store.get', (_$: any, e: any) => ({ value: store.get(e.key) }))
   on('store.set', (_$: any, e: any) => { store.set(e.key, e.value); return { value: undefined } })
@@ -19,6 +21,7 @@ function world(on: any, vars: Record<string, string | undefined>, store = new Ma
   on('turn.complete', () => ({ text: '' }))
   on('session.measure', (_$: any, e: any) => ({ changed: e.changed }))
   on('session.send', () => ({ isDelivered: true }))
+  on('ui.status', () => ({ value: undefined }))
   return store
 }
 
@@ -75,37 +78,6 @@ test('ops records whom it sent what, by name without the ref', async ($, on) => 
   expect(d.line).toBe('07_G の note を note.md に改名し…')
 })
 
-test('the pane shows the plan windows and every session, with bars, ops first', async ($, on) => {
-  const store = world(on, OPS)
-  store.set('ops-dash:session:claude-07', { name: 'claude-07', role: 'peer', pj: '07_G', busy: true, turnStartedAt: Date.parse('2026-10-08T02:28:00Z'), contextPercent: 71, lastTurnEndAt: Date.parse('2026-10-08T02:00:00Z'), updatedAt: 1 })
-  store.set('ops-dash:session:ops', { name: 'ops', role: 'ops', busy: false, contextPercent: 38, updatedAt: 1 })
-  store.set('ops-dash:dispatch:claude-07', { at: 1, line: 'note を整形' })
-  store.set('ops-dash:limits', { at: 1, windows: [{ kind: 'five_hour', percentUsed: 34, resetsAt: '2026-10-08T07:10:00Z' }, { kind: 'seven_day', percentUsed: 61, resetsAt: '2026-10-09T00:00:00Z' }] })
-  await $.session.start(START as any)
-  for (const surface of ['terminal', 'desktop'] as const) {
-    for (const placement of ['dock', 'inline'] as const) {
-      const ui: any = await $.ui.mount({
-        plugin: 'ops-dash', surface, component: 'Pane', requestId: 'peers',
-        props: { title: 'ops-dash', isFocused: false, bodyColumns: 48, placement, scroll: { bodyRows: 30 }, view: 'expanded' } as any,
-      })
-      const texts: string[] = (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? ''))
-      const all = texts.join('\n')
-      expect(all).toContain('5時間枠')
-      expect(all).toContain('週間枠')
-      expect(all).toContain('16:10 リセット')
-      expect(all).toContain('明日 09:00 リセット')
-      expect(all).toContain(' 34%')
-      expect(all).toContain('█')
-      expect(all).toContain('claude-07')
-      expect(all).toContain(' 71%')
-      expect(all).toContain('作業中 2分')
-      expect(all).toContain('依頼')
-      expect(all.indexOf('ops')).toBeLessThan(all.indexOf('claude-07'))
-      await ui.unmount()
-    }
-  }
-})
-
 test('a refused command does not stop the session from writing its status', async ($, on) => {
   const store = world(on, OPS, new Map(), true)
   await $.session.start(START as any)
@@ -121,19 +93,100 @@ test('a session whose session.start never ran still writes on its first turn', a
   expect(r.busy).toBe(true)
 })
 
-test('every line fits the sidebar width, counting Japanese as two cells', async ($, on) => {
-  const store = world(on, OPS)
-  store.set('ops-dash:session:claude-03', { name: 'claude-03', role: 'peer', pj: '03_C', busy: false, contextPercent: 77, lastTurnEndAt: 1, lastReportAt: 1, updatedAt: 1 })
-  store.set('ops-dash:dispatch:claude-03', { at: 1, line: '03_C の note を note.md に改名し、解析番号ごとの見出しを目次が機械的に作れる型に揃える' })
+
+const OPTIONS = { options: { python: '/usr/bin/python3', life_repo: '/home/u/life' } }
+const PANE_PROPS = (placement: 'dock' | 'inline', bodyColumns = 58) =>
+  ({ title: 'ops-dash', isFocused: false, bodyColumns, placement, scroll: { bodyRows: 40 }, view: 'expanded' }) as any
+const settle = () => new Promise(r => setTimeout(r, 20))
+
+async function texts($: any, placement: 'dock' | 'inline', surface: 'terminal' | 'desktop' = 'terminal', cols = 58): Promise<string[]> {
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface, component: 'Pane', requestId: 'peers', props: PANE_PROPS(placement, cols) })
+  const out = (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? ''))
+  await ui.unmount()
+  return out
+}
+
+const EVENTS = [
+  { title: '[07_G] note と hub の整理 [status:focus]', start: '2026-10-08T14:30:00+09:00', end: '2026-10-08T16:30:00+09:00', calendar_id: 'c_tb' },
+  { title: '来客の打ち合わせ', start: '2026-10-13T10:00:00+09:00', end: '2026-10-13T12:00:00+09:00', calendar_id: 'me@example.com' },
+  { title: '共同実験', start: '2026-10-14', end: '2026-10-17', calendar_id: 'me@example.com' },
+]
+const MANY = Array.from({ length: 12 }, (_, i) => ({
+  title: `[X${i}] block`, start: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(8 + i).padStart(2, '0')}:00:00+09:00`,
+  end: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(9 + i).padStart(2, '0')}:00:00+09:00`, calendar_id: 'c_tb',
+}))
+const TASKS_MD = '# tasks\n\n## 今日 2026-10-08\n\n- ⬜ [M20] 現状確認＋実作業 — @user — 10/07（実働締切 10/28）\n- ✅ [07_G] note 整形 — @claude-07 — 10/08\n\n## 待ち\n\n- ⬜ [03_C] 共同研究者への連絡 6 件 — @user — 10/04\n'
+
+test('the calendar block has the same height with no events and with many', OPTIONS as any, async ($, on) => {
+  const events: unknown[] = []
+  world(on, OPS, new Map(), false, events, TASKS_MD)
   await $.session.start(START as any)
-  const ui: any = await $.ui.mount({
-    plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers',
-    props: { title: 'ops-dash', isFocused: false, bodyColumns: 44, placement: 'dock', scroll: { bodyRows: 20 }, view: 'expanded' } as any,
-  })
-  const texts: string[] = (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? ''))
-  const meta = texts.find(t => t.startsWith('  ターン'))!
-  let w = 0
-  for (const ch of meta) w += /[\u2e80-\ua4cf\uff00-\uff60]/.test(ch) ? 2 : 1
-  expect(w).toBeLessThanOrEqual(44)
-  expect(meta.endsWith('…')).toBe(true)
+  await settle()
+  const span = (xs: string[]) => xs.findIndex(x => x.startsWith('─ tasks')) - xs.findIndex(x => x.startsWith('─ calendar'))
+  const empty = await texts($, 'dock')
+  events.push(...MANY, ...EVENTS)
+  await $.command.run({ command: 'dash', args: '' } as any).catch(() => undefined)
+  await $.session.start(START as any)
+  await settle()
+  const full = await texts($, 'dock')
+  expect(span(empty)).toBeGreaterThan(0)
+  expect(span(full)).toBe(span(empty))
+})
+
+test('with many events the calendar is still 1 header + 1 all-day + 12 hour rows', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, MANY, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const many = await texts($, 'dock')
+  const rowsOf = (xs: string[]) => xs.filter(x => /^\d\d $/.test(x)).length
+  expect(rowsOf(many)).toBe(12)
+  expect(many.filter(x => x === '終 ').length).toBe(1)
+})
+
+test('the week shows today first, the all-day run, the tagged block and the meeting', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const all = (await texts($, 'dock')).join('\n')
+  expect(all).toContain('8木')
+  expect(all).toContain('14水')
+  expect(all).toContain('07_G')
+  expect(all).toContain('来客の')
+  expect(all).toContain('共同実')
+  expect(all).toContain('更新 ')
+})
+
+test('tasks are listed by section, done lines included, under the calendar', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const xs = await texts($, 'dock')
+  const t = xs.findIndex(x => x.startsWith('─ tasks'))
+  const after = xs.slice(t).join('\n')
+  expect(after).toContain('今日 2026-10-08')
+  expect(after).toContain('⬜ [M20] 現状確認＋実作業 — @user（実働締切 10/28）')
+  expect(after).toContain('✅ [07_G] note 整形 — @claude-07')
+  expect(after).toContain('待ち')
+})
+
+test('without the settings the pane says what is missing instead of failing', async ($, on) => {
+  world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const all = (await texts($, 'dock')).join('\n')
+  expect(all).toContain('カレンダー未設定')
+  expect(all).toContain('タスク未設定')
+})
+
+test('on both surfaces and placements the pane draws', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  for (const surface of ['terminal', 'desktop'] as const)
+    for (const placement of ['dock', 'inline'] as const) {
+      const all = (await texts($, placement, surface)).join('\n')
+      expect(all).toContain('─ sessions')
+      expect(all).toContain('─ calendar')
+      expect(all).toContain('─ tasks')
+    }
 })

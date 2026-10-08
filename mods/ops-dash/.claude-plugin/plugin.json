@@ -1,6 +1,22 @@
 {
   "name": "ops-dash",
-  "version": "0.1.0",
-  "author": { "name": "38kta-lab" },
-  "description": "Every session with LIFE_ROLE publishes its status (busy, context, cost, last report); the ops session shows them all in a /peers pane and its own context and plan usage in the status line."
+  "version": "0.2.0",
+  "author": {
+    "name": "38kta-lab"
+  },
+  "description": "Every session with LIFE_ROLE publishes its status; the ops session's /dash pane shows plan usage, every session, a one-week calendar and the shared task list.",
+  "userConfig": {
+    "python": {
+      "type": "string",
+      "title": "Python for the calendar script",
+      "description": "Absolute path of the python that runs scripts/google_calendar_read.py. Empty: no calendar.",
+      "default": ""
+    },
+    "life_repo": {
+      "type": "string",
+      "title": "life repo",
+      "description": "Absolute path of the repo holding scripts/google_calendar_read.py and ideas/task-review/tasks.md. Empty: no calendar and no tasks.",
+      "default": ""
+    }
+  }
 }
