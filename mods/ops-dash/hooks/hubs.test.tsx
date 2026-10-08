@@ -85,7 +85,10 @@ test('milestone helpers on their own', () => {
   expect(openActions('1. ⬜ a\n2. ✅ b\n- [ ] c')).toBe(2)
 })
 
+const OPENED: any[] = []
+
 function world(on: any) {
+  OPENED.length = 0
   on('env.get', (_$: any, e: any) => ({ value: e.name === 'LIFE_ROLE' ? 'ops' : undefined }))
   on('store.get', () => ({ value: undefined }))
   on('store.set', () => ({ value: undefined }))
@@ -96,7 +99,7 @@ function world(on: any) {
   on('process.run', () => ({ value: { exitCode: 0, stdout: '[]', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('fs.list', () => ({ value: [{ name: '11_A_alpha.md', kind: 'file', size: 1 }, { name: '12_B_beta.md', kind: 'file', size: 1 }, { name: 'README.md', kind: 'file', size: 1 }] }))
   on('fs.read', (_$: any, e: any) => ({ value: e.path.endsWith('11_A_alpha.md') ? ALPHA : e.path.endsWith('12_B_beta.md') ? BETA : '' }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.open', (_$: any, e: any) => { OPENED.push(e); return { value: { isPlaced: true } } })
   on('ui.status', () => ({ value: undefined }))
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
 }
@@ -153,4 +156,12 @@ test('the milestones tab of a hub is drawn as a list', () => {
   const md = sectionMarkdown(h, 1)
   expect(md).toContain('- **2026-10-21 (水)** — **abstract**')
   expect(md).not.toMatch(/^\|/m)
+})
+
+test('the ops session opens hubs then dash at start, without taking the keyboard', OPTIONS as any, async ($, on) => {
+  world(on)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await new Promise(r => setTimeout(r, 20))
+  expect(OPENED.map(o => o.id)).toEqual(['hubs', 'peers'])
+  expect(OPENED.every(o => o.focus === undefined)).toBe(true)
 })
