@@ -162,8 +162,8 @@ test('the ops session opens dash, hubs, then notes at start (the first opened is
   world(on)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await new Promise(r => setTimeout(r, 20))
-  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
-  expect(OPENED.every(o => o.focus === undefined)).toBe(true)
+  expect(OPENED.slice(0, 3).map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
+  expect(OPENED.slice(0, 3).every(o => o.focus === undefined)).toBe(true)
 })
 
 test('consultText: where the hub is, the newest Current State, the first open next actions, then the ask', () => {
@@ -197,4 +197,23 @@ test('pressing 次の一手を相談 puts the draft in the prompt and says so; n
   expect(sent).toEqual([])
   expect(await texts(ui)).toContain('プロンプトに下書きを入れた')
   await ui.unmount()
+})
+
+test('at start, when another pane is in front, dash is opened again with focus to bring it forward', OPTIONS as any, async ($, on) => {
+  world(on)
+  on('ui.panes', () => ({ value: [{ id: 'peers', title: 'ops-dash', isShown: false, isFocused: false, isPlaced: true }, { id: 'notes', title: 'notes', isShown: true, isFocused: false, isPlaced: true }] }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await new Promise(r => setTimeout(r, 20))
+  const last = OPENED[OPENED.length - 1]
+  expect(last.id).toBe('peers')
+  expect(last.focus).toBe(true)
+})
+
+test('at start, when dash is already in front, nothing takes the keyboard', OPTIONS as any, async ($, on) => {
+  world(on)
+  on('ui.panes', () => ({ value: [{ id: 'peers', title: 'ops-dash', isShown: true, isFocused: false, isPlaced: true }] }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await new Promise(r => setTimeout(r, 20))
+  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
+  expect(OPENED.every(o => o.focus === undefined)).toBe(true)
 })
