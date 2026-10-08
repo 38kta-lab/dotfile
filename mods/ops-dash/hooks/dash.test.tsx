@@ -413,7 +413,9 @@ test('the band above the prompt has ops-dash / hubs / notes buttons in the ops s
   const band: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   const buttons = (await band.findAll({ type: 'Button' })).map((b: any) => [String(b.props?.label), String(b.props?.hotkey)])
   await band.unmount()
-  expect(buttons).toEqual([['ops-dash', 'd'], ['hubs', 'h'], ['notes', 'n']])
+  expect(buttons.slice(0, 3)).toEqual([['ops-dash', 'd'], ['hubs', 'h'], ['notes', 'n']])
+  expect(buttons[3][0]).toMatch(/^alert/)
+  expect(buttons[3][1]).toBe('a')
 })
 
 test('pressing a band button opens that pane with focus', OPTIONS as any, async ($, on) => {
