@@ -551,27 +551,30 @@ let notesNote = ''
 const THUMB = '/tmp/ops-dash-notes-view.png'
 const MAX_B64 = 2700000 // Image takes at most 2 MiB of picture
 
+// The list comes from the hubs alone (nas_code and nas_data): nothing is read
+// from the NAS until a project is chosen.
 async function notesLoad($: any, repo: string): Promise<void> {
   if (hubs.length === 0) await loadHubs($, repo)
   const out: NotePj[] = []
   for (const h of hubs) {
     const code = frontValue(h.text, 'nas_code')
     const data = frontValue(h.text, 'nas_data')
-    if (!code || !data) continue
-    try {
-      const md = String(await $.fs.read(`${code}/note/note.md`))
-      if (md.includes('<!-- TOC:START -->')) out.push({ slug: h.slug, title: h.title, code, data })
-    } catch {
-      // no note.md: not listed
-    }
+    if (code && data) out.push({ slug: h.slug, title: h.title, code, data })
   }
   notePjs = out
 }
 
+// Only the head of note.md, up to the end of its contents (a note can be
+// 10,000+ lines on a slow NAS): awk stops reading there.
 async function notesOpenToc($: any, pj: NotePj): Promise<void> {
+  notesView = { kind: 'toc', pj, rows: [] }
+  notesNote = `${pj.code}/note/note.md の目次を読んでいます…`
+  $.ui.invalidate('ui.render')
   try {
-    notesView = { kind: 'toc', pj, rows: tocRows(String(await $.fs.read(`${pj.code}/note/note.md`))) }
-    notesNote = ''
+    const r = await $.process.run(['awk', '{ print } /<!-- TOC:END -->/ { exit }', `${pj.code}/note/note.md`], { timeoutMs: 20000 })
+    const rows = tocRows(String(r.stdout ?? ''))
+    notesView = { kind: 'toc', pj, rows }
+    notesNote = rows.length > 0 ? '' : r.exitCode === 0 ? 'この note には目次がありません（scripts/note_toc.py で作る）' : `note を読めない（exit ${r.exitCode}）`
   } catch (err) {
     notesNote = `note を読めない（${String(err).slice(0, 60)}）`
   }
@@ -759,9 +762,9 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'notes' }, async $ => {
-    await notesLoad($, repo)
     notesView = { kind: 'list' }
     notesNote = ''
+    void notesLoad($, repo).then(() => $.ui.invalidate('ui.render'))
     const opened = await $.ui.open({ id: NOTES, title: 'notes', columns: 84, focus: true })
     if (opened.isPlaced) return { text: 'notes opened.' }
     return { text: `notes: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
@@ -778,7 +781,7 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           <Text bold>notes</Text>
-          <Text dimColor>note のある PJ（hub の nas_code に note/note.md と目次があるもの）</Text>
+          <Text dimColor>hub に nas_code / nas_data がある PJ（目次は選んでから読む）</Text>
           {notePjs.length === 0 && <Text dimColor>見つかりません</Text>}
           {notePjs.map(pj => (
             <Button key={`pj-${pj.slug}`} label={clip(`${pj.slug.split('_').slice(0, 2).join('_')}  ${pj.title}`, width - 2)} plain onPress={() => notesOpenToc($, pj)} />
