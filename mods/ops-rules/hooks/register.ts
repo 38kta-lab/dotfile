@@ -156,8 +156,22 @@ let restating = false
 const ALLOW = 'Allow once'
 const DENY = 'Deny'
 
+// The alert pane reads a mail's body with `alert_feed.py --body` to show it on
+// the terminal only. Run from the model's Bash, the body would land in the
+// model's context and go out with the next request, sensitive classes (人事・
+// 成績・査読) included. So the model may not run it, in any session. The pane's
+// own $.process.run is not a tool call and is not held here.
+export function readsMailBody(command: string): boolean {
+  return /alert_feed(\.py)?\b[^|;&\n]*--body\b/.test(command)
+}
+
+const MAIL_BODY_DENY =
+  'ops-rules: alert_feed.py --body is for the alert pane only (it shows a mail body on the terminal, sensitive ones included). ' +
+  'Do not run it, or read the body another way. To read a mail the person chose, use `alert_feed.py --show <id>`, which refuses sensitive classes.'
+
 export const register: Register = on => {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    if (readsMailBody(e.command)) return { deny: MAIL_BODY_DENY }
     const tools = analysisTools(e.command)
     if (tools.length === 0) return next(e)
     if ((await $.env.get('LIFE_ROLE')) !== 'ops') return next(e)

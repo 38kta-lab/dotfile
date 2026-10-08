@@ -6,8 +6,8 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, newIds, parseFeed, parseWhen, shortDate, splitMail } from './alert'
-import type { MailFeed, MailItem } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, newIds, parseBody, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
@@ -430,6 +430,22 @@ let mailBulkOpen = false
 let mailPage = 0
 let mailMode: { kind: 'list' } | { kind: 'ask' } | { kind: 'cal-title'; item: MailItem } | { kind: 'cal-when'; item: MailItem; title: string } = { kind: 'list' }
 let mailBusy = false
+// One mail opened from the list: its body, fetched when opened, not kept.
+let mailView: { kind: 'list' } | { kind: 'body'; item: MailItem; body?: MailBody; full: boolean } = { kind: 'list' }
+const MAIL_BODY_LINES = 40
+
+async function mailOpen($: any, python: string, repo: string, item: MailItem): Promise<void> {
+  mailView = { kind: 'body', item, full: false }
+  $.ui.invalidate('ui.render')
+  try {
+    const r = await $.process.run(bodyArgv(python, repo, item.id), { cwd: repo, timeoutMs: 60000 })
+    const body = parseBody(String(r.stdout ?? ''), item.id)
+    if (mailView.kind === 'body' && mailView.item.id === item.id) mailView = { ...mailView, body }
+  } catch (err) {
+    if (mailView.kind === 'body' && mailView.item.id === item.id) mailView = { ...mailView, body: { id: item.id, error: String(err).slice(0, 80) } }
+  }
+  $.ui.invalidate('ui.render')
+}
 
 // Headers only (scripts/gmail/alert_feed.py); nothing here reaches the model.
 // `toast`: say "Gmail 新着 n 件" for ids not seen at the last look (never on
@@ -1205,6 +1221,36 @@ export const register: Register = (on, options) => {
     }
     const back = () => { mailMode = { kind: 'list' }; redraw() }
 
+    if (mailView.kind === 'body') {
+      const v = mailView
+      const it = v.item
+      const one = (then: () => void) => { mailSel = new Set([it.id]); mailView = { kind: 'list' }; then(); redraw() }
+      const lines = (v.body?.body ?? '').split('\n')
+      const onTerminal = e.surface === 'terminal'
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="mail-back" label="← 一覧" hotkey="b" plain onPress={() => { mailView = { kind: 'list' }; redraw() }} />
+            <Button key="mail-body-done" label="Done にする" hotkey="d" onPress={() => one(() => { void mailMarkDone($, python, repo) })} />
+            {!it.sensitive && <Button key="mail-body-ask" label="詳しく（モデルに頼む）" hotkey="s" plain onPress={() => one(() => { mailMode = { kind: 'ask' } })} />}
+            <Button key="mail-body-cal" label="カレンダーに入れる" hotkey="c" plain onPress={() => one(() => { mailMode = { kind: 'cal-title', item: it } })} />
+          </Box>
+          <Box marginTop={1}><Text bold wrap="wrap">{`${it.sensitive ? `［${it.sensitive}］` : ''}${it.subject}`}</Text></Box>
+          <Text dimColor wrap="wrap">{`${it.from}  ${shortDate(it.date)}`}</Text>
+          {it.sensitive && <Text dimColor>この区分はモデルに渡しません（表示はこの画面だけ）</Text>}
+          <Box flexDirection="column" marginTop={1}>
+            {!onTerminal && <Text dimColor>本文は端末の画面でだけ表示します</Text>}
+            {onTerminal && !v.body && <Text dimColor>本文を取っています…</Text>}
+            {onTerminal && v.body?.error && <Text color="red">{`本文を取れなかった（${v.body.error.slice(0, 80)}）`}</Text>}
+            {onTerminal && v.body && !v.body.error && (v.full ? lines : lines.slice(0, MAIL_BODY_LINES)).map(l => <Text wrap="wrap">{l === '' ? ' ' : l}</Text>)}
+            {onTerminal && v.body && !v.body.error && lines.length > MAIL_BODY_LINES && (
+              <Button key="mail-body-full" label={v.full ? '本文をたたむ' : `本文の全部（あと ${lines.length - MAIL_BODY_LINES} 行）`} hotkey="f" plain onPress={() => { mailView = { ...v, full: !v.full }; redraw() }} />
+            )}
+          </Box>
+        </Box>
+      )
+    }
+
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={2}>
@@ -1215,7 +1261,10 @@ export const register: Register = (on, options) => {
         {mailNote !== '' && <Text color={/できなかった|取れなかった|渡しません|日時は|ありません/.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
         {!mailFeed && mailNote === '' && <Text dimColor>読み込んでいます…（最初の取得は 15 秒ほど）</Text>}
         {shown.map(x => (
-          <Button key={`mail-${x.id}`} label={clip(mailLine(x, mailSel.has(x.id)), width - 2)} plain dimColor={!x.unread && !mailSel.has(x.id)} onPress={() => toggle(x.id)} />
+          <Box flexDirection="row" columnGap={1}>
+            <Button key={`mail-sel-${x.id}`} label={mailSel.has(x.id) ? '☑' : '☐'} plain onPress={() => toggle(x.id)} />
+            <Button key={`mail-${x.id}`} label={clip(mailLine(x), width - 5)} plain dimColor={!x.unread && !mailSel.has(x.id)} onPress={() => mailOpen($, python, repo, x)} />
+          </Box>
         ))}
         {Array.from({ length: Math.max(0, MAIL_ROWS - shown.length) }, () => <Text> </Text>)}
         <Box flexDirection="row" columnGap={2}>
