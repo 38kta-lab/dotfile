@@ -454,8 +454,9 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: COMMAND }, async $ => {
-    await $.ui.open({ id: PANE, title: 'ops-dash', columns: 58 })
-    return { text: 'ops-dash opened.' }
+    const opened = await $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true })
+    if (opened.isPlaced) return { text: 'ops-dash opened.' }
+    return { text: `ops-dash: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
