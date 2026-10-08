@@ -738,6 +738,62 @@ async function notesOpenImage($: any, v: { pj: NotePj; rows: TocRow[]; row: TocR
   $.ui.invalidate('ui.render')
 }
 
+// ---- fig pane: a draft figure any session drops in a folder, and the palette ----
+
+// Any session puts a PNG in ~/.local/share/life/preview/ (figstyle.preview does
+// it in one line); /fig shows the newest at once, the rest as a list, and the
+// shared palette's sample always first.
+const FIG = 'fig'
+type FigEntry = { label: string; path: string }
+let figList: FigEntry[] = []
+let figView: { kind: 'list' } | { kind: 'image'; entry: FigEntry; src?: string; w?: number; h?: number } = { kind: 'list' }
+let figNote = ''
+const FIG_MAX = 15
+
+async function loadPicture($: any, path: string): Promise<{ src?: string; w?: number; h?: number; note: string }> {
+  try {
+    const dims = await $.process.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', path], { timeoutMs: 20000 })
+    const w = Number(String(dims.stdout).match(/pixelWidth:\s*(\d+)/)?.[1] ?? 0)
+    const h = Number(String(dims.stdout).match(/pixelHeight:\s*(\d+)/)?.[1] ?? 0)
+    let src = bytesToBase64(await $.fs.read(path, { as: 'bytes' }))
+    if (src.length > MAX_B64) {
+      await $.process.run(['sips', '-Z', '1600', path, '--out', THUMB], { timeoutMs: 30000 })
+      src = bytesToBase64(await $.fs.read(THUMB, { as: 'bytes' }))
+    }
+    if (!isBase64(src) || src.length > MAX_B64) return { note: '画像を読めなかった（大きすぎるか、png でない）' }
+    return { src, w, h, note: w && h ? `${w} × ${h} px` : '' }
+  } catch (err) {
+    return { note: `画像を読めなかった（${String(err).slice(0, 60)}）` }
+  }
+}
+
+async function figLoad($: any, repo: string): Promise<void> {
+  const home = String((await $.env.get('HOME')) ?? '')
+  const dir = `${home}/.local/share/life/preview`
+  const out: FigEntry[] = []
+  if (repo) out.push({ label: '共通 12 色の見本（figstyle.GLOBAL）', path: `${repo}/assets/figstyle/palette.png` })
+  try {
+    const r = await $.process.run(['/bin/sh', '-c', 'ls -t "$1"/*.png 2>/dev/null | head -n "$2"; exit 0', 'sh', dir, String(FIG_MAX)], { timeoutMs: 10000 })
+    for (const line of String(r.stdout ?? '').split('\n').map((l: string) => l.trim()).filter(Boolean)) {
+      out.push({ label: line.slice(dir.length + 1), path: line })
+    }
+    figNote = out.length > 1 ? '' : `仮の図はまだありません（${dir}/ に png を置く。figstyle.preview(fig, "名前")）`
+  } catch (err) {
+    figNote = `仮の図の場所を読めない（${String(err).slice(0, 60)}）`
+  }
+  figList = out
+}
+
+async function figOpen($: any, entry: FigEntry): Promise<void> {
+  figView = { kind: 'image', entry }
+  figNote = '読み込んでいます…'
+  $.ui.invalidate('ui.render')
+  const p = await loadPicture($, entry.path)
+  figView = { kind: 'image', entry, src: p.src, w: p.w, h: p.h }
+  figNote = p.note
+  $.ui.invalidate('ui.render')
+}
+
 function notesBack($: any): void {
   const v = notesView
   if (v.kind === 'image') notesView = { kind: 'pngs', pj: v.pj, rows: v.rows, row: v.row, files: v.files, deep: true, body: v.body }
@@ -783,6 +839,7 @@ export const register: Register = (on, options) => {
         $.ui.status(undefined)
         try {
           await $.command.register({ name: 'notes', description: 'Open the research notes: a project, its note contents by number, the pictures under that number, one picture' })
+          await $.command.register({ name: 'fig', description: 'Show draft figures any session drops in ~/.local/share/life/preview/ (newest first), and the shared palette' })
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
@@ -867,6 +924,56 @@ export const register: Register = (on, options) => {
       }
     }
     return ran
+  })
+
+  on('command.run', { command: 'fig' }, async $ => {
+    await figLoad($, repo)
+    const newest = figList.find(x => !x.label.startsWith('共通'))
+    figView = { kind: 'list' }
+    const opened = await $.ui.open({ id: FIG, title: 'fig', columns: 84, focus: true })
+    if (newest) void figOpen($, newest)
+    if (opened.isPlaced) return { text: 'fig opened.' }
+    return { text: `fig: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: FIG }, async ($, e) => {
+    const { Box, Text, Button, Image } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 84)
+    const v = figView
+    const note = figNote !== '' ? <Text dimColor>{figNote}</Text> : null
+    const reload = async () => {
+      await figLoad($, repo)
+      if (v.kind === 'image') await figOpen($, v.entry)
+      else $.ui.invalidate('ui.render')
+    }
+    if (v.kind === 'list') {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Text bold>fig</Text>
+            <Button key="reload" label="更新" hotkey="r" plain onPress={reload} />
+          </Box>
+          {note}
+          <Box flexDirection="column" marginTop={1}>
+            {figList.map(f => (
+              <Button key={`fig-${f.path}`} label={clip(f.label, width - 2)} plain onPress={() => figOpen($, f)} />
+            ))}
+          </Box>
+        </Box>
+      )
+    }
+    const cols = Math.min(255, Math.max(20, width - 2))
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>
+          <Button key="back" label="← 一覧" hotkey="b" plain onPress={() => { figView = { kind: 'list' }; figNote = ''; $.ui.invalidate('ui.render') }} />
+          <Text bold>{clip(v.entry.label, width - 24)}</Text>
+          <Button key="reload" label="更新" hotkey="r" plain onPress={reload} />
+        </Box>
+        {note}
+        {v.src && <Image key="fig-image" source={{ png: v.src }} columns={cols} rows={imageRows(v.w ?? 0, v.h ?? 0, cols)} alt="（この端末では画像を描けない。CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1 で起動する）" />}
+      </Box>
+    )
   })
 
   on('command.run', { command: 'notes' }, async $ => {
