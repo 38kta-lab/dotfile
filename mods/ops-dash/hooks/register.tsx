@@ -2,6 +2,8 @@ import type { Register } from 'claude-code'
 
 import { consultText, parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
 import type { Hub } from './hubs'
+import { bytesToBase64, frontValue, imageRows, isBase64, pngList, tocRows } from './notes'
+import type { TocRow } from './notes'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
@@ -535,6 +537,105 @@ async function goToHub($: any, slug: string): Promise<void> {
   await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
 }
 
+// ---- notes pane: a project's note → its contents → a number's pictures ----
+
+const NOTES = 'notes'
+type NotePj = { slug: string; title: string; code: string; data: string }
+let notePjs: NotePj[] = []
+let notesView:
+  | { kind: 'list' }
+  | { kind: 'toc'; pj: NotePj; rows: TocRow[] }
+  | { kind: 'pngs'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; deep?: boolean }
+  | { kind: 'image'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; file: string; src?: string; w?: number; h?: number } = { kind: 'list' }
+let notesNote = ''
+const THUMB = '/tmp/ops-dash-notes-view.png'
+const MAX_B64 = 2700000 // Image takes at most 2 MiB of picture
+
+async function notesLoad($: any, repo: string): Promise<void> {
+  if (hubs.length === 0) await loadHubs($, repo)
+  const out: NotePj[] = []
+  for (const h of hubs) {
+    const code = frontValue(h.text, 'nas_code')
+    const data = frontValue(h.text, 'nas_data')
+    if (!code || !data) continue
+    try {
+      const md = String(await $.fs.read(`${code}/note/note.md`))
+      if (md.includes('<!-- TOC:START -->')) out.push({ slug: h.slug, title: h.title, code, data })
+    } catch {
+      // no note.md: not listed
+    }
+  }
+  notePjs = out
+}
+
+async function notesOpenToc($: any, pj: NotePj): Promise<void> {
+  try {
+    notesView = { kind: 'toc', pj, rows: tocRows(String(await $.fs.read(`${pj.code}/note/note.md`))) }
+    notesNote = ''
+  } catch (err) {
+    notesNote = `note を読めない（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+// First the quick look: <number>/out/*.png and <number>/*.png, no walking
+// down the tree (the NAS is slow to walk). `deep` walks it, on request.
+async function notesOpenPngs($: any, pj: NotePj, rows: TocRow[], row: TocRow, deep = false): Promise<void> {
+  const dir = `${pj.data}/${row.id}`
+  notesView = { kind: 'pngs', pj, rows, row, files: [], deep }
+  notesNote = deep ? `${dir} の下の階層も探しています…` : `${dir}/out を見ています…`
+  $.ui.invalidate('ui.render')
+  try {
+    const argv = deep
+      ? ['find', dir, '-maxdepth', '6', '-type', 'f', '-iname', '*.png']
+      : ['/bin/sh', '-c', 'for f in "$1"/out/*.png "$1"/out/*.PNG "$1"/*.png "$1"/*.PNG; do [ -f "$f" ] && echo "$f"; done; exit 0', 'sh', dir]
+    const r = await $.process.run(argv, { timeoutMs: deep ? 60000 : 15000 })
+    const files = pngList(String(r.stdout ?? ''), dir)
+    notesView = { kind: 'pngs', pj, rows, row, files, deep }
+    const where = deep ? '下の階層まで探して' : 'out/ と直下に'
+    notesNote = files.length === 0 ? (r.exitCode === 0 ? `${where} png はありません` : `探せなかった（exit ${r.exitCode}）`) : `${where} ${files.length} 件${files.length >= 200 ? '（先頭 200 件）' : ''}`
+  } catch (err) {
+    notesNote = `探せなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+async function notesOpenImage($: any, v: { pj: NotePj; rows: TocRow[]; row: TocRow; files: string[] }, file: string): Promise<void> {
+  const path = `${v.pj.data}/${v.row.id}/${file}`
+  notesView = { ...v, kind: 'image', file }
+  notesNote = '読み込んでいます…'
+  $.ui.invalidate('ui.render')
+  try {
+    const dims = await $.process.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', path], { timeoutMs: 20000 })
+    const w = Number(String(dims.stdout).match(/pixelWidth:\s*(\d+)/)?.[1] ?? 0)
+    const h = Number(String(dims.stdout).match(/pixelHeight:\s*(\d+)/)?.[1] ?? 0)
+    let src = bytesToBase64(await $.fs.read(path, { as: 'bytes' }))
+    if (src.length > MAX_B64) {
+      await $.process.run(['sips', '-Z', '1600', path, '--out', THUMB], { timeoutMs: 30000 })
+      src = bytesToBase64(await $.fs.read(THUMB, { as: 'bytes' }))
+    }
+    if (!isBase64(src) || src.length > MAX_B64) {
+      notesNote = '画像を読めなかった（大きすぎるか、png でない）'
+      notesView = { ...v, kind: 'image', file }
+    } else {
+      notesView = { ...v, kind: 'image', file, src, w, h }
+      notesNote = w && h ? `${w} × ${h} px` : ''
+    }
+  } catch (err) {
+    notesNote = `画像を読めなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+function notesBack($: any): void {
+  const v = notesView
+  if (v.kind === 'image') notesView = { kind: 'pngs', pj: v.pj, rows: v.rows, row: v.row, files: v.files, deep: true }
+  else if (v.kind === 'pngs') notesView = { kind: 'toc', pj: v.pj, rows: v.rows }
+  else notesView = { kind: 'list' }
+  notesNote = ''
+  $.ui.invalidate('ui.render')
+}
+
 export function hubLine(h: Hub, width: number): string {
   const age = h.daysSinceUpdate === undefined ? '—' : h.daysSinceUpdate === 0 ? '今日' : `${h.daysSinceUpdate}日前`
   const ms = h.next ? `★${h.next.date} ${h.next.daysLeft}日` : '—'
@@ -570,6 +671,7 @@ export const register: Register = (on, options) => {
         // an earlier version of this mod left).
         $.ui.status(undefined)
         try {
+          await $.command.register({ name: 'notes', description: 'Open the research notes: a project, its note contents by number, the pictures under that number, one picture' })
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
@@ -654,6 +756,76 @@ export const register: Register = (on, options) => {
       }
     }
     return ran
+  })
+
+  on('command.run', { command: 'notes' }, async $ => {
+    await notesLoad($, repo)
+    notesView = { kind: 'list' }
+    notesNote = ''
+    const opened = await $.ui.open({ id: NOTES, title: 'notes', columns: 84, focus: true })
+    if (opened.isPlaced) return { text: 'notes opened.' }
+    return { text: `notes: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: NOTES }, async ($, e) => {
+    const { Box, Text, Button, Image } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 84)
+    const v = notesView
+    const back = <Button key="back" label="← 戻る" hotkey="b" plain onPress={() => notesBack($)} />
+    const note = notesNote !== '' ? <Text dimColor>{notesNote}</Text> : null
+
+    if (v.kind === 'list') {
+      return (
+        <Box flexDirection="column">
+          <Text bold>notes</Text>
+          <Text dimColor>note のある PJ（hub の nas_code に note/note.md と目次があるもの）</Text>
+          {notePjs.length === 0 && <Text dimColor>見つかりません</Text>}
+          {notePjs.map(pj => (
+            <Button key={`pj-${pj.slug}`} label={clip(`${pj.slug.split('_').slice(0, 2).join('_')}  ${pj.title}`, width - 2)} plain onPress={() => notesOpenToc($, pj)} />
+          ))}
+          {note}
+        </Box>
+      )
+    }
+
+    if (v.kind === 'toc') {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>{back}<Text bold>{clip(`${v.pj.slug}  目次 ${v.rows.length} 件`, width - 12)}</Text></Box>
+          {note}
+          <Box flexDirection="column" marginTop={1}>
+            {v.rows.map(r => (
+              <Button key={`toc-${r.id}`} label={clip(`${r.id.replace(/^KM_/, '')}  ${r.date === '日付未記載' ? '     ' : r.date.slice(5).replace('-', '/')}  ${r.title}`, width - 2)} plain onPress={() => notesOpenPngs($, v.pj, v.rows, r)} />
+            ))}
+          </Box>
+        </Box>
+      )
+    }
+
+    if (v.kind === 'pngs') {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>{back}<Text bold>{clip(`${v.row.id}  ${v.row.title}`, width - 12)}</Text></Box>
+          <Text dimColor wrap="wrap">{`結論: ${v.row.conclusion}  ／  状態: ${v.row.state}`}</Text>
+          {note}
+          {!v.deep && <Button key="deep" label="下の階層も探す（遅い）" hotkey="d" plain onPress={() => notesOpenPngs($, v.pj, v.rows, v.row, true)} />}
+          <Box flexDirection="column" marginTop={1}>
+            {v.files.map(f => (
+              <Button key={`png-${f}`} label={clip(f, width - 2)} plain onPress={() => notesOpenImage($, v, f)} />
+            ))}
+          </Box>
+        </Box>
+      )
+    }
+
+    const cols = Math.min(255, Math.max(20, width - 2))
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>{back}<Text bold>{clip(`${v.row.id}  ${v.file}`, width - 12)}</Text></Box>
+        {note}
+        {v.src && <Image key="note-image" source={{ png: v.src }} columns={cols} rows={imageRows(v.w ?? 0, v.h ?? 0, cols)} alt="（この端末では画像を描けない。CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1 で起動する）" />}
+      </Box>
+    )
   })
 
   on('command.run', { command: 'hubs' }, async $ => {
