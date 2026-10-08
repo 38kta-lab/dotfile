@@ -17,6 +17,10 @@ export type SessionRecord = {
   contextPercent?: number
   costUsd?: number
   lastReportAt?: number
+  // A question waiting for the person (a guard's dialog, the model's
+  // AskUserQuestion): its first words and since when. Cleared when answered.
+  waiting?: string
+  waitingSince?: number
   updatedAt: number
 }
 
@@ -585,6 +589,21 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Every question put to the person in this session passes here as a
+  // tool.call of AskUserQuestion, a guard's $.ui.ask included. While it is
+  // open the session is waiting for the person, not working.
+  on('tool.call', { tool: 'AskUserQuestion' }, async ($, e, next) => {
+    const me = await who($)
+    if (!me) return next(e)
+    const q = String(e.questions?.[0]?.question ?? '').replace(/\s+/g, ' ').trim()
+    await write($, me, { waiting: q.slice(0, 120) || '確認', waitingSince: await $.clock.now() })
+    try {
+      return await next(e)
+    } finally {
+      await write($, me, { waiting: undefined, waitingSince: undefined })
+    }
+  })
+
   on('turn.start', async ($, e, next) => {
     const me = await who($)
     // No status line: clear any an earlier version of this mod left.
@@ -832,7 +851,7 @@ export const register: Register = (on, options) => {
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">
-            <Text color={r.busy ? 'yellow' : 'green'}>{r.busy ? '● ' : '○ '}</Text>
+            <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
             <Text bold>{pad(r.name, 10)}</Text>
             <Text dimColor>{pad(r.pj ?? '', 5)}</Text>
             {r.contextPercent === undefined ? (
@@ -843,9 +862,13 @@ export const register: Register = (on, options) => {
                 <Text>{` ${String(Math.round(r.contextPercent)).padStart(3)}%`}</Text>
               </Box>
             )}
-            <Text color={r.busy ? 'yellow' : undefined} dimColor={!r.busy}>
-              {r.busy ? `  作業中 ${elapsed(now, r.turnStartedAt)}` : r.lastTurnEndAt ? `  ${ago(now, r.lastTurnEndAt)}` : '  —'}
-            </Text>
+            {r.waiting ? (
+              <Text color="red" bold>{`  確認待ち ${elapsed(now, r.waitingSince)}`}</Text>
+            ) : (
+              <Text color={r.busy ? 'yellow' : undefined} dimColor={!r.busy}>
+                {r.busy ? `  作業中 ${elapsed(now, r.turnStartedAt)}` : r.lastTurnEndAt ? `  ${ago(now, r.lastTurnEndAt)}` : '  —'}
+              </Text>
+            )}
           </Box>
         ))}
 
