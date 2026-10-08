@@ -194,7 +194,6 @@ export const register: Register = on => {
     }
     if (!looksEnglish(e.answer)) return r
     restating = true
-    $.ui.toast('直前の返答が英語だったので、日本語で言い直させます')
     $.prompt.submit({ text: RESTATE }).catch(() => {
       restating = false
     })

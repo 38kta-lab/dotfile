@@ -431,3 +431,36 @@ test('pressing a band button opens that pane with focus', OPTIONS as any, async 
   const mine = opened.slice(before)
   expect(mine.map(o => [o.id, o.focus])).toEqual([['hubs', true]])
 })
+
+// ---- toasts: a peer finished or is waiting, an event soon ----
+
+import { peerNotices, eventNotices } from './register'
+
+const rec = (name: string, x: Partial<any>) => ({ name, role: 'peer', busy: false, updatedAt: 0, ...x }) as any
+
+test('peerNotices: nothing on the first look; then finished and waiting, peers only', () => {
+  const t0 = Date.parse('2026-10-08T05:00:00Z')
+  const first = peerNotices(undefined, [rec('claude-21', { busy: true, turnStartedAt: t0 }), rec('ops', { role: 'ops', busy: true })], t0)
+  expect(first.lines).toEqual([])
+  const t1 = t0 + 12 * 60000
+  const second = peerNotices(first.snap, [rec('claude-21', { busy: false }), rec('ops', { role: 'ops', busy: false })], t1)
+  expect(second.lines).toEqual(['claude-21 が終わりました（作業 12分）'])
+  const third = peerNotices(second.snap, [rec('claude-21', { busy: true, waiting: 'config-guard: Bash a shell command that may change a protected file', turnStartedAt: t1 })], t1)
+  expect(third.lines.length).toBe(1)
+  expect(third.lines[0]).toMatch(/^claude-21 が確認待ち: config-guard/)
+  const fourth = peerNotices(third.snap, [rec('claude-21', { busy: true, waiting: 'config-guard: Bash a shell command that may change a protected file', turnStartedAt: t1 })], t1)
+  expect(fourth.lines).toEqual([])
+})
+
+test('eventNotices: a timed event within 10 minutes, once; not past, not far, not all-day', () => {
+  const now = Date.parse('2026-10-08T05:50:00Z') // 14:50 JST
+  const told = new Set<string>()
+  const evs = [
+    { title: '学会 B の部会 [status:meeting]', start: '2026-10-08T15:00:00+09:00', end: '2026-10-08T16:00:00+09:00', calendarId: 'x', meetingUrl: 'https://zoom.example/j/1' },
+    { title: '遠い予定', start: '2026-10-08T16:00:00+09:00', end: '2026-10-08T17:00:00+09:00', calendarId: 'x' },
+    { title: '過ぎた予定', start: '2026-10-08T14:00:00+09:00', end: '2026-10-08T15:30:00+09:00', calendarId: 'x' },
+    { title: '終日', start: '2026-10-08', end: '2026-10-09', calendarId: 'x' },
+  ] as any
+  expect(eventNotices(evs, now, told)).toEqual(['15:00 学会 B の部会（あと 10 分）  会議 URL あり（dash の予定から）'])
+  expect(eventNotices(evs, now + 60000, told)).toEqual([])
+})
