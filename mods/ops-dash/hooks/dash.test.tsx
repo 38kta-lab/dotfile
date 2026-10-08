@@ -85,7 +85,7 @@ test('the peers pane lists every session with its state, ops first', async ($, o
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui: any = await $.ui.mount({
       plugin: 'ops-dash', surface, component: 'Pane', requestId: 'peers',
-      props: { title: 'peers', isFocused: false, bodyColumns: 100, placement: 'dock', scroll: { bodyRows: 20 }, view: 'expanded' } as any,
+      props: { title: 'peers', isFocused: false, bodyColumns: 100, placement: 'inline', scroll: { bodyRows: 20 }, view: 'expanded' } as any,
     })
     const texts = (await ui.findAll({ type: 'Text' })).map((t: any) => t.text ?? t.props?.children ?? '')
     const all = JSON.stringify(texts)
@@ -111,4 +111,19 @@ test('a session whose session.start never ran still writes on its first turn', a
   await $.turn.start({ text: 'go', turnId: 't1' })
   const r: any = store.get('ops-dash:session:claude-03')
   expect(r.busy).toBe(true)
+})
+
+test('docked beside the transcript, each session takes two short lines', async ($, on) => {
+  const store = world(on, OPS)
+  store.set('ops-dash:session:claude-03', { name: 'claude-03', role: 'peer', pj: '03_C', busy: false, contextPercent: 77, updatedAt: 1 })
+  store.set('ops-dash:session:ops', { name: 'ops', role: 'ops', busy: false, contextPercent: 51, updatedAt: 1 })
+  store.set('ops-dash:dispatch:claude-03', { at: 1, line: '03_C の note を note.md に改名し、解析番号ごとの見出し' })
+  await $.session.start(START as any)
+  const ui: any = await $.ui.mount({
+    plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers',
+    props: { title: 'peers', isFocused: false, bodyColumns: 44, placement: 'dock', scroll: { bodyRows: 20 }, view: 'expanded' } as any,
+  })
+  const texts: string[] = (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? ''))
+  expect(texts.some(t => t.startsWith('claude-03 03_C  idle  ctx 77%!'))).toBe(true)
+  expect(texts.every(t => t.length <= 44)).toBe(true)
 })
