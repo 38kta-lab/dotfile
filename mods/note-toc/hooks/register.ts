@@ -38,21 +38,25 @@ async function check($: any, python: string, repo: string, path: string): Promis
   return message(path, `${python} ${script} ${path} --write`, verdict(r.exitCode, r.stderr))
 }
 
+// One hook for both tools; each is registered with a literal matcher, because
+// a session reads the matcher from the source (a matcher built from a loop
+// variable passed the tests but never ran in a session).
+async function afterWrite($: any, path: string, ran: any, python: string, repo: string): Promise<any> {
+  if (!NOTE.test(path) || ran.deny !== undefined || ran.isError) return ran
+  // Say so instead of staying silent: an unset path means the check never runs.
+  if (!repo) return { ...ran, context: [...(ran.context ?? []), 'note-toc: life_repo が未設定のため、note.md の目次と見出しの型を確かめられませんでした（settings.json の pluginConfigs）。'] }
+  try {
+    const note = await check($, python, repo, path)
+    return note ? { ...ran, context: [...(ran.context ?? []), note] } : ran
+  } catch (err) {
+    return { ...ran, context: [...(ran.context ?? []), `note-toc: note.md の確認に失敗しました（${String(err).slice(0, 300)}）。`] }
+  }
+}
+
 export const register: Register = (on, options) => {
   const python = String(options.python || 'python3')
   const repo = String(options.life_repo ?? '')
 
-  for (const tool of ['Edit', 'Write'] as const) {
-    on('tool.call', { tool }, async ($, e, next) => {
-      const ran = await next(e)
-      if (!repo || !NOTE.test(e.file_path) || ran.deny !== undefined || ran.isError) return ran
-      try {
-        const note = await check($, python, repo, e.file_path)
-        return note ? { ...ran, context: [...(ran.context ?? []), note] } : ran
-      } catch (err) {
-        $.ui.log(`note-toc: check failed: ${String(err)}`, { to: 'debug' })
-        return ran
-      }
-    })
-  }
+  on('tool.call', { tool: 'Edit' }, async ($, e, next) => afterWrite($, e.file_path, await next(e), python, repo))
+  on('tool.call', { tool: 'Write' }, async ($, e, next) => afterWrite($, e.file_path, await next(e), python, repo))
 }
