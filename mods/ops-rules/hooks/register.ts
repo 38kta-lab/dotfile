@@ -65,12 +65,27 @@ export function analysisTools(command: string): string[] {
 const TASKS_PATH = /(^|\/)ideas\/task-review\/tasks\.md$/
 const NO_HUB = new Set(['事務'])
 
+// ✅ lines in `newText` beyond those already in `oldText`, counted as a
+// multiset so a second identical line still counts.
 export function newlyDone(oldText: string, newText: string): string[] {
-  const before = new Set(oldText.split('\n').map(l => l.trim()))
-  return newText
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l.startsWith('- ✅') && !before.has(l))
+  const before = new Map<string, number>()
+  for (const l of oldText.split('\n').map(x => x.trim())) before.set(l, (before.get(l) ?? 0) + 1)
+  const out: string[] = []
+  for (const l of newText.split('\n').map(x => x.trim())) {
+    if (!l.startsWith('- ✅')) continue
+    const n = before.get(l) ?? 0
+    if (n > 0) before.set(l, n - 1)
+    else out.push(l)
+  }
+  return out
+}
+
+async function readText($: any, path: string): Promise<string | undefined> {
+  try {
+    return String(await $.fs.read(path))
+  } catch {
+    return undefined
+  }
 }
 
 function projects(lines: readonly string[]): string[] {
@@ -137,9 +152,17 @@ export const register: Register = on => {
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
     if (!TASKS_PATH.test(e.file_path)) return next(e)
-    const done = newlyDone(e.old_string, e.new_string)
+    // The edit's own strings say whether a ✅ was added, but an edit of part
+    // of a line carries only that part. The whole lines come from the file,
+    // read before and after; the strings stand in when it cannot be read.
+    const hint = newlyDone(e.old_string, e.new_string)
+    if (hint.length === 0) return next(e)
+    const before = await readText($, e.file_path)
     const ran = await next(e)
-    if (done.length === 0 || ran.deny !== undefined || ran.isError) return ran
+    if (ran.deny !== undefined || ran.isError) return ran
+    const after = before === undefined ? undefined : await readText($, e.file_path)
+    const whole = before !== undefined && after !== undefined ? newlyDone(before, after) : []
+    const done = whole.length > 0 ? whole : hint
     try {
       await logDone($, e.file_path, done)
     } catch (err) {
