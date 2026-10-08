@@ -133,13 +133,13 @@ test('the calendar block has the same height with no events and with many', OPTI
   expect(span(full)).toBe(span(empty))
 })
 
-test('with many events the calendar is still 1 header + 1 all-day + 12 hour rows', OPTIONS as any, async ($, on) => {
+test('with many events the calendar is still 1 header + 1 all-day + 13 hour rows (08–20)', OPTIONS as any, async ($, on) => {
   world(on, OPS, new Map(), false, MANY, TASKS_MD)
   await $.session.start(START as any)
   await settle()
   const many = await texts($, 'dock')
   const rowsOf = (xs: string[]) => xs.filter(x => /^\d\d $/.test(x)).length
-  expect(rowsOf(many)).toBe(12)
+  expect(rowsOf(many)).toBe(13)
   expect(many.filter(x => x === '終 ').length).toBe(1)
 })
 
