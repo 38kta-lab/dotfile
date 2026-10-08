@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { base64, frontValue, imageRows, pngList, tocRows } from './notes'
+import { base64, entryLines, frontValue, imageRows, pngList, tocRows } from './notes'
 
 const NOTE = `# Sample note
 
@@ -13,6 +13,21 @@ const NOTE = `# Sample note
 <!-- TOC:END -->
 
 ## KM_Z0001 — 最初の解析（日付未記載）
+- 問い: 一つ目の問い
+
+## KM_Z0002 — 二つ目 a \\| b（2026-10-05）
+- 問い: 二つは一致するか
+- 結論: 一致した
+- 状態: 確定
+
+### 実行
+- script/sample.py
+
+### 結果
+- 一致率 100 %
+
+## 別の節
+- ここは含めない
 `
 
 const HUB = `---
@@ -31,6 +46,15 @@ test('tocRows reads the table between the markers, an escaped bar kept in its ce
   expect(rows.map(r => r.id)).toEqual(['KM_Z0001', 'KM_Z0002'])
   expect(rows[1]).toEqual({ id: 'KM_Z0002', date: '2026-10-05', title: '二つ目 a | b', conclusion: '一致した', state: '確定' })
   expect(tocRows('# no toc')).toEqual([])
+})
+
+test('entryLines: the lines under one number, without its heading or the next section', () => {
+  const body = entryLines(NOTE, 'KM_Z0002')
+  expect(body[0]).toBe('- 問い: 二つは一致するか')
+  expect(body).toContain('### 結果')
+  expect(body.join('\n')).not.toContain('ここは含めない')
+  expect(body.join('\n')).not.toContain('一つ目の問い')
+  expect(entryLines(NOTE, 'KM_Z0009')).toEqual([])
 })
 
 test('frontValue drops the inline comment', () => {
@@ -69,6 +93,7 @@ function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
     runs.push(e.argv ?? e)
     const argv: string[] = e.argv ?? e
+    if (argv[0] === 'awk' && argv[1] === '-v') return { value: { exitCode: 0, stdout: NOTE.slice(NOTE.indexOf('## ' + argv[2].slice(3) + ' — ')), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (argv[0] === 'awk') return { value: { exitCode: 0, stdout: argv[2] === '/data/x/_repos/21_Q_sample/note/note.md' ? NOTE : '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (argv[0] === '/bin/sh' || argv[0] === 'find') return { value: { exitCode: 0, stdout: '/data/x/q_sample/KM_Z0002/out/fig1.png\n/data/x/q_sample/KM_Z0002/out/fig2.png\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (argv[0] === 'sips') return { value: { exitCode: 0, stdout: 'pixelWidth: 800\n  pixelHeight: 400\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -120,6 +145,10 @@ test('notes: project → contents → pictures of a number → one picture, and 
   expect(await labels(ui)).toContain('下の階層も探す（遅い）')
   expect(await labels(ui)).toContain('out/fig1.png')
   expect(await texts(ui)).toContain('結論: 一致した')
+  const md = (await ui.findAll({ type: 'Markdown' })).map((m: any) => String(m.props?.text ?? '')).join('\n')
+  expect(md).toContain('二つは一致するか')
+  expect(md).toContain('一致率 100 %')
+  expect(md).not.toContain('ここは含めない')
 
   await $.ui.press({ plugin: 'ops-dash', key: 'png-out/fig1.png' })
   await settle()

@@ -72,3 +72,20 @@ export function bytesToBase64(r: any): string {
 }
 
 export const isBase64 = (s: string) => s.length > 0 && s.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(s)
+
+// One number's entry in note.md: the lines under its "## <id> — …" heading,
+// up to the next "## " heading. `awk` hands over just that span (heading
+// included); the whole note works too. No such heading: nothing.
+export function entryLines(md: string, id: string): string[] {
+  const lines = md.split('\n')
+  const at = lines.findIndex(l => l.startsWith(`## ${id} — `))
+  if (at < 0) return []
+  const out: string[] = []
+  for (let i = at + 1; i < lines.length; i++) {
+    if (lines[i].startsWith('## ')) break
+    out.push(lines[i])
+  }
+  while (out.length && !out[out.length - 1].trim()) out.pop()
+  while (out.length && !out[0].trim()) out.shift()
+  return out
+}
