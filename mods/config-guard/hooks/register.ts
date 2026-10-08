@@ -78,16 +78,34 @@ function secretReasons(text: string): string[] {
   return hit ? [`the content looks like it holds a ${hit[0]}`] : []
 }
 
+// The command cut into the pieces that each run on their own, each paired with
+// the `cd` targets before it (`cd ~/.claude && sed -i ... settings.json` still
+// names settings.json under .claude). A file named in one piece and a write in
+// another (`git rm note/x.md && git commit -m "... CLAUDE.md"`) is not a write
+// to that file. Commit messages are dropped: they name files, they write none.
+function segments(command: string): string[] {
+  const c = command
+    .replace(/\d*&?>>?\s*\/dev\/null/g, '')
+    .replace(/(\s-m|\s--message)(=|\s+)("(?:[^"\\]|\\.)*"|'[^']*')/g, '$1 ""')
+  const out: string[] = []
+  let dirs = ''
+  for (const piece of c.split(/&&|\|\||;|\n|\|/)) {
+    out.push(`${dirs} ${piece}`)
+    const cd = piece.match(/^\s*cd\s+(\S+)/)
+    if (cd) dirs += ` ${cd[1]}`
+  }
+  return out
+}
+
 function opsOnlyCommand(command: string): boolean {
-  const c = command.replace(/\d*&?>>?\s*\/dev\/null/g, '')
-  return OPS_ONLY_IN_COMMAND.test(c) && WRITES.test(c)
+  return segments(command).some(s => OPS_ONLY_IN_COMMAND.test(s) && WRITES.test(s))
 }
 
 function bashReasons(command: string, extra: readonly string[]): string[] {
-  const c = command.replace(/\d*&?>>?\s*\/dev\/null/g, '')
-  const touches = PROTECTED_IN_COMMAND.some(r => r.test(c)) || extra.some(s => c.includes(s))
+  const hit = segments(command).some(s =>
+    (PROTECTED_IN_COMMAND.some(r => r.test(s)) || extra.some(x => s.includes(x))) && WRITES.test(s))
   return [
-    ...(touches && WRITES.test(c) ? [`a shell command that may change a protected file: ${command.slice(0, 120)}`] : []),
+    ...(hit ? [`a shell command that may change a protected file: ${command.slice(0, 120)}`] : []),
     ...secretReasons(command),
   ]
 }
