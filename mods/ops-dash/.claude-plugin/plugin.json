@@ -1,0 +1,6 @@
+{
+  "name": "ops-dash",
+  "version": "0.1.0",
+  "author": { "name": "38kta-lab" },
+  "description": "Every session with LIFE_ROLE publishes its status (busy, context, cost, last report); the ops session shows them all in a /peers pane and its own context and plan usage in the status line."
+}
