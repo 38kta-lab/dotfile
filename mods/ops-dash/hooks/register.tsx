@@ -939,6 +939,9 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: FIG }, async ($, e) => {
     const { Box, Text, Button, Image } = $.ui.resolve(e)
     const width = Math.max(40, e.props.bodyColumns ?? 84)
+    // A reload of this mod empties its memory while the pane stays open:
+    // read again here rather than asking for /fig again.
+    if (figList.length === 0) await figLoad($, repo)
     const v = figView
     const note = figNote !== '' ? <Text dimColor>{figNote}</Text> : null
     const reload = async () => {
@@ -988,6 +991,9 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: NOTES }, async ($, e) => {
     const { Box, Text, Button, Image, Markdown } = $.ui.resolve(e)
     const width = Math.max(40, e.props.bodyColumns ?? 84)
+    // A reload of this mod empties its memory while the pane stays open:
+    // read again here rather than asking for /notes again.
+    if (notePjs.length === 0) await notesLoad($, repo)
     const v = notesView
     const back = <Button key="back" label="← 戻る" hotkey="b" plain onPress={() => notesBack($)} />
     const note = notesNote !== '' ? <Text dimColor>{notesNote}</Text> : null
@@ -1069,6 +1075,8 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button, Markdown } = $.ui.resolve(e)
     const width = Math.max(40, e.props.bodyColumns ?? 84)
     const redraw = () => $.ui.invalidate('ui.render')
+    // A reload of this mod empties its memory while the pane stays open.
+    if (hubs.length === 0) await loadHubs($, repo)
     const reload = async () => {
       await loadHubs($, repo)
       redraw()

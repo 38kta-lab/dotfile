@@ -165,3 +165,13 @@ test('notes: project → contents → pictures of a number → one picture, and 
   expect((await labels(ui)).some((l: string) => l.startsWith('21_Q'))).toBe(true)
   await ui.unmount()
 })
+
+test('a notes pane drawn without /notes (as after a reload of the mod) still lists the projects', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'notes', props: PROPS })
+  await settle()
+  expect((await labels(ui)).some((l: string) => l.startsWith('21_Q'))).toBe(true)
+  await ui.unmount()
+})
