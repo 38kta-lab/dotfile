@@ -466,3 +466,21 @@ test('eventNotices: a timed event within 10 minutes, once; not past, not far, no
   expect(eventNotices(evs, now, told)).toEqual(['15:00 学会 B の部会（あと 10 分）  会議 URL あり（dash の予定から）'])
   expect(eventNotices(evs, now + 60000, told)).toEqual([])
 })
+
+import { weekGrid } from './register'
+
+test('an hour row shows the event that starts in it, not one running on into it', () => {
+  const now = Date.parse('2026-10-08T22:00:00Z') // 10/09 07:00 JST
+  const evs = [
+    { title: '[22_R] 文字起こし [status:focus]', start: '2026-10-09T13:00:00+09:00', end: '2026-10-09T14:30:00+09:00', calendarId: 'c_tb' },
+    { title: '[21_Q] 論文の残り [status:focus]', start: '2026-10-09T14:30:00+09:00', end: '2026-10-09T17:30:00+09:00', calendarId: 'c_tb' },
+    { title: '[Z90] 実作業 [status:focus]', start: '2026-10-09T17:30:00+09:00', end: '2026-10-09T19:00:00+09:00', calendarId: 'c_tb' },
+  ] as any
+  const w = weekGrid(evs, now, 8)
+  const cell = (h: number) => w.hours.find(r => r.label === String(h).padStart(2, '0'))!.cells[0].text.trim()
+  expect(cell(13)).toBe('22_R')
+  expect(cell(14)).toBe('21_Q')
+  expect(cell(15)).toBe('')
+  expect(cell(17)).toBe('Z90')
+  expect(cell(18)).toBe('')
+})

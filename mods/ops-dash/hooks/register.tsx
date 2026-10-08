@@ -249,7 +249,12 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
     const cellsRow = days.map(d => {
       const from = d.start + h * 3600000
       const to = from + 3600000
-      const ev = events.find(e => !isAllDay(e) && Date.parse(e.start) < to && Date.parse(e.end) > from)
+      // An event that starts within this hour wins over one still running
+      // into it (13:00–14:30 then 14:30–17:30: the 14:00 row is the second,
+      // with its name); with none starting, the running one's band goes on.
+      const overlapping = events.filter(e => !isAllDay(e) && Date.parse(e.start) < to && Date.parse(e.end) > from)
+      const starting = overlapping.filter(e => Date.parse(e.start) >= from).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+      const ev = starting[0] ?? overlapping[0]
       if (!ev) return blank
       const startsHere = Date.parse(ev.start) >= from || h === HOUR_FIRST
       return { text: fit(startsHere ? shortTitle(ev.title) : ''), color: eventColor(ev) }
