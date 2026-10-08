@@ -64,9 +64,10 @@ test('a failed edit is not checked', OPTIONS as any, async ($, on) => {
   expect(r.context ?? []).toEqual([])
 })
 
-test('without life_repo the check is off', async ($, on) => {
+test('without life_repo the check does not run, and says so', async ($, on) => {
   const ran: string[][] = []
   world(on, STALE, ran)
-  await $.tool.call(edit)
+  const r = await $.tool.call(edit)
   expect(ran).toEqual([])
+  expect((r.context ?? []).join(' ')).toContain('life_repo が未設定')
 })
