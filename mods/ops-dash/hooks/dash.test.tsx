@@ -73,9 +73,9 @@ test('a peer that sends to ops records when it last reported', async ($, on) => 
 test('ops records whom it sent what, by name without the ref', async ($, on) => {
   const store = world(on, OPS)
   await $.session.start(START as any)
-  await $.session.send({ to: 'claude-22 [b43449]', text: '\n22_R の note を note.md に改名し…\n詳細' } as any)
+  await $.session.send({ to: 'claude-22 [b43449]', text: '\n22_R の表を新しい形式に直し…\n詳細' } as any)
   const d: any = store.get('ops-dash:dispatch:claude-22')
-  expect(d.line).toBe('22_R の note を note.md に改名し…')
+  expect(d.line).toBe('22_R の表を新しい形式に直し…')
 })
 
 test('a refused command does not stop the session from writing its status', async ($, on) => {
@@ -106,8 +106,16 @@ async function texts($: any, placement: 'dock' | 'inline', surface: 'terminal' |
   return out
 }
 
+// Rows of the next-events list drawn as buttons (one row each).
+async function eventButtons($: any): Promise<number> {
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const n = (await ui.findAll({ type: 'Button' })).filter((b: any) => /^(今日|明日|\d+\/\d+\()/.test(String(b.props?.label ?? ''))).length
+  await ui.unmount()
+  return n
+}
+
 const EVENTS = [
-  { title: '[22_R] note と hub の整理 [status:focus]', start: '2026-10-08T14:30:00+09:00', end: '2026-10-08T16:30:00+09:00', calendar_id: 'c_tb' },
+  { title: '[22_R] 資料の整理 [status:focus]', start: '2026-10-08T14:30:00+09:00', end: '2026-10-08T16:30:00+09:00', calendar_id: 'c_tb' },
   { title: '来客の打ち合わせ', start: '2026-10-13T10:00:00+09:00', end: '2026-10-13T12:00:00+09:00', calendar_id: 'me@example.com' },
   { title: '共同実験', start: '2026-10-14', end: '2026-10-17', calendar_id: 'me@example.com' },
 ]
@@ -115,7 +123,7 @@ const MANY = Array.from({ length: 12 }, (_, i) => ({
   title: `[X${i}] block`, start: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(8 + i).padStart(2, '0')}:00:00+09:00`,
   end: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(9 + i).padStart(2, '0')}:00:00+09:00`, calendar_id: 'c_tb',
 }))
-const TASKS_MD = '# tasks\n\n- ✅ の行は翌朝に消す（説明文）\n\n## 今日 2026-10-08\n\n- ✅ [22_R] note 整形 — @claude-22 — 10/08\n- ⬜ [Z90] 現状確認＋実作業 — @user — 10/07（実働締切 10/28）\n- ⬜ [事務] 学会 B 総会 — @user — 10/08（10/09 13:00）\n\n## 今週・近日\n\n- ⬜ [22_R] 学会 A の**参加登録**（ポスターのみ）— @user — 10/08（要旨〆 10/21）\n- ⬜ [21_Q] 解析 8: 対象遺伝子の位置 — @claude-21（未依頼）— 10/07\n- ⬜ [22_R] note と hub の整理（14:30–16:30）— @user・@ops — 10/08\n\n## 待ち\n\n- ⬜ [21_Q] 共同研究者への連絡 6 件 — @user — 10/04\n'
+const TASKS_MD = '# tasks\n\n- ✅ の行は翌朝に消す（説明文）\n\n## 今日 2026-10-08\n\n- ✅ [22_R] 表の整形 — @claude-22 — 10/08\n- ⬜ [Z90] 現状確認＋実作業 — @user — 10/07（実働締切 10/28）\n- ⬜ [事務] 学会 B 総会 — @user — 10/08（10/09 13:00）\n\n## 今週・近日\n\n- ⬜ [22_R] 学会 A の**参加登録**（ポスターのみ）— @user — 10/08（要旨〆 10/21）\n- ⬜ [21_Q] 解析 8: 対象遺伝子の位置 — @claude-21（未依頼）— 10/07\n- ⬜ [22_R] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n\n## 待ち\n\n- ⬜ [21_Q] 共同研究者への連絡 6 件 — @user — 10/04\n'
 
 test('the calendar block has the same height with no events and with many', OPTIONS as any, async ($, on) => {
   const events: unknown[] = []
@@ -124,13 +132,16 @@ test('the calendar block has the same height with no events and with many', OPTI
   await settle()
   const span = (xs: string[]) => xs.findIndex(x => x.startsWith('─ tasks')) - xs.findIndex(x => x.startsWith('─ calendar'))
   const empty = await texts($, 'dock')
+  const emptyButtons = await eventButtons($)
   events.push(...MANY, ...EVENTS)
   await $.command.run({ command: 'dash', args: '' } as any).catch(() => undefined)
   await $.session.start(START as any)
   await settle()
   const full = await texts($, 'dock')
+  const fullButtons = await eventButtons($)
   expect(span(empty)).toBeGreaterThan(0)
-  expect(span(full)).toBe(span(empty))
+  expect(fullButtons).toBeGreaterThan(0)
+  expect(span(full) + fullButtons).toBe(span(empty) + emptyButtons)
 })
 
 test('with many events the calendar is still 1 header + 1 all-day + 13 hour rows (08–20)', OPTIONS as any, async ($, on) => {
@@ -169,14 +180,14 @@ test('tasks: open first then done, tag column, deadline and owner at the right, 
   expect(all).toContain('〆10/28')
   expect(all).toContain('〆10/9')
   expect(all).toContain('〆10/21')
-  expect(all).toContain('→ 07')
-  expect(all).toContain('→ 03 未依頼')
+  expect(all).toContain('→ 22')
+  expect(all).toContain('→ 21 未依頼')
   expect(all).toContain('→ ops')
   expect(all).not.toContain('— @')
   expect(all).not.toContain('**')
   expect(all).not.toContain('@user')
-  expect(all.indexOf('現状確認')).toBeLessThan(all.indexOf('note 整形'))
-  expect(after.some(x => x.startsWith('M20'))).toBe(true)
+  expect(all.indexOf('現状確認')).toBeLessThan(all.indexOf('表の整形'))
+  expect(after.some(x => x.startsWith('Z90'))).toBe(true)
 })
 
 test('without the settings the pane says what is missing instead of failing', async ($, on) => {
@@ -201,4 +212,87 @@ test('on both surfaces and placements the pane draws', OPTIONS as any, async ($,
       expect(all).toContain('─ calendar')
       expect(all).toContain('─ tasks')
     }
+})
+
+// ---- the next events and one event's detail ----
+
+import { upcoming, whenLabel, hubOfEvent } from './register'
+import type { CalEvent } from './register'
+
+const NOW = Date.parse('2026-10-08T02:30:00Z') // 11:30 JST
+const ev = (title: string, start: string, end: string, extra: Partial<CalEvent> = {}): CalEvent => ({ title, start, end, calendarId: 'c_tb', ...extra })
+
+test('upcoming: all-day today first, then timed events not yet over, soonest first', () => {
+  const list = [
+    ev('later', '2026-10-09T10:00:00+09:00', '2026-10-09T11:00:00+09:00'),
+    ev('over', '2026-10-08T09:00:00+09:00', '2026-10-08T10:00:00+09:00'),
+    ev('now', '2026-10-08T11:00:00+09:00', '2026-10-08T12:00:00+09:00'),
+    ev('all day', '2026-10-08', '2026-10-09'),
+    ev('all day tomorrow', '2026-10-09', '2026-10-10'),
+  ]
+  expect(upcoming(list, NOW, 5).map(e => e.title)).toEqual(['all day', 'now', 'later'])
+  expect(upcoming(list, NOW, 2).map(e => e.title)).toEqual(['all day', 'now'])
+})
+
+test('whenLabel: today, tomorrow, a later weekday, all day', () => {
+  expect(whenLabel(ev('a', '2026-10-08T14:30:00+09:00', '2026-10-08T16:30:00+09:00'), NOW)).toBe('今日 14:30–16:30')
+  expect(whenLabel(ev('b', '2026-10-09T10:00:00+09:00', '2026-10-09T12:00:00+09:00'), NOW)).toBe('明日 10:00–12:00')
+  expect(whenLabel(ev('c', '2026-10-14', '2026-10-17'), NOW)).toBe('10/14(水) 終日')
+})
+
+test('hubOfEvent: the [PJ] tag finds its hub; a status tag or no tag finds none', () => {
+  const slugs = ['22_R_sample-genome', 'Z90-slides', 'X91-ops']
+  expect(hubOfEvent(ev('[22_R] 資料の整理 [status:focus]', '', ''), slugs)).toBe('22_R_sample-genome')
+  expect(hubOfEvent(ev('[Z90] 作業', '', ''), slugs)).toBe('Z90-slides')
+  expect(hubOfEvent(ev('[status:focus] 作業', '', ''), slugs)).toBeUndefined()
+  expect(hubOfEvent(ev('来客の打ち合わせ', '', ''), slugs)).toBeUndefined()
+  expect(hubOfEvent(ev('[22] 似た番号', '', ''), slugs)).toBeUndefined()
+})
+
+const DETAILED = [
+  { title: '[22_R] 資料の整理 [status:focus]', start: '2026-10-08T14:30:00+09:00', end: '2026-10-08T16:30:00+09:00', calendar_id: 'c_tb', location: '', description: '', meeting_url: '', html_link: 'https://calendar.example/e1' },
+  { title: '来客の打ち合わせ', start: '2026-10-09T10:00:00+09:00', end: '2026-10-09T11:00:00+09:00', calendar_id: 'me@example.com', location: '会議室 1', description: '議題\n- 一つ目\n- 二つ目', meeting_url: 'https://zoom.example/j/123', html_link: 'https://calendar.example/e2' },
+]
+
+test('the dash lists the next events under the grid, marking the one with a meeting link', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, DETAILED, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const labels = (await ui.findAll({ type: 'Button' })).map((b: any) => String(b.props?.label ?? ''))
+  await ui.unmount()
+  const evs = labels.filter((l: string) => l.startsWith('今日') || l.startsWith('明日'))
+  expect(evs.length).toBe(2)
+  expect(evs[0]).toContain('今日 14:30–16:30')
+  expect(evs[0]).not.toContain('status:')
+  expect(evs[0]).not.toContain('🔗')
+  expect(evs[1]).toContain('明日 10:00–11:00')
+  expect(evs[1]).toContain('🔗')
+})
+
+test('pressing an event opens its detail: time, place, link, copy buttons, description', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, DETAILED, TASKS_MD)
+  const opened: any[] = []
+  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  await $.session.start(START as any)
+  await settle()
+  const dash: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const target = (await dash.findAll({ type: 'Button' })).find((b: any) => String(b.props?.label ?? '').startsWith('明日'))
+  await dash.press({ key: target.key })
+  await dash.unmount()
+  const pane = opened.find(o => o.id === 'event')
+  expect(pane).toBeDefined()
+  expect(pane.closeOnEscape).toBe(true)
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'event', props: { ...PANE_PROPS('dock', 72), title: 'event' } })
+  const texts = (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? '')).join('\n')
+  const buttons = (await ui.findAll({ type: 'Button' })).map((b: any) => String(b.props?.label ?? ''))
+  await ui.unmount()
+  expect(texts).toContain('来客の打ち合わせ')
+  expect(texts).toContain('明日 10:00–11:00')
+  expect(texts).toContain('会議室 1')
+  expect(texts).toContain('https://zoom.example/j/123')
+  expect(texts).toContain('二つ目')
+  expect(buttons).toContain('会議 URL をコピー')
+  expect(buttons).toContain('場所をコピー')
+  expect(buttons).toContain('予定のページをコピー')
 })

@@ -155,7 +155,16 @@ export function cardsOf(records: SessionRecord[], dispatches: Record<string, Dis
 
 // ---- calendar: one week, fixed height ----------------------------------
 
-export type CalEvent = { title: string; start: string; end: string; calendarId: string }
+export type CalEvent = {
+  title: string
+  start: string
+  end: string
+  calendarId: string
+  location?: string
+  description?: string
+  meetingUrl?: string
+  htmlLink?: string
+}
 
 export const HOUR_FIRST = 8
 export const HOUR_LAST = 20 // the last row is 20:00–21:00
@@ -246,6 +255,40 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
 
 export type Task = { done: boolean; tag: string; title: string; owner: string; deadline?: { month: number; day: number } }
 export type TaskSection = { title: string; tasks: Task[] }
+
+// ---- the next events, and one event's detail ----------------------------
+
+// Timed events not yet over, soonest first; all-day events covering today
+// come first. At most `n`.
+export function upcoming(events: CalEvent[], now: number, n: number): CalEvent[] {
+  const today = dayStart(now)
+  const allDay = events.filter(e => isAllDay(e) && allDayCovers(e, today))
+  const timed = events
+    .filter(e => !isAllDay(e) && Date.parse(e.end) > now)
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+  return [...allDay, ...timed].slice(0, n)
+}
+
+// "今日 14:30–16:30" / "明日 10:00–12:00" / "10/14(水) 終日"
+export function whenLabel(ev: CalEvent, now: number): string {
+  const today = dayStart(now)
+  const dayOf = (iso: string) => (isAllDay({ ...ev, start: iso }) ? (() => { const [y, m, d] = iso.slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d).getTime() })() : dayStart(Date.parse(iso)))
+  const start = dayOf(ev.start)
+  const diff = Math.round((start - today) / 86400000)
+  const d = new Date(start)
+  const day = diff === 0 ? '今日' : diff === 1 ? '明日' : `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY[d.getDay()]})`
+  if (isAllDay(ev)) return `${day} 終日`
+  return `${day} ${hhmm(Date.parse(ev.start))}–${hhmm(Date.parse(ev.end))}`
+}
+
+// The hub an event belongs to, by the "[PJ]" tag at the start of its title.
+// A hub's code is "22_R" in "22_R_sample-genome", "Z90" in "Z90-slides"; a tag
+// naming two ("21_Q/22_R") goes to the first.
+export function hubOfEvent(ev: CalEvent, slugs: readonly string[]): string | undefined {
+  const tag = ev.title.match(/^\[([^\]]+)\]/)?.[1]?.split('/')[0].trim()
+  if (!tag || tag.startsWith('status:')) return undefined
+  return slugs.find(s => s.match(/^(\d{2}_[A-Z]|[A-Z]\d{2})/)?.[1] === tag)
+}
 
 function plain(text: string): string {
   return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim()
@@ -352,15 +395,22 @@ async function fetchCalendar($: any, python: string, repo: string): Promise<void
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   try {
     const r = await $.process.run(
-      [python, `${repo}/scripts/google_calendar_read.py`, '--start', iso(d0), '--end', iso(d7), '--format', 'json'],
+      [python, `${repo}/scripts/google_calendar_read.py`, '--start', iso(d0), '--end', iso(d7), '--format', 'json', '--details', '--max-results', '200'],
       { cwd: repo, timeoutMs: 60000 },
     )
     if (r.exitCode !== 0) {
       calendarNote = `カレンダー取得に失敗（exit ${r.exitCode}）`
       return
     }
-    const list = JSON.parse(r.stdout) as { title: string; start: string; end: string; calendar_id: string }[]
-    calendar = list.map(e => ({ title: e.title, start: e.start, end: e.end, calendarId: e.calendar_id }))
+    const list = JSON.parse(r.stdout) as {
+      title: string; start: string; end: string; calendar_id: string
+      location?: string; description?: string; meeting_url?: string; html_link?: string
+    }[]
+    calendar = list.map(e => ({
+      title: e.title, start: e.start, end: e.end, calendarId: e.calendar_id,
+      location: e.location || undefined, description: e.description || undefined,
+      meetingUrl: e.meeting_url || undefined, htmlLink: e.html_link || undefined,
+    }))
     calendarNote = `更新 ${hhmm(now)}`
   } catch (err) {
     calendarNote = `カレンダー取得に失敗（${String(err).slice(0, 40)}）`
@@ -375,6 +425,12 @@ let hubsLoadedAt = 0
 let hubsNote = ''
 let view: { kind: 'list' } | { kind: 'hub'; slug: string; tab: number } = { kind: 'list' }
 let back: { slug: string; tab: number }[] = []
+
+// The event pane: one event's detail, opened from the dash's list of next events.
+const EVENT = 'event'
+let detail: CalEvent | undefined
+let copied = ''
+const NEXT_EVENTS = 5
 
 async function loadHubs($: any, repo: string): Promise<void> {
   if (!repo) {
@@ -406,6 +462,13 @@ function openHub(slug: string, tab = 0): void {
 function goBack(): void {
   const prev = back.pop()
   view = prev ? { kind: 'hub', slug: prev.slug, tab: prev.tab } : { kind: 'list' }
+}
+
+async function openEvent($: any, ev: CalEvent): Promise<void> {
+  detail = ev
+  copied = ''
+  const opened = await $.ui.open({ id: EVENT, title: 'event', focus: true, closeOnEscape: true, columns: 72, rows: 20 })
+  if (opened.isPlaced) $.ui.invalidate('ui.render')
 }
 
 export function hubLine(h: Hub, width: number): string {
@@ -585,6 +648,52 @@ export const register: Register = (on, options) => {
     )
   })
 
+  on('ui.render', { component: 'Pane', requestId: EVENT }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 72)
+    const ev = detail
+    if (!ev) return <Text dimColor>予定が選ばれていません。</Text>
+    const now = await $.clock.now()
+    if (hubs.length === 0) await loadHubs($, repo)
+    const hubSlug = hubOfEvent(ev, hubs.map(h => h.slug))
+    const copy = async (label: string, text: string, press: any) => {
+      const r = await $.ui.copy({ text, surface: press?.surface })
+      copied = r.isCopied ? `${label}をコピーしました` : `コピーできませんでした（${r.reason ?? '理由不明'}）`
+      $.ui.invalidate('ui.render')
+    }
+    const openHubPane = async () => {
+      if (!hubSlug) return
+      openHub(hubSlug)
+      await $.ui.close({ id: EVENT })
+      await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
+      $.ui.invalidate('ui.render')
+    }
+    const desc = (ev.description ?? '').split('\n').map(l => l.trimEnd())
+    const DESC_LINES = 12
+    return (
+      <Box flexDirection="column">
+        <Text bold wrap="wrap">{ev.title}</Text>
+        <Text>{whenLabel(ev, now)}</Text>
+        {ev.location && <Text wrap="wrap">{`場所  ${ev.location}`}</Text>}
+        {ev.meetingUrl && <Text color="cyan" wrap="wrap">{ev.meetingUrl}</Text>}
+        <Box flexDirection="row" columnGap={2} marginTop={1}>
+          {ev.meetingUrl && <Button key="copy-url" label="会議 URL をコピー" hotkey="c" onPress={(press: any) => copy('会議 URL ', ev.meetingUrl!, press)} />}
+          {ev.location && <Button key="copy-loc" label="場所をコピー" hotkey="l" plain onPress={(press: any) => copy('場所', ev.location!, press)} />}
+          {ev.htmlLink && <Button key="copy-page" label="予定のページをコピー" hotkey="p" plain onPress={(press: any) => copy('予定のページ', ev.htmlLink!, press)} />}
+          {hubSlug && <Button key="hub" label={`${hubSlug.split('_').slice(0, 2).join('_').replace(/-.*/, '')} の hub ↗`} hotkey="h" plain onPress={openHubPane} />}
+        </Box>
+        {copied !== '' && <Text color="green">{copied}</Text>}
+        {desc.some(l => l) && (
+          <Box flexDirection="column" marginTop={1}>
+            {desc.slice(0, DESC_LINES).map(l => <Text dimColor wrap="wrap">{clip(l, width * 3)}</Text>)}
+            {desc.length > DESC_LINES && <Text dimColor>{`…ほか ${desc.length - DESC_LINES} 行`}</Text>}
+          </Box>
+        )}
+        <Box marginTop={1}><Text dimColor>Esc で閉じる</Text></Box>
+      </Box>
+    )
+  })
+
   on('command.run', { command: COMMAND }, async $ => {
     const opened = await $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true })
     if (opened.isPlaced) return { text: 'ops-dash opened.' }
@@ -592,7 +701,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const { records, limits } = await readAll($)
     const now = await $.clock.now()
     const width = Math.max(40, e.props.bodyColumns ?? 58)
@@ -606,7 +715,8 @@ export const register: Register = (on, options) => {
     const sorted = [...records].sort((a, b) => (a.role === 'ops' ? -1 : b.role === 'ops' ? 1 : a.name.localeCompare(b.name)))
     const peerBar = Math.max(6, Math.min(12, width - 40))
 
-    // calendar: fixed height
+    // calendar: fixed height, then the next few events as buttons
+    const next = upcoming(calendar, now, NEXT_EVENTS)
     const dayWidth = Math.max(5, Math.floor((width - 3) / 7))
     const week = weekGrid(calendar, now, dayWidth)
 
@@ -672,6 +782,18 @@ export const register: Register = (on, options) => {
             {row.cells.map(c => (c.color ? <Text backgroundColor={c.color} color="black">{c.text}</Text> : <Text dimColor>{c.text.replace(/ (?=$)/, '·').replace(/^ /, ' ')}</Text>))}
           </Box>
         ))}
+        <Box flexDirection="column" marginTop={1}>
+          {next.length === 0 && <Text dimColor>この先の予定なし</Text>}
+          {next.map((ev, i) => (
+            <Button
+              key={`ev-${i}-${ev.start}`}
+              label={clip(`${pad(whenLabel(ev, now), 18)} ${ev.title.replace(/\[status:[^\]]+\]/g, '').trim()}${ev.meetingUrl ? '  🔗' : ''}`, width - 2)}
+              plain
+              onPress={() => openEvent($, ev)}
+            />
+          ))}
+          {Array.from({ length: NEXT_EVENTS - Math.max(1, next.length) }, () => <Text> </Text>)}
+        </Box>
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('tasks')}</Text></Box>
         {taskNote !== '' && <Text dimColor>{taskNote}</Text>}

@@ -31,9 +31,9 @@ const ANALYSES = [
 // Commands ops ran on 2026-10-08 to read and check peers' files: never held.
 const CHECKS = [
   'grep -n "note1" /data/x/projA/CLAUDE.md',
-  'cd /data/x/projB && git log --oneline -3 && git diff-tree -r -M --name-status ca12f91 | head -3',
+  'cd /data/x/projB && git log --oneline -3 && git diff-tree -r -M --name-status 1a2b3c4 | head -3',
   "python3 - <<'EOF'\nfrom collections import Counter\nprint(1)\nEOF",
-  'ls /data/x/projB_data/ | grep -cE "^KM_G"',
+  'ls /data/x/projB_data/ | grep -cE "^JOB_"',
   'head -1 /data/x/JOB_0034/out/version_map.tsv | tr "\\t" "\\n"',
   'grep minimap2 /data/x/JOB_0018/run.log',
   'cat /data/x/JOB_0001/flye/flye.log | tail -5',
@@ -113,7 +113,7 @@ test('turning a project line ✅ reminds the model to fix that hub', async ($, o
   editTool(on)
   const r = await $.tool.call({
     tool: 'Edit', file_path: TASKS,
-    old_string: '- ⬜ [21_Q] 第 2 段 — @claude-21 — 10/07', new_string: '- ✅ [21_Q] 第 2 段 — @claude-21 — 10/07',
+    old_string: '- ⬜ [21_Q] 解析 8 — @claude-21 — 10/07', new_string: '- ✅ [21_Q] 解析 8 — @claude-21 — 10/07',
   })
   expect(r.context?.join(' ')).toContain('projects/active/21_Q*.md')
   expect(r.context?.join(' ')).toContain('Next Actions')
@@ -146,7 +146,7 @@ test('a line that was already ✅ is not counted again', async ($, on) => {
   editTool(on)
   const r = await $.tool.call({
     tool: 'Edit', file_path: TASKS,
-    old_string: '- ✅ [22_R] note 整形\n- ⬜ [Z90] 確認', new_string: '- ✅ [22_R] note 整形\n- ⬜ [Z90] 確認（13:00）',
+    old_string: '- ✅ [22_R] 表の整形\n- ⬜ [Z90] 確認', new_string: '- ✅ [22_R] 表の整形\n- ⬜ [Z90] 確認（13:00）',
   })
   expect(r.context ?? []).toEqual([])
 })
