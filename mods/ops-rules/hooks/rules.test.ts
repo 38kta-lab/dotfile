@@ -162,3 +162,40 @@ test('the same ✅ in another file adds nothing', async ($, on) => {
   const r = await $.tool.call({ tool: 'Edit', file_path: '/home/u/life/projects/active/03_C.md', old_string: '- ⬜ [03_C] x', new_string: '- ✅ [03_C] x' })
   expect(r.context ?? []).toEqual([])
 })
+
+function files(on: any, now = Date.parse('2026-10-08T03:41:00Z')) {
+  const fs = new Map<string, string>()
+  on('fs.read', (_$: any, e: any) => {
+    if (!fs.has(e.path)) throw new Error('ENOENT')
+    return { value: fs.get(e.path) }
+  })
+  on('fs.write', (_$: any, e: any) => { fs.set(e.path, e.text); return { value: undefined } })
+  on('clock.now', () => ({ value: now }))
+  return fs
+}
+
+test('a line turned ✅ is logged with the minute in done/YYYY-MM.md next to tasks.md', async ($, on) => {
+  editTool(on)
+  const fs = files(on)
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [事務] 経理返信 — @user — 10/08', new_string: '- ✅ [事務] 経理返信 — @user — 10/08' })
+  const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
+  expect(log).toContain('# done 2026-10')
+  expect(log).toContain('- 2026-10-08 12:41 ✅ [事務] 経理返信 — @user — 10/08')
+})
+
+test('later ✅ lines are appended, not overwritten', async ($, on) => {
+  editTool(on)
+  const fs = files(on)
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [03_C] a', new_string: '- ✅ [03_C] a' })
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [M20] b', new_string: '- ✅ [M20] b' })
+  const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
+  expect(log.indexOf('✅ [03_C] a')).toBeLessThan(log.indexOf('✅ [M20] b'))
+  expect(log.match(/^# done/gm)?.length).toBe(1)
+})
+
+test('an edit with nothing turned ✅ logs nothing, and a failed edit logs nothing', async ($, on) => {
+  editTool(on, true)
+  const fs = files(on)
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [03_C] x', new_string: '- ✅ [03_C] x' })
+  expect(fs.size).toBe(0)
+})

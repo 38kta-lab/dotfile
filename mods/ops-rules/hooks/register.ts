@@ -81,6 +81,33 @@ function projects(lines: readonly string[]): string[] {
   return [...new Set(tags)].filter(t => !NO_HUB.has(t))
 }
 
+// Every line turned ✅ is also logged, with the minute, to a month file next
+// to tasks.md (done/YYYY-MM.md), so what was done when survives the morning
+// clean-up that deletes ✅ lines from tasks.md.
+function two(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+export function logLines(now: number, done: readonly string[]): { month: string; lines: string[] } {
+  const d = new Date(now)
+  const month = `${d.getFullYear()}-${two(d.getMonth() + 1)}`
+  const stamp = `${month}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`
+  return { month, lines: done.map(l => `- ${stamp} ${l.replace(/^- /, '')}`) }
+}
+
+async function logDone($: any, tasksPath: string, done: readonly string[]): Promise<void> {
+  const { month, lines } = logLines(await $.clock.now(), done)
+  const dir = tasksPath.replace(/[^/]*$/, '')
+  const path = `${dir}done/${month}.md`
+  let old = ''
+  try {
+    old = String(await $.fs.read(path))
+  } catch {
+    old = `# done ${month}\n\ntasks.md で ✅ にした行（ops-rules mod が ✅ の瞬間に書く）。\n\n`
+  }
+  await $.fs.write(path, old.replace(/\n*$/, '\n') + lines.join('\n') + '\n')
+}
+
 const ALLOW = 'Allow once'
 const DENY = 'Deny'
 
@@ -113,6 +140,11 @@ export const register: Register = on => {
     const done = newlyDone(e.old_string, e.new_string)
     const ran = await next(e)
     if (done.length === 0 || ran.deny !== undefined || ran.isError) return ran
+    try {
+      await logDone($, e.file_path, done)
+    } catch (err) {
+      $.ui.log(`ops-rules: could not log done lines: ${String(err)}`)
+    }
     const pjs = projects(done)
     if (pjs.length === 0) return ran
     const hubs = pjs.map(p => `projects/active/${p}*.md`).join(', ')
