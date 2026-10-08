@@ -581,7 +581,7 @@ async function notesOpenToc($: any, pj: NotePj): Promise<void> {
   $.ui.invalidate('ui.render')
 }
 
-// First the quick look: <number>/out/*.png and <number>/*.png, no walking
+// First the quick look: <number>/out/*.png only, no walking
 // down the tree (the NAS is slow to walk). `deep` walks it, on request.
 async function notesOpenPngs($: any, pj: NotePj, rows: TocRow[], row: TocRow, deep = false): Promise<void> {
   const dir = `${pj.data}/${row.id}`
@@ -591,11 +591,11 @@ async function notesOpenPngs($: any, pj: NotePj, rows: TocRow[], row: TocRow, de
   try {
     const argv = deep
       ? ['find', dir, '-maxdepth', '6', '-type', 'f', '-iname', '*.png']
-      : ['/bin/sh', '-c', 'for f in "$1"/out/*.png "$1"/out/*.PNG "$1"/*.png "$1"/*.PNG; do [ -f "$f" ] && echo "$f"; done; exit 0', 'sh', dir]
+      : ['/bin/sh', '-c', 'for f in "$1"/out/*.png "$1"/out/*.PNG; do [ -f "$f" ] && echo "$f"; done; exit 0', 'sh', dir]
     const r = await $.process.run(argv, { timeoutMs: deep ? 60000 : 15000 })
     const files = pngList(String(r.stdout ?? ''), dir)
     notesView = { kind: 'pngs', pj, rows, row, files, deep }
-    const where = deep ? '下の階層まで探して' : 'out/ と直下に'
+    const where = deep ? '下の階層まで探して' : 'out/ に'
     notesNote = files.length === 0 ? (r.exitCode === 0 ? `${where} png はありません` : `探せなかった（exit ${r.exitCode}）`) : `${where} ${files.length} 件${files.length >= 200 ? '（先頭 200 件）' : ''}`
   } catch (err) {
     notesNote = `探せなかった（${String(err).slice(0, 60)}）`
