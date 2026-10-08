@@ -847,10 +847,11 @@ export const register: Register = (on, options) => {
           // Open both panes at start, without taking the keyboard. Opened unasked,
           // a pane is drawn from 144 columns (110 once the person has opened it);
           // narrower, it waits until the terminal widens or /dash or /hubs is run.
-          // hubs first so that dash is the tab in front.
+          // dash first: the pane opened first is the one in front (10/08, seen on the
+          // terminal: hubs opened first stayed in front), and its tab comes first.
           void loadHubs($, repo)
-            .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: 84 }))
             .then(() => $.ui.open({ id: PANE, title: 'ops-dash', columns: 58 }))
+            .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: 84 }))
             .catch((err: unknown) => $.ui.log(`ops-dash: could not open the panes at start: ${String(err)}`, { to: 'debug' }))
           $.clock.every(600000, () => fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render')))
         } catch (err) {
