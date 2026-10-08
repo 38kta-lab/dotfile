@@ -132,13 +132,48 @@ export const TABS: { key: string; label: string; pick: (h: Hub) => { name: strin
   { key: '6', label: '全文', pick: h => ({ name: '全文', body: h.text }) },
 ]
 
+// Tables wrap badly in a pane, so every table is drawn as a list: the first
+// cell bold, the second beside it, the rest as "column: value" lines below.
+// Code fences are left as they are.
+const cellsOf = (row: string) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+const isRule = (row: string) => /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(row.trim())
+
+export function tablesToLists(md: string): string {
+  const lines = md.split('\n')
+  const out: string[] = []
+  let fence = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence
+    const startsTable = !fence && line.trim().startsWith('|') && i + 1 < lines.length && isRule(lines[i + 1])
+    if (!startsTable) {
+      out.push(line)
+      continue
+    }
+    const head = cellsOf(line)
+    i += 2
+    while (i < lines.length && lines[i].trim().startsWith('|')) {
+      const c = cellsOf(lines[i])
+      const first = c[0] ? `**${c[0].replace(/\*\*/g, '')}**` : ''
+      out.push(`- ${[first, c[1]].filter(Boolean).join(' — ')}`)
+      for (let k = 2; k < c.length; k++) {
+        if (c[k] && c[k] !== '—' && c[k] !== '-') out.push(`  - ${head[k] ? `${head[k]}: ` : ''}${c[k]}`)
+      }
+      i++
+    }
+    i--
+    out.push('')
+  }
+  return out.join('\n')
+}
+
 export const MAX_CHARS = 90000
 
 export function sectionMarkdown(h: Hub, tab: number): string {
   const t = TABS[tab]
   const s = t.pick(h)
   if (!s) return `_この hub には「${t.label}」の節がありません。_`
-  const body = s.name === '全文' ? s.body : `## ${s.name}\n\n${s.body}`
+  const body = tablesToLists(s.name === '全文' ? s.body : `## ${s.name}\n\n${s.body}`)
   if (body.length <= MAX_CHARS) return body
   return body.slice(0, MAX_CHARS) + `\n\n_（${body.length.toLocaleString()} 字のうち先頭 ${MAX_CHARS.toLocaleString()} 字まで。続きは節ごとに見てください）_`
 }

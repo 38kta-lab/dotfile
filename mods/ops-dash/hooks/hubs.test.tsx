@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { parseHub, nextMilestone, openActions, sectionMarkdown } from './hubs'
+import { parseHub, nextMilestone, openActions, sectionMarkdown, tablesToLists } from './hubs'
 
 const NOW = Date.parse('2026-10-08T03:00:00Z')
 
@@ -134,4 +134,23 @@ test('list → open a hub → switch tab → follow related → back → back to
   expect(await texts(ui)).toContain('Alpha (11_A)')
   await $.ui.press({ plugin: 'ops-dash', key: 'back' })
   expect((await labels(ui)).join('\n')).toContain('12_B')
+})
+
+test('every table becomes a list; tables inside code fences stay', () => {
+  const md = '## M\n\n| Date | Milestone | Required State |\n|---|---|---|\n| **2026-10-21 (水)** | abstract | draft done |\n| 2026-12-11 | submit | — |\n\nafter\n\n```\n| a | b |\n|---|---|\n```\n'
+  const out = tablesToLists(md)
+  expect(out).toContain('- **2026-10-21 (水)** — abstract')
+  expect(out).toContain('  - Required State: draft done')
+  expect(out).toContain('- **2026-12-11** — submit')
+  expect(out).not.toContain('Required State: —')
+  expect(out).toContain('after')
+  expect(out).toContain('| a | b |')
+  expect(out.split('\n').filter(l => l.startsWith('|')).length).toBe(2)
+})
+
+test('the milestones tab of a hub is drawn as a list', () => {
+  const h = parseHub('11_A_alpha', ALPHA, NOW)
+  const md = sectionMarkdown(h, 1)
+  expect(md).toContain('- **2026-10-21 (水)** — **abstract**')
+  expect(md).not.toMatch(/^\|/m)
 })
