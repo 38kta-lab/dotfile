@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
+import { consultText, parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
 import type { Hub } from './hubs'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -456,6 +456,7 @@ let hubsLoadedAt = 0
 let hubsNote = ''
 let view: { kind: 'list' } | { kind: 'hub'; slug: string; tab: number } = { kind: 'list' }
 let back: { slug: string; tab: number }[] = []
+let consultNote = ''
 
 // One event's detail, drawn in place of the dash (b goes back). Not a pane of
 // its own: a pane opened from a press in another pane never gets the keys.
@@ -487,6 +488,7 @@ async function loadHubs($: any, repo: string): Promise<void> {
 }
 
 function openHub(slug: string, tab = 0): void {
+  consultNote = ''
   if (view.kind === 'hub') back.push({ slug: view.slug, tab: view.tab })
   view = { kind: 'hub', slug, tab }
 }
@@ -700,7 +702,13 @@ export const register: Register = (on, options) => {
           <Button key="back" label={back.length > 0 ? '← 戻る' : '← 一覧'} hotkey="b" plain onPress={() => { goBack(); redraw() }} />
           <Text bold>{clip(`${hub.slug}  ${hub.title}`, width - 24)}</Text>
           <Button key="reload" label="更新" hotkey="r" plain onPress={reload} />
+          <Button key="consult" label="次の一手を相談" hotkey="n" plain onPress={async () => {
+            const r = await $.prompt.fill({ text: consultText(hub, `${repo}/projects/active/${hub.slug}.md`) })
+            consultNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送る）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
+            redraw()
+          }} />
         </Box>
+        {consultNote !== '' && <Text color="green">{consultNote}</Text>}
         <Text dimColor>{clip(`${hub.status} · 更新 ${hub.updated}${hub.next ? ` · ★${hub.next.date} ${hub.next.label} まで ${hub.next.daysLeft}日` : ''}`, width)}</Text>
         <Box flexDirection="row" columnGap={2} marginTop={1}>
           {TABS.map((t, i) => (
