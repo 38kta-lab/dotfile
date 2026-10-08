@@ -71,3 +71,20 @@ test('without life_repo the check does not run, and says so', async ($, on) => {
   expect(ran).toEqual([])
   expect((r.context ?? []).join(' ')).toContain('life_repo が未設定')
 })
+
+import { unmarkedConclusions, conclusionMessage } from './register'
+
+test('a conclusion without the user mark is caught; 未記載 and marked ones are not', () => {
+  const text = [
+    '- 問い: x',
+    '- 結論: A は B より 2 倍多い。これは C を示す',
+    '- 結論: 未記載',
+    '- 結論: 未記載（hub には題名だけ）',
+    '- 結論: 融合は HR（user 2026-10-08）',
+    '- 結論: 分裂は分からない (user 2026-10-08)',
+    '- 状態: 要確認',
+  ].join('\n')
+  expect(unmarkedConclusions(text)).toEqual(['A は B より 2 倍多い。これは C を示す'])
+  expect(conclusionMessage('note/note.md', [])).toBeUndefined()
+  expect(conclusionMessage('note/note.md', ['x'])).toContain('（user YYYY-MM-DD）')
+})
