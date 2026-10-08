@@ -111,12 +111,6 @@ export function limitRows(l: Limits | undefined, now: number): LimitRow[] {
   return (l?.windows ?? []).map(w => ({ label: WINDOW_LABEL[w.kind] ?? w.kind, percent: w.percentUsed, reset: resetLabel(now, w.resetsAt) }))
 }
 
-// One sentence for the status line: "ctx 51% · 5時間枠 1% · 週間枠 17%"
-export function limitsLine(l?: Limits): string {
-  if (!l || l.windows.length === 0) return 'プラン —'
-  return l.windows.map(w => `${WINDOW_LABEL[w.kind] ?? w.kind} ${Math.round(w.percentUsed)}%`).join(' · ')
-}
-
 export type Card = {
   name: string
   pj?: string
@@ -187,6 +181,9 @@ export const register: Register = on => {
     if (me) {
       await write($, me, { busy: false })
       if (me.role === 'ops') {
+        // The pane shows context and plan usage; no status line (and clear one
+        // an earlier version of this mod left).
+        $.ui.status(undefined)
         try {
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
@@ -220,10 +217,6 @@ export const register: Register = on => {
           at: await $.clock.now(),
           windows: e.rateLimits.map(w => ({ kind: w.kind, percentUsed: w.percentUsed, resetsAt: w.resetsAt })),
         })
-      }
-      if (me.role === 'ops') {
-        const pct = e.context.percent === undefined ? '—' : `${Math.round(e.context.percent)}%`
-        $.ui.status(`context ${pct} · ${limitsLine((await $.store.get(LIMITS)) as Limits | undefined)}`)
       }
       $.ui.invalidate('ui.render')
     }
