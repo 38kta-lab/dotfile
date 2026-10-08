@@ -432,7 +432,8 @@ export const register: Register = (on, options) => {
 
     return (
       <Box flexDirection="column">
-        {limitLines.length === 0 && <Text dimColor>プランの利用枠: まだ計測なし</Text>}
+        <Text dimColor>{rule('system usage')}</Text>
+        {limitLines.length === 0 && <Text dimColor>まだ計測なし</Text>}
         {limitLines.map(l => (
           <Box flexDirection="row">
             <Text>{pad(l.label, 8)}</Text>
