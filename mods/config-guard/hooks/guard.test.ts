@@ -178,7 +178,7 @@ test('the ops session edits tasks.md without a dialog', async ($, on) => {
 
 test('a peer session cannot append to tasks.md from the shell, even after cd', async ($, on) => {
   const asked: Asked = { questions: [] }, ran: string[] = []
-  person(on, 'Allow once', asked); tools(on, ran); role(on, 'claude-03')
+  person(on, 'Allow once', asked); tools(on, ran); role(on, 'claude-21')
   const r = await $.tool.call({ tool: 'Bash', command: 'cd ~/life/ideas/task-review && echo "- x" >> tasks.md' })
   expect(r.deny).toBeDefined()
   expect(ran).toEqual([])

@@ -31,9 +31,9 @@ const ANALYSES = [
 // Commands ops ran on 2026-10-08 to read and check peers' files: never held.
 const CHECKS = [
   'grep -n "note1" /data/x/projA/CLAUDE.md',
-  'cd /data/x/projB && git log --oneline -3 && git diff-tree -r -M --name-status ca12f91 | head -3',
+  'cd /data/x/projB && git log --oneline -3 && git diff-tree -r -M --name-status 1a2b3c4 | head -3',
   "python3 - <<'EOF'\nfrom collections import Counter\nprint(1)\nEOF",
-  'ls /data/x/projB_data/ | grep -cE "^KM_G"',
+  'ls /data/x/projB_data/ | grep -cE "^JOB_"',
   'head -1 /data/x/JOB_0034/out/version_map.tsv | tr "\\t" "\\n"',
   'grep minimap2 /data/x/JOB_0018/run.log',
   'cat /data/x/JOB_0001/flye/flye.log | tail -5',
@@ -113,9 +113,9 @@ test('turning a project line ✅ reminds the model to fix that hub', async ($, o
   editTool(on)
   const r = await $.tool.call({
     tool: 'Edit', file_path: TASKS,
-    old_string: '- ⬜ [03_C] 第4波 8 — @claude-03 — 10/07', new_string: '- ✅ [03_C] 第4波 8 — @claude-03 — 10/07',
+    old_string: '- ⬜ [21_Q] 解析 8 — @claude-21 — 10/07', new_string: '- ✅ [21_Q] 解析 8 — @claude-21 — 10/07',
   })
-  expect(r.context?.join(' ')).toContain('projects/active/03_C*.md')
+  expect(r.context?.join(' ')).toContain('projects/active/21_Q*.md')
   expect(r.context?.join(' ')).toContain('Next Actions')
 })
 
@@ -123,11 +123,11 @@ test('a line tagged with two projects names both hubs', async ($, on) => {
   editTool(on)
   const r = await $.tool.call({
     tool: 'Edit', file_path: TASKS,
-    old_string: '- ⬜ [03_C/07_G] hub と note の整理', new_string: '- ✅ [03_C/07_G] hub と note の整理',
+    old_string: '- ⬜ [21_Q/22_R] hub と note の整理', new_string: '- ✅ [21_Q/22_R] hub と note の整理',
   })
   const c = r.context?.join(' ') ?? ''
-  expect(c).toContain('03_C*.md')
-  expect(c).toContain('07_G*.md')
+  expect(c).toContain('21_Q*.md')
+  expect(c).toContain('22_R*.md')
 })
 
 test('an admin line has no hub, so no reminder', async ($, on) => {
@@ -138,7 +138,7 @@ test('an admin line has no hub, so no reminder', async ($, on) => {
 
 test('an edit that turns nothing ✅ adds nothing', async ($, on) => {
   editTool(on)
-  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [M20] 現状確認', new_string: '- ⬜ [M20] 現状確認＋実作業' })
+  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [Z90] 現状確認', new_string: '- ⬜ [Z90] 現状確認＋実作業' })
   expect(r.context ?? []).toEqual([])
 })
 
@@ -146,20 +146,20 @@ test('a line that was already ✅ is not counted again', async ($, on) => {
   editTool(on)
   const r = await $.tool.call({
     tool: 'Edit', file_path: TASKS,
-    old_string: '- ✅ [07_G] note 整形\n- ⬜ [M20] 確認', new_string: '- ✅ [07_G] note 整形\n- ⬜ [M20] 確認（13:00）',
+    old_string: '- ✅ [22_R] 表の整形\n- ⬜ [Z90] 確認', new_string: '- ✅ [22_R] 表の整形\n- ⬜ [Z90] 確認（13:00）',
   })
   expect(r.context ?? []).toEqual([])
 })
 
 test('a failed edit adds no reminder', async ($, on) => {
   editTool(on, true)
-  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [03_C] x', new_string: '- ✅ [03_C] x' })
+  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] x', new_string: '- ✅ [21_Q] x' })
   expect(r.context ?? []).toEqual([])
 })
 
 test('the same ✅ in another file adds nothing', async ($, on) => {
   editTool(on)
-  const r = await $.tool.call({ tool: 'Edit', file_path: '/home/u/life/projects/active/03_C.md', old_string: '- ⬜ [03_C] x', new_string: '- ✅ [03_C] x' })
+  const r = await $.tool.call({ tool: 'Edit', file_path: '/home/u/life/projects/active/21_Q.md', old_string: '- ⬜ [21_Q] x', new_string: '- ✅ [21_Q] x' })
   expect(r.context ?? []).toEqual([])
 })
 
@@ -186,16 +186,16 @@ test('a line turned ✅ is logged with the minute in done/YYYY-MM.md next to tas
 test('later ✅ lines are appended, not overwritten', async ($, on) => {
   editTool(on)
   const fs = files(on)
-  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [03_C] a', new_string: '- ✅ [03_C] a' })
-  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [M20] b', new_string: '- ✅ [M20] b' })
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] a', new_string: '- ✅ [21_Q] a' })
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [Z90] b', new_string: '- ✅ [Z90] b' })
   const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
-  expect(log.indexOf('✅ [03_C] a')).toBeLessThan(log.indexOf('✅ [M20] b'))
+  expect(log.indexOf('✅ [21_Q] a')).toBeLessThan(log.indexOf('✅ [Z90] b'))
   expect(log.match(/^# done/gm)?.length).toBe(1)
 })
 
 test('an edit with nothing turned ✅ logs nothing, and a failed edit logs nothing', async ($, on) => {
   editTool(on, true)
   const fs = files(on)
-  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [03_C] x', new_string: '- ✅ [03_C] x' })
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] x', new_string: '- ✅ [21_Q] x' })
   expect(fs.size).toBe(0)
 })
