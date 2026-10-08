@@ -115,7 +115,7 @@ const MANY = Array.from({ length: 12 }, (_, i) => ({
   title: `[X${i}] block`, start: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(8 + i).padStart(2, '0')}:00:00+09:00`,
   end: `2026-10-${String(8 + (i % 7)).padStart(2, '0')}T${String(9 + i).padStart(2, '0')}:00:00+09:00`, calendar_id: 'c_tb',
 }))
-const TASKS_MD = '# tasks\n\n## 今日 2026-10-08\n\n- ⬜ [M20] 現状確認＋実作業 — @user — 10/07（実働締切 10/28）\n- ✅ [07_G] note 整形 — @claude-07 — 10/08\n\n## 待ち\n\n- ⬜ [03_C] 共同研究者への連絡 6 件 — @user — 10/04\n'
+const TASKS_MD = '# tasks\n\n- ✅ の行は翌朝に消す（説明文）\n\n## 今日 2026-10-08\n\n- ✅ [07_G] note 整形 — @claude-07 — 10/08\n- ⬜ [M20] 現状確認＋実作業 — @user — 10/07（実働締切 10/28）\n- ⬜ [事務] 学会 B 総会 — @user — 10/08（10/09 13:00）\n\n## 今週・近日\n\n- ⬜ [07_G] 学会 A の**参加登録**（ポスターのみ）— @user — 10/08（要旨〆 10/21）\n- ⬜ [03_C] 解析 8: 対象遺伝子の位置 — @claude-03（未依頼）— 10/07\n- ⬜ [07_G] note と hub の整理（14:30–16:30）— @user・@ops — 10/08\n\n## 待ち\n\n- ⬜ [03_C] 共同研究者への連絡 6 件 — @user — 10/04\n'
 
 test('the calendar block has the same height with no events and with many', OPTIONS as any, async ($, on) => {
   const events: unknown[] = []
@@ -156,17 +156,27 @@ test('the week shows today first, the all-day run, the tagged block and the meet
   expect(all).toContain('更新 ')
 })
 
-test('tasks are listed by section, done lines included, under the calendar', OPTIONS as any, async ($, on) => {
+test('tasks: open first then done, tag column, deadline and owner at the right, no preamble', OPTIONS as any, async ($, on) => {
   world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
   await $.session.start(START as any)
   await settle()
   const xs = await texts($, 'dock')
-  const t = xs.findIndex(x => x.startsWith('─ tasks'))
-  const after = xs.slice(t).join('\n')
-  expect(after).toContain('今日 2026-10-08')
-  expect(after).toContain('⬜ [M20] 現状確認＋実作業 — @user（実働締切 10/28）')
-  expect(after).toContain('✅ [07_G] note 整形 — @claude-07')
-  expect(after).toContain('待ち')
+  const after = xs.slice(xs.findIndex(x => x.startsWith('─ tasks')))
+  const all = after.join('\n')
+  expect(all).not.toContain('説明文')
+  expect(all).toContain('今日 2026-10-08')
+  expect(all).toContain('残り 2')
+  expect(all).toContain('〆10/28')
+  expect(all).toContain('〆10/9')
+  expect(all).toContain('〆10/21')
+  expect(all).toContain('→ 07')
+  expect(all).toContain('→ 03 未依頼')
+  expect(all).toContain('→ ops')
+  expect(all).not.toContain('— @')
+  expect(all).not.toContain('**')
+  expect(all).not.toContain('@user')
+  expect(all.indexOf('現状確認')).toBeLessThan(all.indexOf('note 整形'))
+  expect(after.some(x => x.startsWith('M20'))).toBe(true)
 })
 
 test('without the settings the pane says what is missing instead of failing', async ($, on) => {
