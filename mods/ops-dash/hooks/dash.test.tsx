@@ -349,3 +349,40 @@ test('pressing a task shows its whole line, owner, raised day and deadline; b go
   await dash.unmount()
   expect(after).toContain('─ tasks')
 })
+
+// ---- a question waiting for the person shows as 確認待ち ----
+
+test('while a question waits for the person the session record says so, and answering clears it', async ($, on) => {
+  const store = world(on, PEER)
+  let seenWhileOpen: any
+  on('tool.call', { tool: 'AskUserQuestion' }, (_$: any, e: any) => {
+    seenWhileOpen = { ...(store.get('ops-dash:session:claude-21') as any) }
+    const q = e.questions[0].question
+    return { result: { questions: e.questions, answers: { [q]: 'Allow once' } } }
+  })
+  await $.session.start(START as any)
+  await $.tool.call({ tool: 'AskUserQuestion', questions: [{ question: 'config-guard: Bash a shell command that may change a protected file. Allow it?', header: 'Guard', options: [{ label: 'Deny', description: '' }, { label: 'Allow once', description: '' }], multiSelect: false }] } as any)
+  expect(seenWhileOpen.waiting).toContain('config-guard')
+  expect(seenWhileOpen.waitingSince).toBeGreaterThan(0)
+  const after: any = store.get('ops-dash:session:claude-21')
+  expect(after.waiting).toBeUndefined()
+})
+
+test('a refused question also clears the waiting mark', async ($, on) => {
+  const store = world(on, PEER)
+  on('tool.call', { tool: 'AskUserQuestion' }, () => ({ deny: 'no one to ask' }))
+  await $.session.start(START as any)
+  await $.tool.call({ tool: 'AskUserQuestion', questions: [{ question: 'x?', header: 'h', options: [{ label: 'a', description: '' }, { label: 'b', description: '' }], multiSelect: false }] } as any).catch(() => undefined)
+  expect((store.get('ops-dash:session:claude-21') as any).waiting).toBeUndefined()
+})
+
+test('the ops dash marks a session waiting for the person as 確認待ち', OPTIONS as any, async ($, on) => {
+  const store = new Map<string, unknown>()
+  store.set('ops-dash:session:claude-22', { name: 'claude-22', role: 'peer', pj: '22_R', busy: true, turnStartedAt: Date.parse('2026-10-08T02:20:00Z'), waiting: 'config-guard: Bash …', waitingSince: Date.parse('2026-10-08T02:27:00Z'), updatedAt: 1 })
+  world(on, OPS, store, false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const all = (await texts($, 'dock')).join('\n')
+  expect(all).toContain('確認待ち 3分')
+  expect(all).not.toContain('作業中 10分')
+})
