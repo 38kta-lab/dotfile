@@ -415,6 +415,60 @@ async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: 
   return { records, dispatches, limits: (await $.store.get(LIMITS)) as Limits | undefined }
 }
 
+// ---- toasts for the ops session: a peer finished or is waiting, an event soon ----
+
+export type Snap = { busy: boolean; waiting?: string; turnStartedAt?: number }
+
+// What changed since the last look, as lines to toast, and the new snapshot.
+// A name not seen before is only remembered: nothing is said on the first look.
+export function peerNotices(prev: Map<string, Snap> | undefined, records: SessionRecord[], now: number): { lines: string[]; snap: Map<string, Snap> } {
+  const snap = new Map<string, Snap>()
+  const lines: string[] = []
+  for (const r of records) {
+    if (!r || r.role === 'ops') continue
+    snap.set(r.name, { busy: r.busy, waiting: r.waiting, turnStartedAt: r.turnStartedAt })
+    const old = prev?.get(r.name)
+    if (!old) continue
+    if (!old.waiting && r.waiting) lines.push(`${r.name} が確認待ち: ${r.waiting.slice(0, 60)}`)
+    else if (old.busy && !r.busy && !r.waiting) lines.push(`${r.name} が終わりました${old.turnStartedAt ? `（作業 ${elapsed(now, old.turnStartedAt)}）` : ''}`)
+  }
+  return { lines, snap }
+}
+
+export const SOON_MS = 10 * 60000
+
+// Timed events starting within the next 10 minutes, each told once.
+export function eventNotices(events: CalEvent[], now: number, told: Set<string>): string[] {
+  const out: string[] = []
+  for (const ev of events) {
+    if (isAllDay(ev)) continue
+    const start = Date.parse(ev.start)
+    if (!(start > now && start - now <= SOON_MS)) continue
+    const id = `${ev.start}|${ev.title}`
+    if (told.has(id)) continue
+    told.add(id)
+    const mins = Math.max(1, Math.round((start - now) / 60000))
+    const title = ev.title.replace(/\[status:[^\]]+\]/g, '').trim()
+    out.push(`${hhmm(start)} ${title}（あと ${mins} 分）${ev.meetingUrl ? '  会議 URL あり（dash の予定から）' : ''}`)
+  }
+  return out
+}
+
+let noticeSnap: Map<string, Snap> | undefined
+const toldEvents = new Set<string>()
+
+async function checkNotices($: any): Promise<void> {
+  try {
+    const now = await $.clock.now()
+    const { records } = await readAll($)
+    const { lines, snap } = peerNotices(noticeSnap, records, now)
+    noticeSnap = snap
+    for (const l of [...lines, ...eventNotices(calendar, now, toldEvents)]) $.ui.toast(l, { timeoutMs: 10000 })
+  } catch {
+    // a missed look is caught by the next one
+  }
+}
+
 // The ops session's calendar, fetched every 10 minutes.
 let calendar: CalEvent[] = []
 let calendarNote = ''
@@ -843,6 +897,8 @@ export const register: Register = (on, options) => {
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
+          void checkNotices($)
+          $.clock.every(30000, () => checkNotices($))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
           // Open the three panes at start, without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
