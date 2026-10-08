@@ -94,6 +94,23 @@ export function rows(records: SessionRecord[], dispatches: Record<string, Dispat
   })
 }
 
+// The sidebar form: two short lines per session, for a pane docked beside
+// the transcript (narrow) rather than above the prompt (wide).
+export function cards(records: SessionRecord[], dispatches: Record<string, Dispatch>, now: number, width: number): string[][] {
+  const sorted = [...records].sort((a, b) => (a.role === 'ops' ? -1 : b.role === 'ops' ? 1 : a.name.localeCompare(b.name)))
+  return sorted.map(r => {
+    const state = r.busy ? `busy ${age(now, r.turnStartedAt)}` : 'idle'
+    const ctx = r.contextPercent === undefined ? '—' : `${Math.round(r.contextPercent)}%${r.contextPercent >= 70 ? '!' : ''}`
+    const first = `${r.name}${r.pj ? ` ${r.pj}` : ''}  ${state}  ctx ${ctx}`
+    const d = dispatches[r.name]
+    const parts = [`turn ${hhmm(r.lastTurnEndAt)}`]
+    if (r.role !== 'ops') parts.push(`report ${hhmm(r.lastReportAt)}`)
+    if (d) parts.push(`sent ${hhmm(d.at)} ${d.line}`)
+    const second = '  ' + parts.join('  ')
+    return [first, second.length > width ? second.slice(0, Math.max(0, width - 1)) + '…' : second]
+  })
+}
+
 async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: Record<string, Dispatch>; limits?: Limits }> {
   const keys: string[] = await $.store.keys()
   const records: SessionRecord[] = []
@@ -190,7 +207,7 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: COMMAND }, async $ => {
-    await $.ui.open({ id: PANE, title: 'peers' })
+    await $.ui.open({ id: PANE, title: 'peers', columns: 48 })
     return { text: 'ops-dash opened.' }
   })
 
@@ -198,11 +215,27 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const { records, dispatches, limits } = await readAll($)
     const now = await $.clock.now()
+    const empty = records.length === 0
+    if (e.props.placement === 'dock') {
+      const width = e.props.bodyColumns ?? 48
+      return (
+        <Box flexDirection="column">
+          <Text dimColor>{limitsLine(limits)}</Text>
+          {empty && <Text dimColor>No session with LIFE_ROLE has written a status yet.</Text>}
+          {cards(records, dispatches, now, width).map(([first, second]) => (
+            <Box flexDirection="column" marginTop={1}>
+              <Text bold>{first}</Text>
+              <Text dimColor>{second}</Text>
+            </Box>
+          ))}
+        </Box>
+      )
+    }
     const lines = rows(records, dispatches, now)
     return (
       <Box flexDirection="column">
         <Text dimColor>{limitsLine(limits)}</Text>
-        {lines.length === 0 && <Text dimColor>No session with LIFE_ROLE has written a status yet.</Text>}
+        {empty && <Text dimColor>No session with LIFE_ROLE has written a status yet.</Text>}
         {lines.map(l => (
           <Text>{l}</Text>
         ))}
