@@ -6,6 +6,8 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
+import { calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, newIds, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import type { MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
@@ -413,6 +415,109 @@ async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: 
     else if (k.startsWith(DISPATCH)) dispatches[k.slice(DISPATCH.length)] = (await $.store.get(k)) as Dispatch
   }
   return { records, dispatches, limits: (await $.store.get(LIMITS)) as Limits | undefined }
+}
+
+// ---- alert pane: Gmail (and later Slack), headers only, every 5 minutes ----
+
+const ALERT = 'alert'
+const MAIL_ROWS = 12
+let mailFeed: MailFeed | undefined
+let mailNote = ''
+let mailSeen: Set<string> | undefined
+const mailDone = new Set<string>()
+let mailSel = new Set<string>()
+let mailBulkOpen = false
+let mailPage = 0
+let mailMode: { kind: 'list' } | { kind: 'ask' } | { kind: 'cal-title'; item: MailItem } | { kind: 'cal-when'; item: MailItem; title: string } = { kind: 'list' }
+let mailBusy = false
+
+// Headers only (scripts/gmail/alert_feed.py); nothing here reaches the model.
+// `toast`: say "Gmail 新着 n 件" for ids not seen at the last look (never on
+// the first look of the session).
+async function fetchMail($: any, python: string, repo: string, toast: boolean): Promise<void> {
+  if (!python || !repo || mailBusy) return
+  mailBusy = true
+  try {
+    const r = await $.process.run([python, `${repo}/scripts/gmail/alert_feed.py`], { cwd: repo, timeoutMs: 120000 })
+    const feed = parseFeed(String(r.stdout ?? ''))
+    if (feed.error) {
+      mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
+      return
+    }
+    const fresh = newIds(mailSeen, feed.items)
+    if (toast && fresh.length > 0) $.ui.toast(`Gmail 新着 ${fresh.length} 件`, { timeoutMs: 10000 })
+    mailSeen = new Set(feed.items.map(x => x.id))
+    mailFeed = feed
+    for (const id of [...mailSel]) if (!mailSeen.has(id)) mailSel.delete(id)
+    for (const id of [...mailDone]) if (!mailSeen.has(id)) mailDone.delete(id)
+    // A fetch clears only its own earlier failure, not what an action said.
+    if (mailNote.startsWith('Gmail を取れなかった')) mailNote = ''
+  } catch (err) {
+    mailNote = `Gmail を取れなかった（${String(err).slice(0, 60)}）`
+  } finally {
+    mailBusy = false
+    $.ui.invalidate('ui.render')
+  }
+}
+
+function mailSelected(): MailItem[] {
+  return (mailFeed?.items ?? []).filter(x => mailSel.has(x.id))
+}
+
+async function mailMarkDone($: any, python: string, repo: string): Promise<void> {
+  const items = mailSelected()
+  if (items.length === 0) return
+  mailNote = `Done のラベルを付けています（${items.length} 件）…`
+  $.ui.invalidate('ui.render')
+  try {
+    const r = await $.process.run(doneArgv(python, repo, items.map(x => x.id)), { cwd: repo, timeoutMs: 60000 })
+    if (r.exitCode === 0) {
+      for (const x of items) mailDone.add(x.id)
+      mailSel = new Set()
+      mailNote = `Done にした: ${items.length} 件`
+    } else {
+      mailNote = `Done にできなかった（exit ${r.exitCode}: ${String(r.stderr ?? '').trim().slice(-80)}）`
+    }
+  } catch (err) {
+    mailNote = `Done にできなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+async function mailAsk($: any, ask: string): Promise<void> {
+  const text = detailPrompt(mailSelected(), ask)
+  if (!text) {
+    mailNote = '人事などの区分を含むので、モデルには渡しません'
+  } else {
+    const r = await $.prompt.fill({ text })
+    mailNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメールだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
+    if (r.isFilled) mailSel = new Set()
+  }
+  mailMode = { kind: 'list' }
+  $.ui.invalidate('ui.render')
+}
+
+async function mailCalendar($: any, python: string, repo: string, title: string, whenText: string): Promise<void> {
+  const when = parseWhen(whenText)
+  if ('error' in when) {
+    mailNote = when.error
+    $.ui.invalidate('ui.render')
+    return
+  }
+  mailNote = 'カレンダーに入れています…'
+  mailMode = { kind: 'list' }
+  $.ui.invalidate('ui.render')
+  try {
+    const r = await $.process.run(calendarArgv(python, repo, title, when), { cwd: repo, timeoutMs: 60000 })
+    mailNote = r.exitCode === 0 ? `カレンダーに入れた: ${when.start.replace('T', ' ').slice(0, 16)}  ${title}` : `カレンダーに入れられなかった（exit ${r.exitCode}）`
+    if (r.exitCode === 0) {
+      mailSel = new Set()
+      await fetchCalendar($, python, repo)
+    }
+  } catch (err) {
+    mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
 }
 
 // ---- toasts for the ops session: a peer finished or is waiting, an event soon ----
@@ -895,10 +1000,13 @@ export const register: Register = (on, options) => {
           await $.command.register({ name: 'notes', description: 'Open the research notes: a project, its note contents by number, the pictures under that number, one picture' })
           await $.command.register({ name: 'fig', description: 'Show draft figures any session drops in ~/.local/share/life/preview/ (newest first), and the shared palette' })
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
+          await $.command.register({ name: 'alert', description: 'Open the alerts: new Gmail (headers only) to mark Done, ask about, or put on the calendar; Slack later' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
           void checkNotices($)
           $.clock.every(30000, () => checkNotices($))
+          void fetchMail($, python, repo, false)
+          $.clock.every(300000, () => fetchMail($, python, repo, true))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
           // Open the three panes at start, without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
@@ -1064,6 +1172,92 @@ export const register: Register = (on, options) => {
         <Button key="band-dash" label="ops-dash" hotkey="d" plain onPress={() => go(PANE, 'ops-dash', 58)} />
         <Button key="band-hubs" label="hubs" hotkey="h" plain onPress={() => go(HUBS, 'hubs', 84)} />
         <Button key="band-notes" label="notes" hotkey="n" plain onPress={() => go(NOTES, 'notes', 84)} />
+        <Button key="band-alert" label={`alert${mailFeed ? ` ${splitMail(mailFeed.items, mailDone).personal.filter(x => x.unread).length}` : ''}`} hotkey="a" plain onPress={() => go(ALERT, 'alert', 84)} />
+      </Box>
+    )
+  })
+
+  on('command.run', { command: 'alert' }, async $ => {
+    void fetchMail($, python, repo, false)
+    const opened = await $.ui.open({ id: ALERT, title: 'alert', columns: 84, focus: true })
+    if (opened.isPlaced) return { text: 'alert opened.' }
+    return { text: `alert: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: ALERT }, async ($, e) => {
+    const { Box, Text, Button, Input } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 84)
+    const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
+    const redraw = () => $.ui.invalidate('ui.render')
+    const { personal, bulk } = splitMail(mailFeed?.items ?? [], mailDone)
+    const list = [...personal, ...(mailBulkOpen ? bulk : [])]
+    const pages = Math.max(1, Math.ceil(list.length / MAIL_ROWS))
+    if (mailPage >= pages) mailPage = pages - 1
+    const shown = list.slice(mailPage * MAIL_ROWS, (mailPage + 1) * MAIL_ROWS)
+    const sel = mailSelected()
+    const hasSensitive = sel.some(x => x.sensitive)
+    const unread = personal.filter(x => x.unread).length
+    const fetched = mailFeed?.fetched_at ? hhmm(Date.parse(mailFeed.fetched_at)) : '—'
+    const toggle = (id: string) => {
+      if (mailSel.has(id)) mailSel.delete(id)
+      else mailSel.add(id)
+      redraw()
+    }
+    const back = () => { mailMode = { kind: 'list' }; redraw() }
+
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>
+          <Text bold>alert</Text>
+          <Button key="mail-reload" label={mailBusy ? '取得中…' : '更新'} hotkey="r" plain onPress={() => fetchMail($, python, repo, false)} />
+        </Box>
+        <Box marginTop={1}><Text dimColor>{rule(`Gmail  未処理 ${personal.length} 件（未読 ${unread}）・一斉配信 ${bulk.length} 件  取得 ${fetched}`)}</Text></Box>
+        {mailNote !== '' && <Text color={/できなかった|取れなかった|渡しません|日時は|ありません/.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
+        {!mailFeed && mailNote === '' && <Text dimColor>読み込んでいます…（最初の取得は 15 秒ほど）</Text>}
+        {shown.map(x => (
+          <Button key={`mail-${x.id}`} label={clip(mailLine(x, mailSel.has(x.id)), width - 2)} plain dimColor={!x.unread && !mailSel.has(x.id)} onPress={() => toggle(x.id)} />
+        ))}
+        {Array.from({ length: Math.max(0, MAIL_ROWS - shown.length) }, () => <Text> </Text>)}
+        <Box flexDirection="row" columnGap={2}>
+          {bulk.length > 0 && <Button key="mail-bulk" label={`${mailBulkOpen ? '▾' : '▸'} 一斉配信 ${bulk.length} 件`} hotkey="g" plain onPress={() => { mailBulkOpen = !mailBulkOpen; mailPage = 0; redraw() }} />}
+          {pages > 1 && <Button key="mail-prev" label="← 前" hotkey="p" plain dimColor={mailPage === 0} onPress={() => { mailPage = Math.max(0, mailPage - 1); redraw() }} />}
+          {pages > 1 && <Text dimColor>{`${mailPage + 1}/${pages}`}</Text>}
+          {pages > 1 && <Button key="mail-next" label="次 →" hotkey="n" plain dimColor={mailPage >= pages - 1} onPress={() => { mailPage = Math.min(pages - 1, mailPage + 1); redraw() }} />}
+        </Box>
+
+        {sel.length > 0 && mailMode.kind === 'list' && (
+          <Box flexDirection="row" columnGap={2} marginTop={1} flexWrap="wrap">
+            <Text bold>{`選んだ ${sel.length} 件:`}</Text>
+            <Button key="mail-done" label="Done にする" hotkey="d" onPress={() => mailMarkDone($, python, repo)} />
+            {!hasSensitive && <Button key="mail-ask" label="詳しく（モデルに頼む）" hotkey="s" plain onPress={() => { mailMode = { kind: 'ask' }; redraw() }} />}
+            {sel.length === 1 && <Button key="mail-cal" label="カレンダーに入れる" hotkey="c" plain onPress={() => { mailMode = { kind: 'cal-title', item: sel[0] }; redraw() }} />}
+            <Button key="mail-clear" label="選択を外す" hotkey="x" plain onPress={() => { mailSel = new Set(); redraw() }} />
+          </Box>
+        )}
+        {sel.length > 0 && hasSensitive && mailMode.kind === 'list' && <Text dimColor>人事などの区分を含むので「詳しく」は出しません（Done とカレンダーはモデルを通さずにできます）</Text>}
+        {mailMode.kind === 'ask' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Input key="mail-ask-input" label="頼むこと" placeholder="要点と、私がすべきことを短く" submitLabel="下書きに入れる" autoFocus onSubmit={(v: string) => mailAsk($, v)} />
+            <Button key="mail-ask-cancel" label="やめる" hotkey="b" plain onPress={back} />
+          </Box>
+        )}
+        {mailMode.kind === 'cal-title' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>{`予定の題名（${shortDate(mailMode.item.date)} ${mailMode.item.from_name} のメールから）`}</Text>
+            <Input key="mail-cal-title" label="題名" value={calendarTitle(mailMode.item)} submitLabel="次へ" autoFocus onSubmit={(v: string) => { const item = (mailMode as { item: MailItem }).item; mailMode = { kind: 'cal-when', item, title: v.trim() || calendarTitle(item) }; redraw() }} />
+            <Button key="mail-cal-cancel" label="やめる" hotkey="b" plain onPress={back} />
+          </Box>
+        )}
+        {mailMode.kind === 'cal-when' && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>{`「${mailMode.title}」の日時（30 分の枠で TimeBlock に入れる）`}</Text>
+            <Input key="mail-cal-when" label="日時" placeholder="2026-10-15 17:00（日付だけなら 9:00）" submitLabel="カレンダーに入れる" autoFocus onSubmit={(v: string) => mailCalendar($, python, repo, (mailMode as { title: string }).title, v)} />
+            <Button key="mail-cal-cancel2" label="やめる" hotkey="b" plain onPress={back} />
+          </Box>
+        )}
+
+        <Box marginTop={1}><Text dimColor>{rule('Slack')}</Text></Box>
+        <Text dimColor>準備中（チャンネルの整理と workspace の追加の後に作る）</Text>
       </Box>
     )
   })
