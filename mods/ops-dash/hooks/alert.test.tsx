@@ -26,9 +26,9 @@ test('splitMail: personal first, newest first; bulk apart; Done ones gone', () =
   expect(bulk.map(x => x.id)).toEqual(['c'])
 })
 
-test('mailLine marks selection, unread and a sensitive class', () => {
-  expect(mailLine(m('1'), false)).toMatch(/^☐ ● 10\/08 14:32  Sender 1  Subject 1$/)
-  expect(mailLine(m('1', { unread: false, sensitive: '人事' }), true)).toMatch(/^☑   10\/08 14:32  Sender 1  ［人事］Subject 1$/)
+test('mailLine marks unread and a sensitive class (selection is its own button)', () => {
+  expect(mailLine(m('1'))).toMatch(/^● 10\/08 14:32  Sender 1  Subject 1$/)
+  expect(mailLine(m('1', { unread: false, sensitive: '人事' }))).toMatch(/^  10\/08 14:32  Sender 1  ［人事］Subject 1$/)
 })
 
 test('doneArgv adds the Done label to the chosen ids', () => {
@@ -65,7 +65,9 @@ const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sens
 function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
     runs.push(e.argv)
-    const out = String(e.argv[1] ?? '').endsWith('alert_feed.py') ? JSON.stringify(FEED) : '[]'
+    const isFeed = String(e.argv[1] ?? '').endsWith('alert_feed.py')
+    const bodyOf = e.argv[2] === '--body' ? e.argv[3] : undefined
+    const out = bodyOf ? JSON.stringify({ id: bodyOf, from: `Sender ${bodyOf}`, date: '2026-10-08T14:32:00+09:00', subject: `Subject ${bodyOf}`, sensitive: bodyOf === '2' ? '人事' : null, body: `Body line one of ${bodyOf}\nBody line two` }) : isFeed ? JSON.stringify(FEED) : '[]'
     return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('fs.read', () => ({ value: '' }))
@@ -97,10 +99,10 @@ test('the pane lists personal mail, folds bulk; selecting shows Done / 詳しく
   expect(ls.some((l: string) => l.includes('Subject 1'))).toBe(true)
   expect(ls.some((l: string) => l.includes('Subject 3'))).toBe(false)
   expect(ls).toContain('▸ 一斉配信 1 件')
-  await ui.press({ key: 'mail-1' })
+  await ui.press({ key: 'mail-sel-1' })
   await settle()
   ls = await labels(ui)
-  expect(ls.some((l: string) => l.startsWith('☑') && l.includes('Subject 1'))).toBe(true)
+  expect(ls).toContain('☑')
   expect(ls).toContain('Done にする')
   expect(ls).toContain('詳しく（モデルに頼む）')
   expect(ls).toContain('カレンダーに入れる')
@@ -120,7 +122,7 @@ test('a sensitive message selected: no 詳しく, and the reason is shown', OPTI
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await settle()
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
-  await ui.press({ key: 'mail-2' })
+  await ui.press({ key: 'mail-sel-2' })
   await settle()
   const ls = await labels(ui)
   expect(ls).toContain('Done にする')
@@ -138,7 +140,7 @@ test('詳しく puts a draft with the chosen ids and the ask into the prompt (no
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await settle()
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
-  await ui.press({ key: 'mail-1' })
+  await ui.press({ key: 'mail-sel-1' })
   await ui.press({ key: 'mail-ask' })
   await settle()
   await ui.input({ key: 'mail-ask-input', text: '締切を教えて' })
@@ -157,7 +159,7 @@ test('カレンダー: title (a sensitive one names only its class), then the ti
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await settle()
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
-  await ui.press({ key: 'mail-2' })
+  await ui.press({ key: 'mail-sel-2' })
   await ui.press({ key: 'mail-cal' })
   await settle()
   const title: any = await ui.find({ type: 'Input', key: 'mail-cal-title' })
@@ -174,4 +176,55 @@ test('カレンダー: title (a sensitive one names only its class), then the ti
   expect(cal).toEqual(['/py', '/repo/scripts/google_calendar_create.py', '--title', '［人事］締切', '--start', '2026-10-15T17:00:00', '--end', '2026-10-15T17:30:00', '--execute'])
   expect(await texts(ui)).toContain('カレンダーに入れた: 2026-10-15 17:00')
   await ui.unmount()
+})
+
+test('pressing a row opens that mail: --body for its id, the body on the terminal, actions for it', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await ui.press({ key: 'mail-1' })
+  await settle()
+  expect(runs.find(a => a[2] === '--body')).toEqual(['/py', '/repo/scripts/gmail/alert_feed.py', '--body', '1'])
+  const t = await texts(ui)
+  expect(t).toContain('Body line one of 1')
+  expect(t).toContain('Subject 1')
+  const ls = await labels(ui)
+  expect(ls).toContain('Done にする')
+  expect(ls).toContain('詳しく（モデルに頼む）')
+  await ui.press({ key: 'mail-back' })
+  await settle()
+  expect(await labels(ui)).toContain('☐')
+  await ui.unmount()
+})
+
+test('a sensitive mail opened: the body shows on the terminal, but no 詳しく', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await ui.press({ key: 'mail-2' })
+  await settle()
+  expect(await texts(ui)).toContain('Body line one of 2')
+  expect(await texts(ui)).toContain('この区分はモデルに渡しません')
+  expect(await labels(ui)).not.toContain('詳しく（モデルに頼む）')
+  await ui.unmount()
+})
+
+test('on a remote surface the body is not drawn', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const term: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await term.press({ key: 'mail-1' })
+  await settle()
+  await term.unmount()
+  const desk: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'desktop', component: 'Pane', requestId: 'alert', props: PROPS })
+  const t = await texts(desk)
+  await desk.unmount()
+  expect(t).not.toContain('Body line one of 1')
+  expect(t).toContain('本文は端末の画面でだけ表示します')
 })

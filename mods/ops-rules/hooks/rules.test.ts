@@ -299,3 +299,24 @@ test('the system prompt carries the Japanese rule once', async ($, on) => {
   expect(ids).toEqual(['intro', 'ops-rules:japanese'])
   expect(r.sections[1].text).toContain('日本語')
 })
+
+// ---- the model may not read mail bodies the alert pane shows ----
+
+import { readsMailBody } from './register'
+
+test('readsMailBody: alert_feed.py --body in any form; --show and the list are fine', () => {
+  expect(readsMailBody('python scripts/gmail/alert_feed.py --body 18a2b3')).toBe(true)
+  expect(readsMailBody('cd ~/life && /x/python3 scripts/gmail/alert_feed.py --days 3 --body abc | head')).toBe(true)
+  expect(readsMailBody('python scripts/gmail/alert_feed.py --show 18a2b3')).toBe(false)
+  expect(readsMailBody('python scripts/gmail/alert_feed.py')).toBe(false)
+  expect(readsMailBody('grep -n -- --body scripts/gmail/README.md')).toBe(false)
+})
+
+test('a Bash call with alert_feed.py --body is refused in any session, without asking', async ($, on) => {
+  const seen: Seen = { asked: [], ran: [] }
+  setup(on, 'peer', 'Allow once', seen)
+  const r = await $.tool.call({ tool: 'Bash', command: 'python scripts/gmail/alert_feed.py --body 18a2b3' })
+  expect(r.deny).toContain('alert pane only')
+  expect(seen.ran).toEqual([])
+  expect(seen.asked).toEqual([])
+})

@@ -53,11 +53,29 @@ export function splitMail(items: readonly MailItem[], done: ReadonlySet<string>)
   return { personal: live.filter(x => !x.bulk), bulk: live.filter(x => x.bulk) }
 }
 
-export function mailLine(item: MailItem, selected: boolean): string {
-  const mark = selected ? '☑' : '☐'
+// A row's text; the ☐ / ☑ that selects it is a button of its own before it
+// (pressing the row opens the mail).
+export function mailLine(item: MailItem): string {
   const dot = item.unread ? '●' : ' '
   const tag = item.sensitive ? `［${item.sensitive}］` : ''
-  return `${mark} ${dot} ${shortDate(item.date)}  ${item.from_name}  ${tag}${item.subject}`
+  return `${dot} ${shortDate(item.date)}  ${item.from_name}  ${tag}${item.subject}`
+}
+
+// One mail with its body, from `alert_feed.py --body` (the pane's own call; the
+// model is kept from it by ops-rules). Shown on the terminal, never stored.
+export type MailBody = { id: string; from?: string; date?: string; subject?: string; sensitive?: string | null; body?: string; error?: string }
+
+export function bodyArgv(python: string, repo: string, id: string): string[] {
+  return [python, `${repo}/scripts/gmail/alert_feed.py`, '--body', id]
+}
+
+export function parseBody(stdout: string, id: string): MailBody {
+  try {
+    const d = JSON.parse(stdout)
+    return { id, ...d }
+  } catch {
+    return { id, error: '本文を読めなかった' }
+  }
 }
 
 export function doneArgv(python: string, repo: string, ids: readonly string[]): string[] {
