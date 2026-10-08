@@ -24,7 +24,7 @@ This skill is intended for the `life` repo. If invoked elsewhere, stop and repor
 End-of-day planning artifact for tomorrow that:
 
 - pre-decides `[status:X]` tag candidates per Calendar block (so M09 Slack scheduler can auto-apply when user patches them in)
-- carries over today's unfinished items (from `morning-<today>.md` + session TaskList residue)
+- carries over today's unfinished items (from `morning-<today>.md` + the `⬜` lines of `ideas/task-review/tasks.md`; `✅` lines are done and not carried over)
 - flags upcoming deadlines (next 7 days window)
 - gives a rough 1-day plan with time-block intent
 
@@ -148,7 +148,7 @@ PJ tag (`[NN_L]` / `[A##]` / `[E##]` 等) の event は title の意味から推
 
 - 自動で Calendar event を patch しない (user が brief 見て手動で patch、または将来 Phase 3 で自動化)
 - morning brief を上書き / 修正しない
-- session-scoped TaskCreate に load しない (それは morning-tasks の仕事、当日朝にやる)
+- `ideas/task-review/tasks.md` に書かない (それは morning-tasks の仕事、当日朝に ops セッションでやる)
 - 過去日付の brief を作らない (常に「翌日」のみ)
 - Slack status を直接変更しない (M09 scheduler が cron で実行する役割)
 
