@@ -426,8 +426,8 @@ let hubsNote = ''
 let view: { kind: 'list' } | { kind: 'hub'; slug: string; tab: number } = { kind: 'list' }
 let back: { slug: string; tab: number }[] = []
 
-// The event pane: one event's detail, opened from the dash's list of next events.
-const EVENT = 'event'
+// One event's detail, drawn in place of the dash (b goes back). Not a pane of
+// its own: a pane opened from a press in another pane never gets the keys.
 let detail: CalEvent | undefined
 let copied = ''
 const NEXT_EVENTS = 5
@@ -464,11 +464,28 @@ function goBack(): void {
   view = prev ? { kind: 'hub', slug: prev.slug, tab: prev.tab } : { kind: 'list' }
 }
 
-async function openEvent($: any, ev: CalEvent): Promise<void> {
+function openEvent($: any, ev: CalEvent): void {
   detail = ev
   copied = ''
-  const opened = await $.ui.open({ id: EVENT, title: 'event', focus: true, closeOnEscape: true, columns: 72, rows: 20 })
-  if (opened.isPlaced) $.ui.invalidate('ui.render')
+  $.ui.invalidate('ui.render')
+}
+
+function closeEvent($: any): void {
+  detail = undefined
+  copied = ''
+  $.ui.invalidate('ui.render')
+}
+
+async function copyText($: any, label: string, text: string, press: any): Promise<void> {
+  const r = await $.ui.copy({ text, surface: press?.surface })
+  copied = r.isCopied ? `${label}をコピーしました` : `コピーできませんでした（${r.reason ?? '理由不明'}）`
+  $.ui.invalidate('ui.render')
+}
+
+async function goToHub($: any, slug: string): Promise<void> {
+  openHub(slug)
+  closeEvent($)
+  await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
 }
 
 export function hubLine(h: Hub, width: number): string {
@@ -648,52 +665,6 @@ export const register: Register = (on, options) => {
     )
   })
 
-  on('ui.render', { component: 'Pane', requestId: EVENT }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const width = Math.max(40, e.props.bodyColumns ?? 72)
-    const ev = detail
-    if (!ev) return <Text dimColor>予定が選ばれていません。</Text>
-    const now = await $.clock.now()
-    if (hubs.length === 0) await loadHubs($, repo)
-    const hubSlug = hubOfEvent(ev, hubs.map(h => h.slug))
-    const copy = async (label: string, text: string, press: any) => {
-      const r = await $.ui.copy({ text, surface: press?.surface })
-      copied = r.isCopied ? `${label}をコピーしました` : `コピーできませんでした（${r.reason ?? '理由不明'}）`
-      $.ui.invalidate('ui.render')
-    }
-    const openHubPane = async () => {
-      if (!hubSlug) return
-      openHub(hubSlug)
-      await $.ui.close({ id: EVENT })
-      await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
-      $.ui.invalidate('ui.render')
-    }
-    const desc = (ev.description ?? '').split('\n').map(l => l.trimEnd())
-    const DESC_LINES = 12
-    return (
-      <Box flexDirection="column">
-        <Text bold wrap="wrap">{ev.title}</Text>
-        <Text>{whenLabel(ev, now)}</Text>
-        {ev.location && <Text wrap="wrap">{`場所  ${ev.location}`}</Text>}
-        {ev.meetingUrl && <Text color="cyan" wrap="wrap">{ev.meetingUrl}</Text>}
-        <Box flexDirection="row" columnGap={2} marginTop={1}>
-          {ev.meetingUrl && <Button key="copy-url" label="会議 URL をコピー" hotkey="c" onPress={(press: any) => copy('会議 URL ', ev.meetingUrl!, press)} />}
-          {ev.location && <Button key="copy-loc" label="場所をコピー" hotkey="l" plain onPress={(press: any) => copy('場所', ev.location!, press)} />}
-          {ev.htmlLink && <Button key="copy-page" label="予定のページをコピー" hotkey="p" plain onPress={(press: any) => copy('予定のページ', ev.htmlLink!, press)} />}
-          {hubSlug && <Button key="hub" label={`${hubSlug.split('_').slice(0, 2).join('_').replace(/-.*/, '')} の hub ↗`} hotkey="h" plain onPress={openHubPane} />}
-        </Box>
-        {copied !== '' && <Text color="green">{copied}</Text>}
-        {desc.some(l => l) && (
-          <Box flexDirection="column" marginTop={1}>
-            {desc.slice(0, DESC_LINES).map(l => <Text dimColor wrap="wrap">{clip(l, width * 3)}</Text>)}
-            {desc.length > DESC_LINES && <Text dimColor>{`…ほか ${desc.length - DESC_LINES} 行`}</Text>}
-          </Box>
-        )}
-        <Box marginTop={1}><Text dimColor>Esc で閉じる</Text></Box>
-      </Box>
-    )
-  })
-
   on('command.run', { command: COMMAND }, async $ => {
     const opened = await $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true })
     if (opened.isPlaced) return { text: 'ops-dash opened.' }
@@ -705,6 +676,38 @@ export const register: Register = (on, options) => {
     const { records, limits } = await readAll($)
     const now = await $.clock.now()
     const width = Math.max(40, e.props.bodyColumns ?? 58)
+
+    if (detail) {
+      const ev = detail
+      if (hubs.length === 0) await loadHubs($, repo)
+      const hubSlug = hubOfEvent(ev, hubs.map(x => x.slug))
+      const desc = (ev.description ?? '').split('\n').map(l => l.trimEnd())
+      const DESC_LINES = 12
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="back" label="← 予定の一覧" hotkey="b" plain onPress={() => closeEvent($)} />
+          </Box>
+          <Box marginTop={1}><Text bold wrap="wrap">{ev.title}</Text></Box>
+          <Text>{whenLabel(ev, now)}</Text>
+          {ev.location && <Text wrap="wrap">{`場所  ${ev.location}`}</Text>}
+          {ev.meetingUrl && <Text color="cyan" wrap="wrap">{ev.meetingUrl}</Text>}
+          <Box flexDirection="row" columnGap={2} marginTop={1} flexWrap="wrap">
+            {ev.meetingUrl && <Button key="copy-url" label="会議 URL をコピー" hotkey="c" onPress={(press: any) => copyText($, '会議 URL ', ev.meetingUrl!, press)} />}
+            {ev.location && <Button key="copy-loc" label="場所をコピー" hotkey="l" plain onPress={(press: any) => copyText($, '場所', ev.location!, press)} />}
+            {ev.htmlLink && <Button key="copy-page" label="予定のページをコピー" hotkey="p" plain onPress={(press: any) => copyText($, '予定のページ', ev.htmlLink!, press)} />}
+            {hubSlug && <Button key="hub" label={`${hubSlug.split('_').slice(0, 2).join('_').replace(/-.*/, '')} の hub ↗`} hotkey="h" plain onPress={() => goToHub($, hubSlug)} />}
+          </Box>
+          {copied !== '' && <Text color="green">{copied}</Text>}
+          {desc.some(l => l) && (
+            <Box flexDirection="column" marginTop={1}>
+              {desc.slice(0, DESC_LINES).map(l => <Text dimColor wrap="wrap">{clip(l, width * 3)}</Text>)}
+              {desc.length > DESC_LINES && <Text dimColor>{`…ほか ${desc.length - DESC_LINES} 行`}</Text>}
+            </Box>
+          )}
+        </Box>
+      )
+    }
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
 
     // plan usage: two short lines
