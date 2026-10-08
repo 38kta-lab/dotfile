@@ -3,14 +3,17 @@ import { test, expect } from 'claude-code/testing'
 // The world beneath the plugin, answered here: environment, the shared store
 // (a Map the test reads directly), the clock, commands, timers, and the
 // session and turn events themselves.
-function world(on: any, vars: Record<string, string | undefined>, store = new Map<string, unknown>()) {
+function world(on: any, vars: Record<string, string | undefined>, store = new Map<string, unknown>(), refuseCommand = false) {
   on('env.get', (_$: any, e: any, next: any) => (e.name in vars ? { value: vars[e.name] } : next(e)))
   on('store.get', (_$: any, e: any) => ({ value: store.get(e.key) }))
   on('store.set', (_$: any, e: any) => { store.set(e.key, e.value); return { value: undefined } })
   on('store.keys', () => ({ value: [...store.keys()] }))
   on('clock.now', () => ({ value: Date.parse('2026-10-08T02:30:00Z') }))
   on('clock.every', () => ({ value: undefined }))
-  on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
+  on('command.register', (_$: any, e: any) => {
+    if (refuseCommand) throw new Error(`"/${e.name}" refused: it is a built-in`)
+    return { value: { command: e.name } }
+  })
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
   on('turn.start', (_$: any, e: any) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
@@ -93,4 +96,19 @@ test('the peers pane lists every session with its state, ops first', async ($, o
     expect(all).toContain('note を整形')
     expect(all.indexOf('ops ')).toBeLessThan(all.indexOf('claude-07'))
   }
+})
+
+test('a refused command does not stop the session from writing its status', async ($, on) => {
+  const store = world(on, OPS, new Map(), true)
+  await $.session.start(START as any)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const r: any = store.get('ops-dash:session:ops')
+  expect(r.busy).toBe(true)
+})
+
+test('a session whose session.start never ran still writes on its first turn', async ($, on) => {
+  const store = world(on, PEER)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const r: any = store.get('ops-dash:session:claude-03')
+  expect(r.busy).toBe(true)
 })
