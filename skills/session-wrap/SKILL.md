@@ -38,6 +38,7 @@ Do NOT auto-invoke on session start, Stop hook, or any cron path. This skill alw
    - If the description already references an existing Issue / Calendar event / hub, surface that fact ("既に Issue #99 あり" / "Calendar event 登録済" / "hub M08 に紐付き") so the user can pick option (6) cleanly.
 3. Ask the user to pick a destination via `AskUserQuestion` (one question per item — do not batch):
 
+   - **(0) tasks.md** — `ideas/task-review/tasks.md` に 1 行足す（今日・今週に続けるもの）。**ops セッションのときだけ**選べる（`echo $LIFE_ROLE` が `ops`。他のセッションでは config-guard が止めるので、選択肢から外す）
    - **(1) Issue** — GitHub Issue を `gh issue create` で作る (status-trackable, 複数日, 締切あり)
    - **(2) PJ hub Tasks** — `projects/active/<slug>.md` の `## Tasks` 節に追記。slug が曖昧なら追加で確認
    - **(3) inbox** — `ideas/inbox/YYYY-MM-DD.md` に 1 行追記 (内部で `quick-capture` skill のロジックを使う)

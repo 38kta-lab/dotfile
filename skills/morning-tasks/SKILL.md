@@ -1,13 +1,15 @@
 ---
 name: morning-tasks
-description: "Load the auto-generated morning brief (ideas/task-review/md/morning-YYYY-MM-DD.md) into the current session's TaskCreate list so the user can work through today's tasks with progress tracking. Use when the user says morning-tasks, /morning-tasks, ブリーフを取り込んで, 今日のタスクをTaskにして, brief から task 作って, load brief, ingest morning brief, or wants the morning brief surfaced as trackable TaskCreate entries for this session."
+description: "Load the auto-generated morning brief (ideas/task-review/md/morning-YYYY-MM-DD.md) into the shared task list ideas/task-review/tasks.md, so every session can see today's tasks and they survive /clear. Runs in the ops session only. Use when the user says morning-tasks, /morning-tasks, ブリーフを取り込んで, 今日のタスクをTaskにして, brief から task 作って, load brief, ingest morning brief, or wants the morning brief turned into today's task list."
 metadata:
-  short-description: "Load morning brief into session TaskCreate"
+  short-description: "Write today's tasks from the morning brief into tasks.md"
 ---
 
 # Morning Tasks
 
-Read the already-generated morning brief and create TaskCreate entries for the items listed under "今日やるべきこと" so progress can be tracked within the current Claude Code session.
+Read the already-generated morning brief and write the items under "今日やるべきこと" into `ideas/task-review/tasks.md`, the task list shared by every session.
+
+Until 2026-10-08 this skill loaded the brief into the session's TaskCreate list. That list lived only in one session and vanished on `/clear`, and the brief could not see it, so finished items came back the next morning. `tasks.md` replaces it. See `Rules.md`「記録の 3 層と tasks.md」.
 
 This skill does NOT regenerate the brief — that is handled by the fenrir LaunchDaemon `com.kta.morning-brief` at 06:15 JST. If the brief is missing for today, stop and tell the user.
 
@@ -16,134 +18,112 @@ This skill does NOT regenerate the brief — that is handled by the fenrir Launc
 Before reading anything:
 
 1. Read `README.md` for directory policy.
-2. Read `Rules.md` for safety rules.
+2. Read `Rules.md` for safety rules and the tasks.md rules.
 3. Use `rg` first when searching notes.
 
 This skill is intended for the `life` repo. If invoked elsewhere, stop and report.
 
+**Run it in the ops session only.** Check `echo $LIFE_ROLE` first. If it is not `ops`, stop and tell the user: only the ops session writes `tasks.md` (the config-guard mod refuses the write from any other session, so do not try another way).
+
 ## Inputs
 
-The fenrir cron writes today's brief to:
-
 ```text
-ideas/task-review/md/morning-YYYY-MM-DD.md
+ideas/task-review/md/morning-YYYY-MM-DD.md   today's brief (cron)
+ideas/task-review/tasks.md                   the shared task list
 ```
 
-Use the local execution date for `YYYY-MM-DD`. Always call `date +%F` once before reading so the date is correct (see the global memory `feedback_check_current_time_first.md`).
+Use the local execution date for `YYYY-MM-DD`. Always call `date +%F` once before reading so the date is correct.
 
-If the file for today does not exist:
+If today's brief does not exist:
 
 - Report the missing path.
-- Suggest the user run the brief manually (`bash scripts/automation/run_morning_brief.sh` on fenrir) or invoke `/task-review` to plan from scratch.
+- Suggest running the brief manually (`bash scripts/automation/run_morning_brief.sh` on fenrir) or invoking `/task-review` to plan from scratch.
 - Do NOT fall back to yesterday's brief.
 
-## Parsing
-
-The brief has a `## 今日やるべきこと` section with numbered items shaped like:
+## tasks.md shape
 
 ```markdown
-1. **<subject>**
-   - 理由: ...
-   - 所要時間: ...
-   - 推奨時間: ...
+## 今日 YYYY-MM-DD
+
+- ⬜ [PJ] やること — @担当 — 起票日（締切）
+
+## 今週・近日
+
+## 待ち
 ```
 
-Some items have additional sub-bullets (e.g. multiple concrete sub-tasks bundled under one number). Always treat the top-level numbered item as one task, even when sub-bullets exist. Do NOT split sub-bullets into separate TaskCreate entries — fold them into the description instead.
-
-Skip the other sections (`## Calendar`, `## Gmail要対応`, `## メモ`, etc.) — they are reference material, not actionable items for the session.
-
-## TaskCreate Mapping
-
-For each numbered item under `## 今日やるべきこと`:
-
-- **subject**: the bolded title of the numbered item, trimmed and in imperative form.
-  - If the brief uses a noun phrase (e.g. "本日 6/3 締切の事務メール 3 件"), keep it as-is — do NOT rephrase aggressively.
-  - Strip the leading number, period, and `**` markers.
-- **description**: the sub-bullets joined as short lines. Preserve `理由:`, `所要時間:`, `推奨時間:`, and any nested bullets verbatim. This is what the user (and Claude in future turns) will read to understand the task.
-- **activeForm**: present-continuous form derived from the subject when natural. Omit if the subject reads fine as a spinner label.
-
-Create tasks in the order they appear in the brief. Do NOT add `addBlockedBy` dependencies unless the brief explicitly says one item must finish before another (it usually does not).
+- One task per line. `[PJ]` is the hub slug prefix (`[03_C]`, `[M20]`) or `[事務]` for admin.
+- Owner is `@user`, `@ops`, or `@claude-<slug>` for a peer session.
+- `⬜` open, `✅` done. Keep the hub checkbox style (`- ⬜` / `- ✅`).
 
 ## Workflow
 
-1. Run `date +%F` to get today's date.
-2. Read `ideas/task-review/md/morning-YYYY-MM-DD.md`.
-3. Locate `## 今日やるべきこと` and extract the numbered items.
-4. Optionally call `TaskList` first to check whether tasks already exist from an earlier invocation today. If non-trivial duplicates would result, ask the user whether to clear existing tasks (`TaskUpdate status=deleted`) or to skip ingestion.
-5. Create one `TaskCreate` per numbered item.
-6. Report the result (see Reporting).
+1. Run `date +%F` and `echo $LIFE_ROLE`. Stop unless it is `ops`.
+2. Read today's brief and `tasks.md`.
+3. **Clear yesterday's done lines.** Delete every `✅` line (their history is in the hub or the research repo's `note/progress.md`). Rename the `## 今日 <old date>` heading to today; move its remaining `⬜` lines there as carry-over.
+4. Extract the numbered items under `## 今日やるべきこと` in the brief. One numbered item = one line, even when it has sub-bullets.
+5. **Skip what tasks.md already has.** If an open line already covers the item, keep the existing line (its owner and start date) instead of adding a duplicate.
+6. Add the rest under `## 今日 YYYY-MM-DD`, in brief order, as `- ⬜ [PJ] <subject> — @担当 — <today>（<deadline if the brief gives one>）`.
+   - Subject: the bolded title, trimmed. Keep the brief's noun phrase; do not rephrase aggressively.
+   - Owner: `@user` unless the brief or the hub names a session.
+7. Edit line by line with the Edit tool. Never rewrite the whole file.
+8. Report (see Reporting).
 
 ## Reporting
 
-After creating tasks, report compactly:
-
-- the brief path that was read
-- the number of tasks created
-- a one-line summary per task (subject only — do not echo the full description)
-- a reminder that `/task-list` (or asking "今のタスクは") will show them
-
-Example:
-
 ```text
-Loaded ideas/task-review/md/morning-2026-06-03.md → 5 tasks
-  1. 本日 6/3 締切の事務メール 3 件を片付ける
-  2. 明日 6/4 の微生物 CS 定例会・全体会の出席・準備確認
-  3. 6/5 大阪出張まわりの状態確認
-  4. メイン作業ブロック: portal-local 次フェーズ or server-setup MTG 準備
-  5. 6/5〆タスクを前倒し
-TaskList で進捗確認できます。
+Loaded ideas/task-review/md/morning-2026-10-08.md → tasks.md
+  cleared 3 done lines from 10/07
+  carried over 4 open lines
+  added 2:
+    ⬜ [事務] 系会議の議題連絡（15:00 〆）
+    ⬜ [M20] 現状確認＋実作業
 ```
 
-## Pending / In-flight Task Patterns
+## During the day
 
-As the user works through the day, tasks rarely move cleanly from `pending` → `completed`. Handle these recurring cases:
+As the user works, keep `tasks.md` true. These cases recur:
 
-### 1. Task already submitted, awaiting external event
+### 1. Done
 
-Example: the brief lists "6/5 出張申請の状態確認" but the user replies "申請は提出済み、出張後に報告書を出す". The status-check action is effectively done, but a follow-up step exists after the trip.
+Mark the line `✅`. **In the same turn, update that PJ hub's Next Actions** (Rules.md).
 
-- **Do**: keep status as `pending`, update `subject` and `description` to reflect the remaining action and trigger (e.g. "出張完了後に報告書を経理へ提出" / "本日 action 不要、出張後に再浮上させる pending").
-- **Do not**: split into two tasks (one completed, one new) — the brief was already one item and the session-scoped task list does not benefit from extra granularity.
+### 2. Submitted, awaiting an external event
 
-### 2. Task being worked on in another Claude session
+Example: the brief lists "出張申請の状態確認" and the user replies "申請は提出済み、出張後に報告書を出す".
 
-Example: the user says "#4 は別セッションで進行中".
+- Rewrite the line to the remaining action and its trigger, and move it to `## 待ち`.
+- Do not split it into a done line and a new line.
 
-- **Do**: `TaskUpdate status=deleted` in this session.
-- **Why**: TaskCreate is session-scoped and does not sync across sessions. Keeping the task here creates a stale duplicate that the other session cannot update.
-- **Do not**: leave it as `pending` / mark as `in_progress` — both mislead later turns in this session into thinking work is owed here.
+### 3. Handled in another session
 
-### 3. Email-driven task resolved by triage (該当なし / 提出済み)
+Set the owner to that session (`@claude-03`). Do not delete the line — that is what makes it visible to every session.
 
-Example: the brief lists "6/3〆 事務メール 3 件" but on review the user finds none of them require a reply (該当条件外 / 希望なし / 既提出).
+### 4. Email-driven item resolved by triage (該当なし / 提出済み / 担当外)
 
-- **Do**: `TaskUpdate status=completed`, AND tag the relevant Gmail messages with `9. Done/Triage` so the next morning's brief and `gmail_triage` exclude them.
-- **Tag command pattern**:
+- Mark the line `✅`, AND tag the Gmail messages with `9. Done/Triage` so tomorrow's brief and `gmail_triage` exclude them.
+- Tag command pattern:
   ```bash
   conda activate life && python scripts/gmail_label.py \
     --query 'subject:"<unique substring>"' \
     --add-label "9. Done/Triage" --max-results 5 --dry-run
   ```
-  Always dry-run first to confirm the query matches only the intended message(s). Use unique substrings like `sysbunka 04165` / `syslocal 02296` rather than broad keywords like "勤務状況等申告書" (which match months of history).
-- **Why**: marking the task done without tagging the email causes the same item to reappear in tomorrow's brief, recreating the task next time `morning-tasks` runs.
+  Always dry-run first to confirm the query matches only the intended messages. Use unique substrings like `sysbunka 04165` rather than broad keywords. Then rerun without `--dry-run` and confirm each message carries the label.
+- Why: marking the line done without tagging the email brings the item back in tomorrow's brief.
 
-### 4. Brief item already on Calendar
+### 5. Already on Calendar
 
-Example: the brief asks to confirm a future event; checking Calendar shows it is already registered with the correct time.
-
-- **Do**: `TaskUpdate status=completed`. No new task needed unless a conflict surfaced.
-- **Calendar read**: `python scripts/google_calendar_read.py --start YYYY-MM-DD --end YYYY-MM-DD+1`.
+Mark the line `✅`. Calendar read: `python scripts/google_calendar_read.py --start YYYY-MM-DD --end YYYY-MM-DD+1`.
 
 ## What This Skill Does NOT Do
 
-- Does NOT regenerate the brief — that is cron-driven.
-- Does NOT modify the brief Markdown file.
-- Does NOT create GitHub Issues — use `issue-capture` for that.
-- Does NOT persist TaskCreate entries across sessions — they live only for the current session. If you want durable tracking, write the residue back to the brief Markdown / Issue / `projects/active/*.md` before `/clear`.
-- Does NOT touch the Gmail / Calendar / memo sections of the brief.
+- Does NOT regenerate or edit the brief.
+- Does NOT create GitHub Issues — use `issue-capture`.
+- Does NOT copy hub Next Actions wholesale into tasks.md. Only what starts today or this week goes there.
+- Does NOT use TaskCreate.
 
 ## Safety
 
-This skill only reads the brief and writes to in-session task state. It does not commit, push, or write files.
+Writes only `ideas/task-review/tasks.md`. Does not commit or push unless the user asks.
 
-Do not auto-run this skill on session start — it is explicitly user-triggered. The user invokes it when they want the brief surfaced as trackable tasks for the work session ahead.
+Do not auto-run on session start — it is explicitly user-triggered.

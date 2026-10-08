@@ -22,6 +22,7 @@ For the `life` repo, the main inputs are:
 ```text
 ideas/inbox/YYYY-MM-DD.md
 ideas/task-review/md/night-YYYY-MM-DD.md   # 前夜の計画 (今日モード時の baseline、下「Night Brief Carry-Over」)
+ideas/task-review/tasks.md                 # 全セッション共通の実行中タスク (下「tasks.md Carry-Over」)
 projects/active/*.md
 ~/.claude/projects/-Users-kta-src-github-com-38kta-lab-life/memory/MEMORY.md   # 作業記憶の正本(auto-memory)の索引
 scripts/google_calendar_read.py
@@ -124,6 +125,16 @@ If it exists, treat it as the **planning baseline**, not just one more input:
 If no night brief exists for today, plan from Calendar + Gmail + inbox/hubs as usual.
 
 (Why: 2026-06-10 に、前夜 night brief で決めた rough plan が翌朝 morning brief に全く反映されない事象が発覚。原因は morning cron が `/task-review 今日` を Calendar+Gmail だけで実行し night brief を読んでいなかったこと。本節と `run_morning_brief.sh` のプロンプト追記で対応。)
+
+## tasks.md Carry-Over (今日モード)
+
+`ideas/task-review/tasks.md` is the task list every session shares (written by the ops session only; see `Rules.md`「記録の 3 層と tasks.md」). Read it whenever planning today or tomorrow:
+
+- **`✅` lines are done.** Do not list them again under `## 今日やるべきこと` or `## 締切ウォッチ`, even when their deadline is still in the future. This is the signal for items finished in a session that left no email trace (e.g. 「議題なし」と判断しただけ).
+- **`⬜` lines are open.** Carry them into the plan and keep their owner: an `@claude-<slug>` line is another session's work, so plan around it rather than assigning it to the user.
+- **Read only.** Never write `tasks.md` from this skill. The cron brief runs without `LIFE_ROLE=ops`, and the config-guard mod refuses the write. `morning-tasks` (in the ops session) turns the brief into tasks.md lines.
+
+(Why: 2026-10-08、前日に完了とした「系会議の議題連絡」が翌朝の brief に「未了なら最優先」として再掲された。完了の記録がセッション内の TaskList にしかなく、brief から見えなかったため。)
 
 ## Note Inputs
 
