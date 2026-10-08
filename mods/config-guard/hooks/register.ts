@@ -47,6 +47,15 @@ const SECRETS: readonly (readonly [string, RegExp])[] = [
   ['private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
 ]
 
+// The shared task list: only the session started with LIFE_ROLE=ops writes it.
+// Every other session reads it. Refused without a dialog: no other session
+// has a reason to write it.
+const OPS_ONLY_PATH = /(^|\/)ideas\/task-review\/tasks\.md$/
+const OPS_ONLY_IN_COMMAND = /task-review\b[\s\S]*\btasks\.md/
+const OPS_ONLY_DENY =
+  'config-guard: ideas/task-review/tasks.md is written by the ops session only. ' +
+  'Do not write it another way; put the change you wanted in your report instead.'
+
 const ALLOW = 'Allow once'
 const DENY = 'Deny'
 
@@ -67,6 +76,11 @@ function pathReasons(path: string, extra: readonly string[]): string[] {
 function secretReasons(text: string): string[] {
   const hit = SECRETS.find(([, r]) => r.test(text))
   return hit ? [`the content looks like it holds a ${hit[0]}`] : []
+}
+
+function opsOnlyCommand(command: string): boolean {
+  const c = command.replace(/\d*&?>>?\s*\/dev\/null/g, '')
+  return OPS_ONLY_IN_COMMAND.test(c) && WRITES.test(c)
 }
 
 function bashReasons(command: string, extra: readonly string[]): string[] {
@@ -100,6 +114,7 @@ export const register: Register = (on, options) => {
   const extra = extraPaths(options.extra_paths)
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
+    if (OPS_ONLY_PATH.test(e.file_path) && (await $.env.get('LIFE_ROLE')) !== 'ops') return { deny: OPS_ONLY_DENY }
     const reasons = [...pathReasons(e.file_path, extra), ...secretReasons(e.content)]
     if (reasons.length === 0) return next(e)
     const deny = await confirm(q => $.ui.ask(q, { header: 'Guard', options: [DENY, ALLOW] }), 'Write', reasons)
@@ -107,6 +122,7 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => (next.called ? next(e) : { deny: FAIL_CLOSED }))
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
+    if (OPS_ONLY_PATH.test(e.file_path) && (await $.env.get('LIFE_ROLE')) !== 'ops') return { deny: OPS_ONLY_DENY }
     const reasons = [...pathReasons(e.file_path, extra), ...secretReasons(e.new_string)]
     if (reasons.length === 0) return next(e)
     const deny = await confirm(q => $.ui.ask(q, { header: 'Guard', options: [DENY, ALLOW] }), 'Edit', reasons)
@@ -121,6 +137,7 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => (next.called ? next(e) : { deny: FAIL_CLOSED }))
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    if (opsOnlyCommand(e.command) && (await $.env.get('LIFE_ROLE')) !== 'ops') return { deny: OPS_ONLY_DENY }
     const reasons = bashReasons(e.command, extra)
     if (reasons.length === 0) return next(e)
     const deny = await confirm(q => $.ui.ask(q, { header: 'Guard', options: [DENY, ALLOW] }), 'Bash', reasons)
