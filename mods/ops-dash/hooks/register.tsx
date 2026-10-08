@@ -253,7 +253,17 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
 // A line is "- ⬜ [PJ] what — @owner — MM/DD（deadline note）". Only lines
 // under a "## " heading count, so the file's own preamble is never a task.
 
-export type Task = { done: boolean; tag: string; title: string; owner: string; deadline?: { month: number; day: number } }
+export type Task = {
+  done: boolean
+  tag: string
+  title: string // short: the first part up to its first "（" or ":"
+  full: string // the whole line after the tag, as written
+  owner: string
+  who: string // the owner part as written ("@user・@ops")
+  created?: string
+  note?: string // the parenthetical that ends the line
+  deadline?: { month: number; day: number }
+}
 export type TaskSection = { title: string; tasks: Task[] }
 
 // ---- the next events, and one event's detail ----------------------------
@@ -284,10 +294,22 @@ export function whenLabel(ev: CalEvent, now: number): string {
 // The hub an event belongs to, by the "[PJ]" tag at the start of its title.
 // A hub's code is "22_R" in "22_R_sample-genome", "Z90" in "Z90-slides"; a tag
 // naming two ("21_Q/22_R") goes to the first.
+export function hubOfTag(tag: string, slugs: readonly string[]): string | undefined {
+  const first = tag.split('/')[0].trim()
+  if (!first || first.startsWith('status:')) return undefined
+  return slugs.find(s => s.match(/^(\d{2}_[A-Z]|[A-Z]\d{2})/)?.[1] === first)
+}
+
 export function hubOfEvent(ev: CalEvent, slugs: readonly string[]): string | undefined {
-  const tag = ev.title.match(/^\[([^\]]+)\]/)?.[1]?.split('/')[0].trim()
-  if (!tag || tag.startsWith('status:')) return undefined
-  return slugs.find(s => s.match(/^(\d{2}_[A-Z]|[A-Z]\d{2})/)?.[1] === tag)
+  const tag = ev.title.match(/^\[([^\]]+)\]/)?.[1]
+  return tag ? hubOfTag(tag, slugs) : undefined
+}
+
+// "学会 A の参加登録（ポスターのみ）" → "学会 A の参加登録". Only at "（": a colon
+// often leaves just a label ("解析 8"). A cut leaving under 4 characters keeps the whole.
+export function shortTaskTitle(title: string): string {
+  const m = title.match(/^(.+?)（/)
+  return m && cells(m[1].trim()) >= 4 ? m[1].trim() : title
 }
 
 function plain(text: string): string {
@@ -307,11 +329,16 @@ export function parseTask(done: boolean, body: string): Task {
   const tail = rest.match(/（([^（）]*)）$/)
   // " — " separates the parts; tasks.md also writes "）— " with no space before it
   const parts = rest.split(/\s?— /)
-  const title = parts[0].trim()
+  const full = parts[0].trim()
   let owner = ''
+  let ownerText = ''
+  let created: string | undefined
   for (const part of parts.slice(1)) {
+    const c = part.trim().match(/^(\d{1,2}\/\d{1,2})/)
+    if (c && created === undefined) created = c[1]
     const at = part.match(/@([A-Za-z0-9_\-・@]+)/)
     if (at) {
+      ownerText = part.trim()
       const names = part.match(/@[A-Za-z0-9_\-]+/g) ?? []
       const others = names.map(n => n.slice(1)).filter(n => n !== 'user')
       owner = others.map(n => n.replace(/^claude-/, '')).join('・')
@@ -322,7 +349,7 @@ export function parseTask(done: boolean, body: string): Task {
     const d = tail[1].match(/(\d{1,2})\/(\d{1,2})/)
     if (d) deadline = { month: Number(d[1]), day: Number(d[2]) }
   }
-  return { done, tag, title, owner, deadline }
+  return { done, tag, title: shortTaskTitle(full), full, owner, who: ownerText, created, note: tail && parts.length > 1 ? tail[1] : undefined, deadline }
 }
 
 export function parseTasks(md: string): TaskSection[] {
@@ -429,6 +456,7 @@ let back: { slug: string; tab: number }[] = []
 // One event's detail, drawn in place of the dash (b goes back). Not a pane of
 // its own: a pane opened from a press in another pane never gets the keys.
 let detail: CalEvent | undefined
+let taskDetail: { task: Task; section: string } | undefined
 let copied = ''
 const NEXT_EVENTS = 5
 
@@ -464,7 +492,19 @@ function goBack(): void {
   view = prev ? { kind: 'hub', slug: prev.slug, tab: prev.tab } : { kind: 'list' }
 }
 
+function openTask($: any, task: Task, section: string): void {
+  taskDetail = { task, section }
+  detail = undefined
+  $.ui.invalidate('ui.render')
+}
+
+function closeTask($: any): void {
+  taskDetail = undefined
+  $.ui.invalidate('ui.render')
+}
+
 function openEvent($: any, ev: CalEvent): void {
+  taskDetail = undefined
   detail = ev
   copied = ''
   $.ui.invalidate('ui.render')
@@ -484,6 +524,7 @@ async function copyText($: any, label: string, text: string, press: any): Promis
 
 async function goToHub($: any, slug: string): Promise<void> {
   openHub(slug)
+  taskDetail = undefined
   closeEvent($)
   await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
 }
@@ -677,6 +718,46 @@ export const register: Register = (on, options) => {
     const now = await $.clock.now()
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
+    if (taskDetail) {
+      const { task: t, section } = taskDetail
+      if (hubs.length === 0) await loadHubs($, repo)
+      const hubSlug = hubOfTag(t.tag, hubs.map(x => x.slug))
+      const left = t.deadline ? daysLeft(now, t.deadline) : undefined
+      const leftLabel = left === undefined ? '' : left < 0 ? `（${-left} 日過ぎ）` : left === 0 ? '（今日）' : `（あと ${left} 日）`
+      const dueColor = t.done || left === undefined ? undefined : left < 0 ? 'red' : left <= 3 ? 'yellow' : undefined
+      const row = (label: string, value: string, color?: string) => (
+        <Box flexDirection="row">
+          <Text dimColor>{pad(label, 6)}</Text>
+          <Text color={color} wrap="wrap">{value}</Text>
+        </Box>
+      )
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="back" label="← タスクの一覧" hotkey="b" plain onPress={() => closeTask($)} />
+          </Box>
+          <Box flexDirection="row" marginTop={1}>
+            <Text>{t.done ? '✅ ' : '⬜ '}</Text>
+            <Text color={tagColor(t.tag)}>{t.tag ? `${t.tag}  ` : ''}</Text>
+            <Text dimColor>{section}</Text>
+          </Box>
+          <Box marginTop={1}><Text bold wrap="wrap">{t.full}</Text></Box>
+          <Box flexDirection="column" marginTop={1}>
+            {row('担当', t.who || '—')}
+            {t.created && row('起票', t.created)}
+            {row('締切', t.deadline ? `${t.deadline.month}/${t.deadline.day}${leftLabel}` : '—', dueColor)}
+            {t.note && !t.deadline && row('補足', t.note)}
+            {t.note && t.deadline && t.note !== `${t.deadline.month}/${t.deadline.day}` && row('補足', t.note)}
+          </Box>
+          {hubSlug && (
+            <Box flexDirection="row" marginTop={1}>
+              <Button key="hub" label={`${hubSlug.split('_').slice(0, 2).join('_').replace(/-.*/, '')} の hub ↗`} hotkey="h" plain onPress={() => goToHub($, hubSlug)} />
+            </Box>
+          )}
+        </Box>
+      )
+    }
+
     if (detail) {
       const ev = detail
       if (hubs.length === 0) await loadHubs($, repo)
@@ -821,7 +902,7 @@ export const register: Register = (on, options) => {
                   <Box flexDirection="row">
                     <Text dimColor={t.done}>{t.done ? '✅ ' : '⬜ '}</Text>
                     <Text color={t.done ? undefined : tagColor(t.tag)} dimColor={t.done}>{shortTag(t.tag, 5) + ' '}</Text>
-                    <Text dimColor={t.done}>{pad(clip(t.title, titleWidth), titleWidth)}</Text>
+                    <Button key={`task-${section.title}-${t.full}`} label={pad(clip(t.title, titleWidth), titleWidth)} plain dimColor={t.done} onPress={() => openTask($, t, section.title)} />
                     {who !== '' && <Text dimColor>{'  ' + who}</Text>}
                     {due !== '' && <Text color={dueColor} dimColor={dueColor === undefined}>{'  ' + due}</Text>}
                   </Box>
