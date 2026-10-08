@@ -443,7 +443,7 @@ export const register: Register = (on, options) => {
           </Box>
         ))}
 
-        <Text dimColor>{rule('sessions')}</Text>
+        <Box marginTop={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">
@@ -464,7 +464,7 @@ export const register: Register = (on, options) => {
           </Box>
         ))}
 
-        <Text dimColor>{rule(`calendar  ${calendarNote}`)}</Text>
+        <Box marginTop={1}><Text dimColor>{rule(`calendar  ${calendarNote}`)}</Text></Box>
         <Box flexDirection="row">
           <Text>{'   '}</Text>
           {week.days.map(d => (
@@ -482,7 +482,7 @@ export const register: Register = (on, options) => {
           </Box>
         ))}
 
-        <Text dimColor>{rule('tasks')}</Text>
+        <Box marginTop={1}><Text dimColor>{rule('tasks')}</Text></Box>
         {taskNote !== '' && <Text dimColor>{taskNote}</Text>}
         {tasks.map(t =>
           t.section !== undefined ? (
