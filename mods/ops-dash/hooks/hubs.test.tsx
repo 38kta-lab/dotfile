@@ -158,11 +158,11 @@ test('the milestones tab of a hub is drawn as a list', () => {
   expect(md).not.toMatch(/^\|/m)
 })
 
-test('the ops session opens dash then hubs at start (the first opened is in front), without taking the keyboard', OPTIONS as any, async ($, on) => {
+test('the ops session opens dash, hubs, then notes at start (the first opened is in front), without taking the keyboard', OPTIONS as any, async ($, on) => {
   world(on)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await new Promise(r => setTimeout(r, 20))
-  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs'])
+  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
   expect(OPENED.every(o => o.focus === undefined)).toBe(true)
 })
 
