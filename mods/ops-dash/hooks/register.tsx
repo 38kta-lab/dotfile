@@ -2,7 +2,7 @@ import type { Register } from 'claude-code'
 
 import { consultText, parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
 import type { Hub } from './hubs'
-import { bytesToBase64, frontValue, imageRows, isBase64, pngList, tocRows } from './notes'
+import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, tocRows } from './notes'
 import type { TocRow } from './notes'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -545,8 +545,9 @@ let notePjs: NotePj[] = []
 let notesView:
   | { kind: 'list' }
   | { kind: 'toc'; pj: NotePj; rows: TocRow[] }
-  | { kind: 'pngs'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; deep?: boolean }
-  | { kind: 'image'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; file: string; src?: string; w?: number; h?: number } = { kind: 'list' }
+  | { kind: 'pngs'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; deep?: boolean; body?: string[]; full?: boolean }
+  | { kind: 'image'; pj: NotePj; rows: TocRow[]; row: TocRow; files: string[]; file: string; src?: string; w?: number; h?: number; body?: string[] } = { kind: 'list' }
+const BODY_LINES = 20
 let notesNote = ''
 const THUMB = '/tmp/ops-dash-notes-view.png'
 const MAX_B64 = 2700000 // Image takes at most 2 MiB of picture
@@ -583,18 +584,31 @@ async function notesOpenToc($: any, pj: NotePj): Promise<void> {
 
 // First the quick look: <number>/out/*.png only, no walking
 // down the tree (the NAS is slow to walk). `deep` walks it, on request.
-async function notesOpenPngs($: any, pj: NotePj, rows: TocRow[], row: TocRow, deep = false): Promise<void> {
+// The entry itself, read alongside: awk prints from the number's heading to
+// the next "## " heading and stops there, not reading the rest of the note.
+async function notesReadEntry($: any, pj: NotePj, id: string): Promise<string[]> {
+  try {
+    const prog = '$0 ~ "^## " id " — " { p = 1 } p && /^## / && $0 !~ "^## " id " — " { exit } p { print }'
+    const r = await $.process.run(['awk', '-v', `id=${id}`, prog, `${pj.code}/note/note.md`], { timeoutMs: 20000 })
+    return entryLines(String(r.stdout ?? ''), id)
+  } catch {
+    return []
+  }
+}
+
+async function notesOpenPngs($: any, pj: NotePj, rows: TocRow[], row: TocRow, deep = false, body?: string[]): Promise<void> {
   const dir = `${pj.data}/${row.id}`
-  notesView = { kind: 'pngs', pj, rows, row, files: [], deep }
+  notesView = { kind: 'pngs', pj, rows, row, files: [], deep, body }
+  const bodyRead = body ? Promise.resolve(body) : notesReadEntry($, pj, row.id)
   notesNote = deep ? `${dir} の下の階層も探しています…` : `${dir}/out を見ています…`
   $.ui.invalidate('ui.render')
   try {
     const argv = deep
       ? ['find', dir, '-maxdepth', '6', '-type', 'f', '-iname', '*.png']
       : ['/bin/sh', '-c', 'for f in "$1"/out/*.png "$1"/out/*.PNG; do [ -f "$f" ] && echo "$f"; done; exit 0', 'sh', dir]
-    const r = await $.process.run(argv, { timeoutMs: deep ? 60000 : 15000 })
+    const [r, lines] = await Promise.all([$.process.run(argv, { timeoutMs: deep ? 60000 : 15000 }), bodyRead])
     const files = pngList(String(r.stdout ?? ''), dir)
-    notesView = { kind: 'pngs', pj, rows, row, files, deep }
+    notesView = { kind: 'pngs', pj, rows, row, files, deep, body: lines }
     const where = deep ? '下の階層まで探して' : 'out/ に'
     notesNote = files.length === 0 ? (r.exitCode === 0 ? `${where} png はありません` : `探せなかった（exit ${r.exitCode}）`) : `${where} ${files.length} 件${files.length >= 200 ? '（先頭 200 件）' : ''}`
   } catch (err) {
@@ -632,7 +646,7 @@ async function notesOpenImage($: any, v: { pj: NotePj; rows: TocRow[]; row: TocR
 
 function notesBack($: any): void {
   const v = notesView
-  if (v.kind === 'image') notesView = { kind: 'pngs', pj: v.pj, rows: v.rows, row: v.row, files: v.files, deep: true }
+  if (v.kind === 'image') notesView = { kind: 'pngs', pj: v.pj, rows: v.rows, row: v.row, files: v.files, deep: true, body: v.body }
   else if (v.kind === 'pngs') notesView = { kind: 'toc', pj: v.pj, rows: v.rows }
   else notesView = { kind: 'list' }
   notesNote = ''
@@ -771,7 +785,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: NOTES }, async ($, e) => {
-    const { Box, Text, Button, Image } = $.ui.resolve(e)
+    const { Box, Text, Button, Image, Markdown } = $.ui.resolve(e)
     const width = Math.max(40, e.props.bodyColumns ?? 84)
     const v = notesView
     const back = <Button key="back" label="← 戻る" hotkey="b" plain onPress={() => notesBack($)} />
@@ -811,7 +825,17 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row" columnGap={2}>{back}<Text bold>{clip(`${v.row.id}  ${v.row.title}`, width - 12)}</Text></Box>
           <Text dimColor wrap="wrap">{`結論: ${v.row.conclusion}  ／  状態: ${v.row.state}`}</Text>
           {note}
-          {!v.deep && <Button key="deep" label="下の階層も探す（遅い）" hotkey="d" plain onPress={() => notesOpenPngs($, v.pj, v.rows, v.row, true)} />}
+          <Box marginTop={1}><Text dimColor>{clip('─ 本文 ' + '─'.repeat(width), width)}</Text></Box>
+          {v.body === undefined && <Text dimColor>本文を読んでいます…</Text>}
+          {v.body !== undefined && v.body.length === 0 && <Text dimColor>この番号の見出し（## {v.row.id} — …）が note に無い。ほかの番号の項目に含まれているかもしれない</Text>}
+          {v.body !== undefined && v.body.length > 0 && (
+            <Markdown key="entry" text={(v.full ? v.body : v.body.slice(0, BODY_LINES)).join('\n')} />
+          )}
+          {v.body !== undefined && v.body.length > BODY_LINES && (
+            <Button key="full" label={v.full ? '本文をたたむ' : `本文の全文（あと ${v.body.length - BODY_LINES} 行）`} hotkey="f" plain onPress={() => { notesView = { ...v, full: !v.full }; $.ui.invalidate('ui.render') }} />
+          )}
+          <Box marginTop={1}><Text dimColor>{clip('─ out/ の png ' + '─'.repeat(width), width)}</Text></Box>
+          {!v.deep && <Button key="deep" label="下の階層も探す（遅い）" hotkey="d" plain onPress={() => notesOpenPngs($, v.pj, v.rows, v.row, true, v.body)} />}
           <Box flexDirection="column" marginTop={1}>
             {v.files.map(f => (
               <Button key={`png-${f}`} label={clip(f, width - 2)} plain onPress={() => notesOpenImage($, v, f)} />
