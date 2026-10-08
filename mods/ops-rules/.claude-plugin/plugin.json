@@ -1,0 +1,6 @@
+{
+  "name": "ops-rules",
+  "version": "0.1.0",
+  "author": { "name": "38kta-lab" },
+  "description": "Rules for the session started with LIFE_ROLE=ops: it decides and does not measure (analysis commands need the person's OK)."
+}
