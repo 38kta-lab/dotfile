@@ -250,7 +250,7 @@ test('a second identical line turned ✅ is still logged', async ($, on) => {
 import { looksEnglish } from './register'
 
 const EN = 'I fixed the guard. The check now runs on each piece of the command, split on the usual separators, and commit messages are left out because they name files without writing any. All nineteen tests pass, and the two new ones fail on the old code, so they do catch the bug. It takes effect after a reload.'
-const JA = 'guard の誤検知を直しました（dotfile `81cc4a7`、push 済み）。コマンドを `&&` / `;` / `|` で区切り、同じ区切りの中に保護ファイル名と書き込みの両方がある場合だけ確認を出します。テストは 19 件すべて通りました。claude-07 と ops-dash、config-guard、ops-rules の README も確認しました。'
+const JA = 'guard の誤検知を直しました（`1a2b3c4`、push 済み）。コマンドを `&&` / `;` / `|` で区切り、同じ区切りの中に保護ファイル名と書き込みの両方がある場合だけ確認を出します。テストは 19 件すべて通りました。claude-22 と ops-dash、config-guard、ops-rules の README も確認しました。'
 
 test('looksEnglish: an English report is English; a Japanese one with code and names is not; a short reply is not judged', () => {
   expect(looksEnglish(EN)).toBe(true)
