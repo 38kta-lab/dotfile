@@ -155,7 +155,7 @@ export function cardsOf(records: SessionRecord[], dispatches: Record<string, Dis
 export type CalEvent = { title: string; start: string; end: string; calendarId: string }
 
 export const HOUR_FIRST = 8
-export const HOUR_LAST = 19 // the last row is 19:00–20:00
+export const HOUR_LAST = 20 // the last row is 20:00–21:00
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 export function isAllDay(ev: CalEvent): boolean {
