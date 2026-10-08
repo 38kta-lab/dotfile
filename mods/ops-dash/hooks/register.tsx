@@ -855,6 +855,13 @@ export const register: Register = (on, options) => {
             .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: 84 }))
             .then(() => notesLoad($, repo))
             .then(() => $.ui.open({ id: NOTES, title: 'notes', columns: 84 }))
+            // Which tab ends up in front is not the order of opening on every
+            // terminal (10/08: with three, notes was in front). Only a focused
+            // open raises a tab, so dash is opened again with focus when another
+            // is in front; Esc hands the keyboard back to the prompt.
+            .then(() => $.ui.panes())
+            .then((panes: readonly { id: string; isShown: boolean }[]) =>
+              panes.some(p => p.id === PANE && p.isShown) ? undefined : $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true }))
             .catch((err: unknown) => $.ui.log(`ops-dash: could not open the panes at start: ${String(err)}`, { to: 'debug' }))
           $.clock.every(600000, () => fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render')))
         } catch (err) {
