@@ -79,6 +79,38 @@ test('cd into ~/.claude and then editing settings.json is still asked', async ($
   expect(asked.questions.length).toBe(1)
 })
 
+test('removing a note and naming CLAUDE.md in the commit message is not asked about', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran)
+  const r = await $.tool.call({
+    tool: 'Bash',
+    command: 'git rm -q note/old.md && git add note/a.md && git commit -m "docs: move old.md into a.md; CLAUDE.md already points at a.md"',
+  })
+  expect(r.deny).toBeUndefined()
+  expect(asked.questions).toEqual([])
+})
+
+test('a write in one step and CLAUDE.md read in another is not asked about', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran)
+  await $.tool.call({ tool: 'Bash', command: 'grep -c note CLAUDE.md; rm -f /tmp/x.txt' })
+  expect(asked.questions).toEqual([])
+})
+
+test('git rm of a CLAUDE.md is still asked', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran)
+  await $.tool.call({ tool: 'Bash', command: 'git status --short && git rm sub/CLAUDE.md' })
+  expect(asked.questions.length).toBe(1)
+})
+
+test('writing CLAUDE.md from a heredoc script is still asked', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran)
+  await $.tool.call({ tool: 'Bash', command: "python3 - <<'EOF'\nopen('CLAUDE.md', 'w').write('x')\nEOF" })
+  expect(asked.questions.length).toBe(1)
+})
+
 test('Edit on a CLAUDE.md is asked', async ($, on) => {
   const asked: Asked = { questions: [] }, ran: string[] = []
   person(on, 'Deny', asked); tools(on, ran)
