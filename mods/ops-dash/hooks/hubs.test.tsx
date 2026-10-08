@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { parseHub, nextMilestone, openActions, sectionMarkdown, tablesToLists } from './hubs'
+import { consultText, parseHub, nextMilestone, openActions, sectionMarkdown, tablesToLists } from './hubs'
 
 const NOW = Date.parse('2026-10-08T03:00:00Z')
 
@@ -164,4 +164,37 @@ test('the ops session opens hubs then dash at start, without taking the keyboard
   await new Promise(r => setTimeout(r, 20))
   expect(OPENED.map(o => o.id)).toEqual(['hubs', 'peers'])
   expect(OPENED.every(o => o.focus === undefined)).toBe(true)
+})
+
+test('consultText: where the hub is, the newest Current State, the first open next actions, then the ask', () => {
+  const h = parseHub('11_A_alpha', ALPHA, NOW)
+  const t = consultText(h, '/home/u/life/projects/active/11_A_alpha.md')
+  expect(t).toContain('hub「11_A_alpha」（Alpha (11_A)）')
+  expect(t).toContain('/home/u/life/projects/active/11_A_alpha.md')
+  expect(t).toContain('## Current State (2026-10-08)')
+  expect(t).toContain('new state')
+  expect(t).not.toContain('old state')
+  expect(t).toContain('- ⬜ first')
+  expect(t).toContain('- ⬜ second')
+  expect(t).not.toContain('done one')
+  expect(t).toContain('理由つきで提案して')
+})
+
+test('pressing 次の一手を相談 puts the draft in the prompt and says so; nothing is sent', OPTIONS as any, async ($, on) => {
+  world(on)
+  const filled: any[] = []
+  const sent: any[] = []
+  on('prompt.fill', (_$: any, e: any) => { filled.push(e); return { isFilled: true } })
+  on('prompt.submit', (_$: any, e: any) => { sent.push(e); return { text: e.text } })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await $.command.run({ command: 'hubs', args: '' } as any)
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'hubs', props: PROPS })
+  await $.ui.press({ plugin: 'ops-dash', key: 'hub-11_A_alpha' })
+  expect(await labels(ui)).toContain('次の一手を相談')
+  await $.ui.press({ plugin: 'ops-dash', key: 'consult' })
+  expect(filled.length).toBe(1)
+  expect(filled[0].text).toContain('hub「11_A_alpha」')
+  expect(sent).toEqual([])
+  expect(await texts(ui)).toContain('プロンプトに下書きを入れた')
+  await ui.unmount()
 })

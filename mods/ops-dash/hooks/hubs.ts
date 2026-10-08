@@ -177,3 +177,29 @@ export function sectionMarkdown(h: Hub, tab: number): string {
   if (body.length <= MAX_CHARS) return body
   return body.slice(0, MAX_CHARS) + `\n\n_（${body.length.toLocaleString()} 字のうち先頭 ${MAX_CHARS.toLocaleString()} 字まで。続きは節ごとに見てください）_`
 }
+
+// The draft put in the ops prompt by "次の一手を相談": where the hub is, its
+// current state and its first open next actions, then the ask. The person
+// reads it, edits it if they like, and sends it; nothing is sent from here.
+export function consultText(h: Hub, path: string, maxState = 1500): string {
+  const state = TABS[0].pick(h)
+  let body = (state?.body ?? '').trim()
+  if (body.length > maxState) body = body.slice(0, maxState) + '\n…（続きは hub）'
+  const next = h.sections.find(s => s.name.startsWith('Next Actions'))
+  const open = (next?.body ?? '')
+    .split('\n')
+    .filter(l => /^\s*(?:-|\d+\.)\s*(?:⬜|\[ \])/.test(l))
+    .slice(0, 3)
+    .map(l => l.trim())
+  return [
+    `hub「${h.slug}」（${h.title}）の次の一手を一緒に考えたい。全文は ${path}`,
+    '',
+    `## ${state?.name ?? 'Current State'}`,
+    body || '（書かれていない）',
+    '',
+    '## Next Actions（まだ済んでいない上から 3 つ）',
+    ...(open.length ? open : ['（無い）']),
+    '',
+    'これを踏まえて、次にやるべきことを 1〜3 個、理由つきで提案して。締切と、誰がやるか（user / ops / peer）も添えて。',
+  ].join('\n')
+}
