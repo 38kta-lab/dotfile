@@ -475,6 +475,69 @@ let trendNote = ''
 let trendLoadedAt = 0
 let trendItem: TrendItem | undefined
 let trendList: { minStars: number } | undefined
+let trendFiles: string[] = [] // every *-trend.md, newest first
+let trendPast = false // the list of days is open
+let trendShown: Trend | undefined // a past day chosen from that list
+let queued = new Set<string>() // URLs already in the reading queue
+let queueNote = ''
+
+// The reading list: ideas/to-read.md in the life repo, one paper a line.
+// A URL already there is not added again.
+export function toReadLine(it: TrendItem, day: string, today: string): string {
+  const clean = (t: string) => t.replace(/\s+/g, ' ').replace(/[\[\]]/g, '').trim()
+  return `- ⬜ ${today} ${'★'.repeat(it.stars) || '☆'} [${clean(it.ja || it.title)}](${it.url}) — ${clean(it.title)}（${it.source}・trend ${day}）`
+}
+
+export function toReadUrls(md: string): Set<string> {
+  return new Set([...md.matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)].map(m => m[1]))
+}
+
+const TO_READ_HEAD = '# 読みたい\n\ndash の trend から「読みたい」で足した論文・記事（ops-dash が末尾に追記）。読んだら ✅、やめたら行を消す。\n\n'
+
+async function refreshQueued($: any, repo: string): Promise<void> {
+  if (!repo) return
+  try {
+    queued = toReadUrls(String(await $.fs.read(`${repo}/ideas/to-read.md`)))
+  } catch {
+    queued = new Set()
+  }
+}
+
+async function addToQueue($: any, repo: string, it: TrendItem, day: string): Promise<void> {
+  const path = `${repo}/ideas/to-read.md`
+  try {
+    let md = ''
+    try {
+      md = String(await $.fs.read(path))
+    } catch {
+      md = TO_READ_HEAD
+    }
+    if (toReadUrls(md).has(it.url)) {
+      queued.add(it.url)
+      queueNote = 'もう読みたいリストに入っています'
+    } else {
+      const now = new Date(await $.clock.now())
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      await $.fs.write(path, md.replace(/\n*$/, '\n') + toReadLine(it, day, today) + '\n')
+      queued.add(it.url)
+      queueNote = '読みたいリスト（ideas/to-read.md）に入れました'
+    }
+  } catch (err) {
+    queueNote = `入れられませんでした（${String(err).slice(0, 50)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+async function openPastTrend($: any, repo: string, file: string): Promise<void> {
+  try {
+    trendShown = parseTrend(String(await $.fs.read(`${repo}/ideas/daily/md/${file}`)))
+    trendPast = false
+    trendList = { minStars: 0 }
+  } catch (err) {
+    trendNote = `trend を読めない（${String(err).slice(0, 40)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
 
 async function loadTrend($: any, repo: string, now: number): Promise<void> {
   if (!repo || now - trendLoadedAt < 600000) return
@@ -482,6 +545,7 @@ async function loadTrend($: any, repo: string, now: number): Promise<void> {
   try {
     const dir = `${repo}/ideas/daily/md`
     const names = ((await $.fs.list(dir)) as any[]).filter(f => f.kind === 'file').map(f => String(f.name))
+    trendFiles = names.filter(n => /^\d{4}-\d{2}-\d{2}-trend\.md$/.test(n)).sort().reverse()
     const file = latestTrendFile(names)
     if (!file) {
       trend = undefined
@@ -981,7 +1045,7 @@ export const register: Register = (on, options) => {
       const it = trendItem
       return (
         <Box flexDirection="column">
-          <Button key="back" label={trendList ? '← trend の一覧' : '← dash'} hotkey="b" plain onPress={() => { trendItem = undefined; copied = ''; $.ui.invalidate('ui.render') }} />
+          <Button key="back" label={trendList ? '← trend の一覧' : '← dash'} hotkey="b" plain onPress={() => { trendItem = undefined; copied = ''; queueNote = ''; $.ui.invalidate('ui.render') }} />
           <Box marginTop={1}><Text bold wrap="wrap">{it.ja || it.title}</Text></Box>
           <Text wrap="wrap">{it.title}</Text>
           <Box flexDirection="row" columnGap={2} marginTop={1}>
@@ -990,30 +1054,52 @@ export const register: Register = (on, options) => {
             {it.category !== '' && <Text dimColor>{it.category}</Text>}
           </Box>
           <Text color="cyan" wrap="wrap">{it.url}</Text>
-          <Box flexDirection="row" marginTop={1}>
+          <Box flexDirection="row" columnGap={2} marginTop={1}>
             <Button key="copy-url" label="URL をコピー" hotkey="c" onPress={(press: any) => copyText($, 'URL ', it.url, press)} />
+            {repo !== '' && (queued.has(it.url)
+              ? <Text color="green">読みたいリストに入っています</Text>
+              : <Button key="want" label="読みたい" hotkey="r" onPress={() => addToQueue($, repo, it, (trendShown ?? trend)?.date ?? '')} />)}
           </Box>
           {copied !== '' && <Text color="green">{copied}</Text>}
+          {queueNote !== '' && <Text color={queueNote.startsWith('入れられ') ? 'red' : 'green'}>{queueNote}</Text>}
         </Box>
       )
     }
 
-    if (trendList && trend) {
+    if (trendPast) {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="back" label="← trend の一覧" hotkey="b" plain onPress={() => { trendPast = false; $.ui.invalidate('ui.render') }} />
+            <Text bold>{`過去の trend  ${trendFiles.length} 日`}</Text>
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            {trendFiles.map(f => (
+              <Button key={`day-${f}`} label={f.slice(0, 10)} plain onPress={() => openPastTrend($, repo, f)} />
+            ))}
+          </Box>
+        </Box>
+      )
+    }
+
+    const listTrend = trendShown ?? trend
+    if (trendList && listTrend) {
       const min = trendList.minStars
-      const shown = trend.items.filter(x => x.stars >= min)
+      const shown = listTrend.items.filter(x => x.stars >= min)
       const sources = [...new Set(shown.map(x => x.source))]
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" columnGap={2}>
-            <Button key="back" label="← dash" hotkey="b" plain onPress={() => { trendList = undefined; $.ui.invalidate('ui.render') }} />
-            <Text bold>{`trend ${trend.date}  ${shown.length} / ${trend.items.length} 件`}</Text>
+            <Button key="back" label="← dash" hotkey="b" plain onPress={() => { trendList = undefined; trendShown = undefined; $.ui.invalidate('ui.render') }} />
+            <Text bold>{`trend ${listTrend.date}  ${shown.length} / ${listTrend.items.length} 件`}</Text>
             <Button key="filter" label={min > 0 ? 'すべて出す' : '★3 以上だけ'} hotkey="s" plain onPress={() => { trendList = { minStars: min > 0 ? 0 : 3 }; $.ui.invalidate('ui.render') }} />
+            <Button key="past" label="過去の trend" hotkey="p" plain onPress={() => { trendPast = true; $.ui.invalidate('ui.render') }} />
           </Box>
           {sources.map(src => (
             <Box flexDirection="column" marginTop={1}>
               <Text dimColor>{rule(src)}</Text>
               {shown.filter(x => x.source === src).map(x => (
-                <Button key={`tr-${x.order}`} label={clip(`${starText(x.stars)} ${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; copied = ''; $.ui.invalidate('ui.render') }} />
+                <Button key={`tr-${x.order}`} label={clip(`${queued.has(x.url) ? '📥 ' : ''}${starText(x.stars)} ${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; copied = ''; queueNote = ''; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />
               ))}
             </Box>
           ))}
@@ -1191,10 +1277,10 @@ export const register: Register = (on, options) => {
           return (
             <Box flexDirection="column">
               {top.map(x => (
-                <Button key={`trend-${x.order}`} label={clip(`${pad('★'.repeat(x.stars), 6)}${pad(x.short, 5)}${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; trendList = undefined; copied = ''; $.ui.invalidate('ui.render') }} />
+                <Button key={`trend-${x.order}`} label={clip(`${pad('★'.repeat(x.stars), 6)}${pad(x.short, 5)}${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; trendList = undefined; trendShown = undefined; copied = ''; queueNote = ''; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />
               ))}
               {Array.from({ length: TREND_ROWS - top.length }, () => <Text> </Text>)}
-              {trend && <Button key="trend-all" label="全部を見る" hotkey="t" plain onPress={() => { trendList = { minStars: 0 }; trendItem = undefined; $.ui.invalidate('ui.render') }} />}
+              {trend && <Button key="trend-all" label="全部を見る（過去の trend も）" hotkey="t" plain onPress={() => { trendList = { minStars: 0 }; trendItem = undefined; trendShown = undefined; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />}
             </Box>
           )
         })()}

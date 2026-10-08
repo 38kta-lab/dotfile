@@ -52,7 +52,7 @@ test('topItems: highest first, ties keep the file order; helpers', () => {
   expect(latestTrendFile(['2026-10-06-trend.md', '2026-10-07-trend.md', '2026-10-07-digest.md', 'index.md'])).toBe('2026-10-07-trend.md')
 })
 
-function world(on: any, copied: string[]) {
+function world(on: any, copied: string[], files?: Map<string, string>) {
   on('env.get', (_$: any, e: any) => ({ value: e.name === 'LIFE_ROLE' ? 'ops' : undefined }))
   on('store.get', () => ({ value: undefined }))
   on('store.set', () => ({ value: undefined }))
@@ -62,7 +62,14 @@ function world(on: any, copied: string[]) {
   on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
   on('process.run', () => ({ value: { exitCode: 0, stdout: '[]', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('fs.list', (_$: any, e: any) => ({ value: e.path.endsWith('ideas/daily/md') ? [{ name: '2026-10-06-trend.md', kind: 'file', size: 1 }, { name: '2026-10-07-trend.md', kind: 'file', size: 1 }] : [] }))
-  on('fs.read', (_$: any, e: any) => ({ value: e.path.endsWith('2026-10-07-trend.md') ? MD : '' }))
+  on('fs.read', (_$: any, e: any) => {
+    if (files?.has(e.path)) return { value: files.get(e.path) }
+    if (e.path.endsWith('2026-10-07-trend.md')) return { value: MD }
+    if (e.path.endsWith('2026-10-06-trend.md')) return { value: OLD }
+    if (files) throw new Error('ENOENT')
+    return { value: '' }
+  })
+  on('fs.write', (_$: any, e: any) => { files?.set(e.path, e.text); return { value: undefined } })
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.copy', (_$: any, e: any) => { copied.push(e.text); return { value: { isCopied: true } } })
   on('ui.status', () => ({ value: undefined }))
@@ -107,5 +114,55 @@ test('the dash shows the top 5 of the newest trend as buttons; a press shows the
   await ui.press({ key: 'filter' })
   await settle()
   expect((await labels(ui)).filter((l: string) => /^★/.test(l)).length).toBe(3)
+  await ui.unmount()
+})
+
+
+const OLD = MD.replace('2026-10-07', '2026-10-06').replace('モデル藻類の光感知', '前の日の論文')
+const LIST = '/home/u/life/ideas/to-read.md'
+
+test('読みたい appends the paper to ideas/to-read.md once; a paper already there says so', OPTIONS as any, async ($, on) => {
+  const files = new Map<string, string>()
+  world(on, [], files)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PROPS })
+  await settle()
+  const rows = () => ui.findAll({ type: 'Button' }).then((bs: any[]) => bs.filter((b: any) => String(b.key ?? '').startsWith('trend-') && b.key !== 'trend-all'))
+  await ui.press({ key: (await rows())[0].key })
+  await settle()
+  await ui.press({ key: 'want' })
+  await settle()
+  const md = files.get(LIST) ?? ''
+  expect(md.startsWith('# 読みたい')).toBe(true)
+  expect(md).toContain('- ⬜ 2026-10-08 ★★★★ [モデル藻類の光感知](https://example.org/p/1) — Light sensing in a model alga.（PubMed・trend 2026-10-07）')
+  expect(await texts(ui)).toContain('読みたいリスト（ideas/to-read.md）に入れました')
+  await ui.press({ key: 'back' })
+  await settle()
+  await ui.press({ key: (await rows())[0].key })
+  await settle()
+  expect(await texts(ui)).toContain('読みたいリストに入っています')
+  expect(await labels(ui)).not.toContain('読みたい')
+  expect((files.get(LIST) ?? '').split('\n').filter(l => l.startsWith('- ⬜')).length).toBe(1)
+  await ui.unmount()
+})
+
+test('from the full list, p lists past days and a day opens its own list', OPTIONS as any, async ($, on) => {
+  world(on, [], new Map())
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PROPS })
+  await settle()
+  await ui.press({ key: 'trend-all' })
+  await settle()
+  await ui.press({ key: 'past' })
+  await settle()
+  const days = await labels(ui)
+  expect(days.indexOf('2026-10-07')).toBeGreaterThan(-1)
+  expect(days.indexOf('2026-10-07')).toBeLessThan(days.indexOf('2026-10-06'))
+  await ui.press({ key: 'day-2026-10-06-trend.md' })
+  await settle()
+  expect(await texts(ui)).toContain('trend 2026-10-06')
+  expect((await labels(ui)).some((l: string) => l.includes('前の日の論文'))).toBe(true)
   await ui.unmount()
 })
