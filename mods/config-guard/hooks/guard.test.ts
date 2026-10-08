@@ -118,3 +118,44 @@ test('a path from the machine-local setting is protected', { options: { extra_pa
   expect(asked.questions.length).toBe(1)
   expect(r.deny).toBeDefined()
 })
+
+// Answers the guard's read of LIFE_ROLE as this session's environment would.
+function role(on: any, value: string | undefined) {
+  on('env.get', (_$: any, e: any, next: any) => (e.name === 'LIFE_ROLE' ? { value } : next(e)))
+}
+
+const TASKS = '/home/u/life/ideas/task-review/tasks.md'
+
+test('a peer session cannot Edit tasks.md, and is not asked', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Allow once', asked); tools(on, ran); role(on, undefined)
+  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '⬜', new_string: '✅' })
+  expect(r.deny).toBeDefined()
+  expect(asked.questions).toEqual([])
+  expect(ran).toEqual([])
+})
+
+test('the ops session edits tasks.md without a dialog', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran); role(on, 'ops')
+  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '⬜', new_string: '✅' })
+  expect(r.deny).toBeUndefined()
+  expect(asked.questions).toEqual([])
+  expect(ran.length).toBe(1)
+})
+
+test('a peer session cannot append to tasks.md from the shell, even after cd', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Allow once', asked); tools(on, ran); role(on, 'claude-03')
+  const r = await $.tool.call({ tool: 'Bash', command: 'cd ~/life/ideas/task-review && echo "- x" >> tasks.md' })
+  expect(r.deny).toBeDefined()
+  expect(ran).toEqual([])
+})
+
+test('a peer session can still read tasks.md', async ($, on) => {
+  const asked: Asked = { questions: [] }, ran: string[] = []
+  person(on, 'Deny', asked); tools(on, ran); role(on, undefined)
+  const r = await $.tool.call({ tool: 'Bash', command: 'cat ~/life/ideas/task-review/tasks.md' })
+  expect(r.deny).toBeUndefined()
+  expect(ran.length).toBe(1)
+})
