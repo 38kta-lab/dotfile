@@ -60,7 +60,7 @@ If today's brief does not exist:
 
 1. Run `date +%F` and `echo $LIFE_ROLE`. Stop unless it is `ops`.
 2. Read today's brief and `tasks.md`.
-3. **Clear yesterday's done lines.** Delete every `✅` line (their history is in the hub or the research repo's `note/progress.md`). Rename the `## 今日 <old date>` heading to today; move its remaining `⬜` lines there as carry-over.
+3. **Clear yesterday's done lines.** Delete every `✅` line. Nothing is lost: the ops-rules mod logged each one with its time to `ideas/task-review/done/YYYY-MM.md` when it was ticked. Rename the `## 今日 <old date>` heading to today; move its remaining `⬜` lines there as carry-over.
 4. Extract the numbered items under `## 今日やるべきこと` in the brief. One numbered item = one line, even when it has sub-bullets.
 5. **Skip what tasks.md already has.** If an open line already covers the item, keep the existing line (its owner and start date) instead of adding a duplicate.
 6. Add the rest under `## 今日 YYYY-MM-DD`, in brief order, as `- ⬜ [PJ] <subject> — @担当 — <today>（<deadline if the brief gives one>）`.
