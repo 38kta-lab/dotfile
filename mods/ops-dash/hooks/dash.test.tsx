@@ -186,7 +186,11 @@ test('tasks: open first then done, tag column, deadline and owner at the right, 
   expect(all).not.toContain('— @')
   expect(all).not.toContain('**')
   expect(all).not.toContain('@user')
-  expect(all.indexOf('現状確認')).toBeLessThan(all.indexOf('表の整形'))
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const titles = (await ui.findAll({ type: 'Button' })).map((x: any) => String(x.props?.label ?? '')).filter((l: string) => l.trim() && !/^(今日|明日|\d+\/)/.test(l))
+  await ui.unmount()
+  expect(titles.findIndex((l: string) => l.includes('現状確認'))).toBeGreaterThan(-1)
+  expect(titles.findIndex((l: string) => l.includes('現状確認'))).toBeLessThan(titles.findIndex((l: string) => l.includes('表の整形')))
   expect(after.some(x => x.startsWith('Z90'))).toBe(true)
 })
 
@@ -299,4 +303,49 @@ test('pressing an event shows its detail inside the dash, with copy buttons, and
   await dash.unmount()
   expect(after).toContain('─ calendar')
   expect(after).not.toContain('会議室 1')
+})
+
+// ---- tasks: a short title in the list, the whole line in the detail ----
+
+import { parseTask, shortTaskTitle } from './register'
+
+test('shortTaskTitle cuts at the first （ only, unless that leaves too little', () => {
+  expect(shortTaskTitle('学会 A の参加登録（ポスターのみ）')).toBe('学会 A の参加登録')
+  expect(shortTaskTitle('解析 8: 対象遺伝子の位置（原稿の穴）')).toBe('解析 8: 対象遺伝子の位置')
+  expect(shortTaskTitle('表の整形')).toBe('表の整形')
+  expect(shortTaskTitle('a（b）')).toBe('a（b）')
+})
+
+test('parseTask keeps the whole line, the owner as written, the day it was raised and the note', () => {
+  const t = parseTask(false, '[22_R] 資料の整理（14:30–16:30）— @user・@ops — 10/08（10/21）')
+  expect(t.title).toBe('資料の整理')
+  expect(t.full).toBe('資料の整理（14:30–16:30）')
+  expect(t.who).toBe('@user・@ops')
+  expect(t.created).toBe('10/08')
+  expect(t.note).toBe('10/21')
+  expect(t.deadline).toEqual({ month: 10, day: 21 })
+})
+
+test('pressing a task shows its whole line, owner, raised day and deadline; b goes back', OPTIONS as any, async ($, on) => {
+  const md = '## 今日 2026-10-08\n\n- ⬜ [22_R] 資料の整理（14:30–16:30、旧い形と新しい形の両方を残す）— @user・@ops — 10/08（10/21）\n'
+  world(on, OPS, new Map(), false, [], md)
+  await $.session.start(START as any)
+  await settle()
+  const dash: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const target = (await dash.findAll({ type: 'Button' })).find((b: any) => String(b.props?.label ?? '').startsWith('資料の整理'))
+  expect(String(target.props.label)).not.toContain('旧い形')
+  await dash.press({ key: target.key })
+  await settle()
+  const texts = (await dash.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? '')).join('\n')
+  expect(texts).toContain('資料の整理（14:30–16:30、旧い形と新しい形の両方を残す）')
+  expect(texts).toContain('@user・@ops')
+  expect(texts).toContain('10/08')
+  expect(texts).toContain('10/21（あと 13 日）')
+  expect(texts).toContain('今日 2026-10-08')
+  expect(texts).not.toContain('─ tasks')
+  await dash.press({ key: 'back' })
+  await settle()
+  const after = (await dash.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? '')).join('\n')
+  await dash.unmount()
+  expect(after).toContain('─ tasks')
 })
