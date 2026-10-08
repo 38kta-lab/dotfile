@@ -1,5 +1,8 @@
 import type { Register } from 'claude-code'
 
+import { parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
+import type { Hub } from './hubs'
+
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
 // Sessions without a role (cron runs, ad-hoc sessions) write nothing.
@@ -364,6 +367,55 @@ async function fetchCalendar($: any, python: string, repo: string): Promise<void
   }
 }
 
+// ---- hubs pane: read project hubs, a list then one hub by section ----------
+
+const HUBS = 'hubs'
+let hubs: Hub[] = []
+let hubsLoadedAt = 0
+let hubsNote = ''
+let view: { kind: 'list' } | { kind: 'hub'; slug: string; tab: number } = { kind: 'list' }
+let back: { slug: string; tab: number }[] = []
+
+async function loadHubs($: any, repo: string): Promise<void> {
+  if (!repo) {
+    hubsNote = 'hub の場所が未設定（pluginConfigs の life_repo）'
+    return
+  }
+  const dir = `${repo}/projects/active`
+  try {
+    const now = await $.clock.now()
+    const entries = await $.fs.list(dir)
+    const files = entries.filter((f: any) => f.kind === 'file' && f.name.endsWith('.md') && f.name !== 'README.md')
+    const out: Hub[] = []
+    for (const f of files) {
+      out.push(parseHub(f.name.replace(/\.md$/, ''), String(await $.fs.read(`${dir}/${f.name}`)), now))
+    }
+    hubs = sortHubs(out)
+    hubsLoadedAt = now
+    hubsNote = ''
+  } catch (err) {
+    hubsNote = `hub を読めない（${String(err).slice(0, 60)}）`
+  }
+}
+
+function openHub(slug: string, tab = 0): void {
+  if (view.kind === 'hub') back.push({ slug: view.slug, tab: view.tab })
+  view = { kind: 'hub', slug, tab }
+}
+
+function goBack(): void {
+  const prev = back.pop()
+  view = prev ? { kind: 'hub', slug: prev.slug, tab: prev.tab } : { kind: 'list' }
+}
+
+export function hubLine(h: Hub, width: number): string {
+  const age = h.daysSinceUpdate === undefined ? '—' : h.daysSinceUpdate === 0 ? '今日' : `${h.daysSinceUpdate}日前`
+  const ms = h.next ? `★${h.next.date} ${h.next.daysLeft}日` : '—'
+  const next = h.openNext > 0 ? `次${h.openNext}` : ''
+  const head = `${pad(h.slug.split('_').slice(0, 2).join('_').replace(/-.*/, ''), 6)} ${pad(h.status, 8)} ${pad(age, 7)} ${pad(ms, 13)} ${pad(next, 4)} `
+  return clip(head + h.title.replace(/\s*\([^)]*\)\s*$/, ''), width)
+}
+
 // Who this session is, read once per load. Every hook asks, so a skipped
 // session.start (or a reload) never leaves the session silent.
 let self: Me | undefined
@@ -391,6 +443,7 @@ export const register: Register = (on, options) => {
         // an earlier version of this mod left).
         $.ui.status(undefined)
         try {
+          await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
@@ -451,6 +504,77 @@ export const register: Register = (on, options) => {
       }
     }
     return ran
+  })
+
+  on('command.run', { command: 'hubs' }, async $ => {
+    await loadHubs($, repo)
+    view = { kind: 'list' }
+    back = []
+    const opened = await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
+    if (opened.isPlaced) return { text: 'hubs opened.' }
+    return { text: `hubs: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: HUBS }, async ($, e) => {
+    const { Box, Text, Button, Markdown } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 84)
+    const redraw = () => $.ui.invalidate('ui.render')
+    const reload = async () => {
+      await loadHubs($, repo)
+      redraw()
+    }
+
+    if (view.kind === 'list') {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Text bold>{`hubs  ${hubs.length} 件`}</Text>
+            <Button key="reload" label="更新" hotkey="r" plain onPress={reload} />
+          </Box>
+          {hubsNote !== '' && <Text dimColor>{hubsNote}</Text>}
+          <Text dimColor>{clip('slug   status   更新    次の Milestone 次の手順', width)}</Text>
+          {hubs.map(one => (
+            <Button key={`hub-${one.slug}`} label={hubLine(one, width - 2)} plain onPress={() => { openHub(one.slug); redraw() }} />
+          ))}
+        </Box>
+      )
+    }
+
+    const hub = hubs.find(x => x.slug === view.slug)
+    if (!hub) {
+      view = { kind: 'list' }
+      return <Text dimColor>その hub が見つかりません。</Text>
+    }
+    const current = view.tab
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>
+          <Button key="back" label={back.length > 0 ? '← 戻る' : '← 一覧'} hotkey="b" plain onPress={() => { goBack(); redraw() }} />
+          <Text bold>{clip(`${hub.slug}  ${hub.title}`, width - 24)}</Text>
+          <Button key="reload" label="更新" hotkey="r" plain onPress={reload} />
+        </Box>
+        <Text dimColor>{clip(`${hub.status} · 更新 ${hub.updated}${hub.next ? ` · ★${hub.next.date} ${hub.next.label} まで ${hub.next.daysLeft}日` : ''}`, width)}</Text>
+        <Box flexDirection="row" columnGap={2} marginTop={1}>
+          {TABS.map((t, i) => (
+            <Button key={`tab-${t.key}`} label={t.label} hotkey={t.key} plain dimColor={i !== current} onPress={() => { view = { kind: 'hub', slug: hub.slug, tab: i }; redraw() }} />
+          ))}
+        </Box>
+        {hub.related.length > 0 && (
+          <Box flexDirection="row" columnGap={2}>
+            <Text dimColor>関連</Text>
+            {hub.related.map(r => {
+              const target = hubs.find(x => x.slug === r)
+              return target
+                ? <Button key={`rel-${r}`} label={`${r.split('_').slice(0, 2).join('_').replace(/-.*/, '')} ↗`} plain onPress={() => { openHub(r); redraw() }} />
+                : <Text dimColor>{r}</Text>
+            })}
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Markdown key="body" text={sectionMarkdown(hub, current)} />
+        </Box>
+      </Box>
+    )
   })
 
   on('command.run', { command: COMMAND }, async $ => {
