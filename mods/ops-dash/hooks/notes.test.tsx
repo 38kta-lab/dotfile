@@ -69,6 +69,7 @@ function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
     runs.push(e.argv ?? e)
     const argv: string[] = e.argv ?? e
+    if (argv[0] === 'awk') return { value: { exitCode: 0, stdout: argv[2] === '/data/x/_repos/21_Q_sample/note/note.md' ? NOTE : '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (argv[0] === '/bin/sh' || argv[0] === 'find') return { value: { exitCode: 0, stdout: '/data/x/q_sample/KM_Z0002/out/fig1.png\n/data/x/q_sample/KM_Z0002/out/fig2.png\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     if (argv[0] === 'sips') return { value: { exitCode: 0, stdout: 'pixelWidth: 800\n  pixelHeight: 400\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     return { value: { exitCode: 0, stdout: '[]', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -99,12 +100,15 @@ test('notes: project → contents → pictures of a number → one picture, and 
   await $.command.run({ command: 'notes', args: '' } as any)
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'notes', props: PROPS })
 
+  await settle()
   const list = await labels(ui)
   expect(list.some((l: string) => l.startsWith('21_Q'))).toBe(true)
   expect(list.some((l: string) => l.startsWith('22_R'))).toBe(false)
+  expect(runs.some(r => r[0] === 'awk')).toBe(false)
 
   await $.ui.press({ plugin: 'ops-dash', key: 'pj-21_Q_sample' })
   await settle()
+  expect(runs.some(r => r[0] === 'awk')).toBe(true)
   const toc = await labels(ui)
   expect(toc.some((l: string) => l.includes('Z0001') && l.includes('最初の解析'))).toBe(true)
   expect(toc.some((l: string) => l.includes('Z0002') && l.includes('10/05'))).toBe(true)
