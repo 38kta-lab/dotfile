@@ -123,6 +123,36 @@ async function logDone($: any, tasksPath: string, done: readonly string[]): Prom
   await $.fs.write(path, old.replace(/\n*$/, '\n') + lines.join('\n') + '\n')
 }
 
+// ---- replies in Japanese ----------------------------------------------------
+// The person reads in Japanese. A rule in the system prompt asks for it every
+// turn; a turn whose answer still came out in English is followed, once, by an
+// automatic request to say the same thing again in Japanese.
+const JAPANESE: { id: string; text: string; scope: 'session' } = {
+  id: 'ops-rules:japanese',
+  text:
+    'user への返答は、作業の途中の一言も最終報告も、すべて日本語で書く。英語にするのは user が頼んだときだけ。' +
+    'コマンドの出力・コード・ファイル名が英語でも、説明の地の文は日本語で書く。長い作業の後の最終報告ほど英語になりやすいので、書き始める前に言語を確かめる。',
+  scope: 'session',
+}
+const RESTATE =
+  '（ops-rules 自動）直前の返答が英語でした。同じ内容を日本語で言い直してください。作業はやり直さず、ツールも使わないでください。'
+
+// Prose only: code blocks, inline code, URLs and paths say nothing about the
+// language of the reply. English when its words clearly outnumber the
+// Japanese characters; a short reply is never judged.
+export function looksEnglish(answer: string): boolean {
+  const prose = answer
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`\n]*`/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/[\w.~-]*\/[\w.~/-]+/g, ' ')
+  const ja = (prose.match(/[\u3040-\u30ff\u3400-\u9fff]/g) ?? []).length
+  const words = (prose.match(/[A-Za-z]{2,}/g) ?? []).length
+  return words >= 25 && ja < words * 0.5
+}
+
+let restating = false
+
 const ALLOW = 'Allow once'
 const DENY = 'Deny'
 
@@ -149,6 +179,27 @@ export const register: Register = on => {
         'Tell the person what you wanted to measure and wait for their instruction.',
     }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'ops-rules: its check failed, so the call was refused.' }))
+
+  on('prompt.compose', async ($, e, next) => {
+    const r = await next(e)
+    return { ...r, sections: [...r.sections.filter(x => x.id !== JAPANESE.id), JAPANESE] }
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const r = await next(e)
+    if (e.agentId !== undefined || e.reason !== 'answer') return r
+    if (restating) {
+      restating = false
+      return r
+    }
+    if (!looksEnglish(e.answer)) return r
+    restating = true
+    $.ui.toast('直前の返答が英語だったので、日本語で言い直させます')
+    $.prompt.submit({ text: RESTATE }).catch(() => {
+      restating = false
+    })
+    return r
+  })
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
     if (!TASKS_PATH.test(e.file_path)) return next(e)

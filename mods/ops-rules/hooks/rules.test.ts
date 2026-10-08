@@ -244,3 +244,58 @@ test('a second identical line turned ✅ is still logged', async ($, on) => {
   const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
   expect(log.match(/✅ \[21_Q\] 同じ行/g)?.length).toBe(1)
 })
+
+// ---- replies in Japanese ----
+
+import { looksEnglish } from './register'
+
+const EN = 'I fixed the guard. The check now runs on each piece of the command, split on the usual separators, and commit messages are left out because they name files without writing any. All nineteen tests pass, and the two new ones fail on the old code, so they do catch the bug. It takes effect after a reload.'
+const JA = 'guard の誤検知を直しました（dotfile `81cc4a7`、push 済み）。コマンドを `&&` / `;` / `|` で区切り、同じ区切りの中に保護ファイル名と書き込みの両方がある場合だけ確認を出します。テストは 19 件すべて通りました。claude-07 と ops-dash、config-guard、ops-rules の README も確認しました。'
+
+test('looksEnglish: an English report is English; a Japanese one with code and names is not; a short reply is not judged', () => {
+  expect(looksEnglish(EN)).toBe(true)
+  expect(looksEnglish(JA)).toBe(false)
+  expect(looksEnglish('OK, done.')).toBe(false)
+  expect(looksEnglish('結果は次のとおりです。\n```\n' + EN + '\n' + EN + '\n```\n以上です。')).toBe(false)
+})
+
+function submits(on: any) {
+  const sent: string[] = []
+  on('prompt.submit', (_$: any, e: any) => { sent.push(e.text); return { text: e.text } })
+  on('ui.toast', () => ({ value: undefined }))
+  on('turn.complete', () => ({ text: '' }))
+  return sent
+}
+const done = (answer: string, extra: any = {}) => ({ reason: 'answer', answer, durationMs: 1, isAborted: false, turnId: 't', ...extra })
+const settle = () => new Promise(r => setTimeout(r, 10))
+
+test('an English answer is followed by one request to restate it in Japanese; the restatement is not judged again', async ($, on) => {
+  const sent = submits(on)
+  await $.turn.complete(done(EN) as any)
+  await settle()
+  expect(sent.length).toBe(1)
+  expect(sent[0]).toContain('日本語で言い直して')
+  await $.turn.complete(done(EN) as any)
+  await settle()
+  expect(sent.length).toBe(1)
+  await $.turn.complete(done(EN) as any)
+  await settle()
+  expect(sent.length).toBe(2)
+})
+
+test('a Japanese answer, an interrupted turn and a subagent run send nothing', async ($, on) => {
+  const sent = submits(on)
+  await $.turn.complete(done(JA) as any)
+  await $.turn.complete(done(EN, { reason: 'aborted', isAborted: true }) as any)
+  await $.turn.complete(done(EN, { agentId: 'a1' }) as any)
+  await settle()
+  expect(sent).toEqual([])
+})
+
+test('the system prompt carries the Japanese rule once', async ($, on) => {
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'x', scope: 'shared' }] }))
+  const r: any = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] } as any)
+  const ids = r.sections.map((x: any) => x.id)
+  expect(ids).toEqual(['intro', 'ops-rules:japanese'])
+  expect(r.sections[1].text).toContain('日本語')
+})
