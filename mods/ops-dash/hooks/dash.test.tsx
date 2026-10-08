@@ -403,3 +403,31 @@ test('jump buttons: calendar (c), trend (r), tasks (k) come first, and pressing 
   await dash.unmount()
   expect(after).toContain('─ calendar')
 })
+
+const BAND = { hasSurvey: false, isWorking: false, maxRows: 10, columns: 80, scroll: { bodyRows: 10 } } as any
+
+test('the band above the prompt has ops-dash / hubs / notes buttons in the ops session', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const band: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const buttons = (await band.findAll({ type: 'Button' })).map((b: any) => [String(b.props?.label), String(b.props?.hotkey)])
+  await band.unmount()
+  expect(buttons).toEqual([['ops-dash', 'd'], ['hubs', 'h'], ['notes', 'n']])
+})
+
+test('pressing a band button opens that pane with focus', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  const opened: any[] = []
+  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  on('fs.list', () => ({ value: [] }))
+  await $.session.start(START as any)
+  await settle()
+  const before = opened.length
+  const band: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await band.press({ key: 'band-hubs' })
+  await settle()
+  await band.unmount()
+  const mine = opened.slice(before)
+  expect(mine.map(o => [o.id, o.focus])).toEqual([['hubs', true]])
+})

@@ -990,6 +990,28 @@ export const register: Register = (on, options) => {
     )
   })
 
+  // A row above the prompt: open dash / hubs / notes without typing a command
+  // (a typed /dash stays in the chat). The ops session only; a survey wins.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const me = await who($)
+    if (me?.role !== 'ops' || e.props.hasSurvey) return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const go = async (id: string, title: string, columns: number) => {
+      if (id === NOTES) void notesLoad($, repo).then(() => $.ui.invalidate('ui.render'))
+      if (id === HUBS) await loadHubs($, repo)
+      const r = await $.ui.open({ id, title, columns, focus: true })
+      if (!r.isPlaced) $.ui.toast(`${title}: 端末が狭くて開けない（${r.reason ?? ''}）`)
+    }
+    return (
+      <Box flexDirection="row" columnGap={2}>
+        <Text dimColor>pane</Text>
+        <Button key="band-dash" label="ops-dash" hotkey="d" plain onPress={() => go(PANE, 'ops-dash', 58)} />
+        <Button key="band-hubs" label="hubs" hotkey="h" plain onPress={() => go(HUBS, 'hubs', 84)} />
+        <Button key="band-notes" label="notes" hotkey="n" plain onPress={() => go(NOTES, 'notes', 84)} />
+      </Box>
+    )
+  })
+
   on('command.run', { command: 'notes' }, async $ => {
     notesView = { kind: 'list' }
     notesNote = ''
