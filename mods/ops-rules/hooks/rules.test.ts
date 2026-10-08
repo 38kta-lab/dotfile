@@ -199,3 +199,48 @@ test('an edit with nothing turned ✅ logs nothing, and a failed edit logs nothi
   await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] x', new_string: '- ✅ [21_Q] x' })
   expect(fs.size).toBe(0)
 })
+
+// An Edit that really changes the file in `fs`, as the tool does.
+function editFile(on: any, fs: Map<string, string>) {
+  on('tool.call', { tool: 'Edit' }, (_$: any, e: any) => {
+    const text = fs.get(e.file_path) ?? ''
+    if (!text.includes(e.old_string)) return { result: 'old_string not found', isError: true }
+    fs.set(e.file_path, text.replace(e.old_string, e.new_string))
+    return { result: { filePath: e.file_path } }
+  })
+}
+const TASKS_MD = '# tasks\n\n## 今日\n\n- ⬜ [21_Q] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n- ⬜ [事務] 学会 B 総会の委任状 — @user — 10/08（10/09 13:00）\n'
+
+test('an edit of only the start of a line logs the whole line from the file', async ($, on) => {
+  const fs = files(on)
+  fs.set(TASKS, TASKS_MD)
+  editFile(on, fs)
+  const r = await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] 資料の整理', new_string: '- ✅ [21_Q] 資料の整理' })
+  const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
+  expect(log).toContain('- 2026-10-08 12:41 ✅ [21_Q] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n')
+  expect(r.context?.join(' ')).toContain('資料の整理（14:30–16:30）— @user・@ops — 10/08')
+  expect(r.context?.join(' ')).toContain('21_Q*.md')
+})
+
+test('two lines turned ✅ by one edit of their starts are both logged whole', async ($, on) => {
+  const fs = files(on)
+  fs.set(TASKS, TASKS_MD)
+  editFile(on, fs)
+  await $.tool.call({
+    tool: 'Edit', file_path: TASKS,
+    old_string: '- ⬜ [21_Q] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n- ⬜ [事務] 学会 B',
+    new_string: '- ✅ [21_Q] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n- ✅ [事務] 学会 B',
+  })
+  const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
+  expect(log).toContain('✅ [21_Q] 資料の整理（14:30–16:30）— @user・@ops — 10/08\n')
+  expect(log).toContain('✅ [事務] 学会 B 総会の委任状 — @user — 10/08（10/09 13:00）\n')
+})
+
+test('a second identical line turned ✅ is still logged', async ($, on) => {
+  const fs = files(on)
+  fs.set(TASKS, '- ✅ [21_Q] 同じ行\n- ⬜ [21_Q] 同じ行\n')
+  editFile(on, fs)
+  await $.tool.call({ tool: 'Edit', file_path: TASKS, old_string: '- ⬜ [21_Q] 同じ', new_string: '- ✅ [21_Q] 同じ' })
+  const log = fs.get('/home/u/life/ideas/task-review/done/2026-10.md')!
+  expect(log.match(/✅ \[21_Q\] 同じ行/g)?.length).toBe(1)
+})
