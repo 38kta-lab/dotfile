@@ -197,6 +197,8 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     const me = await who($)
+    // No status line: clear any an earlier version of this mod left.
+    if (me?.role === 'ops') $.ui.status(undefined)
     if (me) await write($, me, { busy: true, turnStartedAt: await $.clock.now() })
     return next(e)
   })
