@@ -386,3 +386,20 @@ test('the ops dash marks a session waiting for the person as 確認待ち', OPTI
   expect(all).toContain('確認待ち 3分')
   expect(all).not.toContain('作業中 10分')
 })
+
+// Whether the ring really moves is only seen on a terminal ($.ui.focus has no
+// stand-in here); this holds the buttons, their keys, and that a press is safe.
+test('jump buttons: calendar (c), trend (r), tasks (k) come first, and pressing them does not fail', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, DETAILED, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const dash: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const buttons = (await dash.findAll({ type: 'Button' })).slice(0, 3).map((b: any) => [String(b.props?.label), String(b.props?.hotkey)])
+  expect(buttons).toEqual([['calendar', 'c'], ['trend', 'r'], ['tasks', 'k']])
+  await dash.press({ key: 'jump-c' })
+  await dash.press({ key: 'jump-k' })
+  await settle()
+  const after = (await dash.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? '')).join('\n')
+  await dash.unmount()
+  expect(after).toContain('─ calendar')
+})
