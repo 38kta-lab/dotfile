@@ -1329,8 +1329,28 @@ export const register: Register = (on, options) => {
       }
     } else taskNote = 'タスク未設定（pluginConfigs の life_repo）'
 
+    // Jumps: the first button of each long section (c / r / k; t is the trend list's).
+    const trendTop = trend ? topItems(trend.items, TREND_ROWS) : []
+    const firstTask = tasks.flatMap(sec => [...sec.tasks.filter(t => !t.done), ...sec.tasks.filter(t => t.done)].map(t => `task-${sec.title}-${t.full}`))[0]
+    const jumps: { hotkey: string; label: string; key?: string }[] = [
+      { hotkey: 'c', label: 'calendar', key: next[0] ? `ev-0-${next[0].start}` : undefined },
+      { hotkey: 'r', label: 'trend', key: trendTop[0] ? `trend-${trendTop[0].order}` : undefined },
+      { hotkey: 'k', label: 'tasks', key: firstTask },
+    ]
+    const jump = async (key?: string) => {
+      if (!key) return
+      try {
+        await $.ui.focus({ requestId: PANE, key })
+      } catch {
+        // the ring stays where it was
+      }
+    }
+
     return (
       <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>
+          {jumps.map(j => <Button key={`jump-${j.hotkey}`} label={j.label} hotkey={j.hotkey} plain dimColor={!j.key} onPress={() => jump(j.key)} />)}
+        </Box>
         <Box marginBottom={1}><Text dimColor>{rule('system usage')}</Text></Box>
         {limitLines.length === 0 && <Text dimColor>まだ計測なし</Text>}
         {limitLines.map(l => (
