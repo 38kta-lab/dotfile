@@ -4,6 +4,8 @@ import { consultText, parseHub, sectionMarkdown, sortHubs, TABS } from './hubs'
 import type { Hub } from './hubs'
 import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, tocRows } from './notes'
 import type { TocRow } from './notes'
+import { latestTrendFile, parseTrend, starText, topItems } from './trend'
+import type { Trend, TrendItem } from './trend'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
@@ -464,6 +466,34 @@ let consultNote = ''
 // its own: a pane opened from a press in another pane never gets the keys.
 let detail: CalEvent | undefined
 let taskDetail: { task: Task; section: string } | undefined
+
+// The daily trend under the calendar: the newest ideas/daily/md/*-trend.md,
+// read again every 10 minutes. A fixed 5 rows on the dash; `t` lists all.
+const TREND_ROWS = 5
+let trend: Trend | undefined
+let trendNote = ''
+let trendLoadedAt = 0
+let trendItem: TrendItem | undefined
+let trendList: { minStars: number } | undefined
+
+async function loadTrend($: any, repo: string, now: number): Promise<void> {
+  if (!repo || now - trendLoadedAt < 600000) return
+  trendLoadedAt = now
+  try {
+    const dir = `${repo}/ideas/daily/md`
+    const names = ((await $.fs.list(dir)) as any[]).filter(f => f.kind === 'file').map(f => String(f.name))
+    const file = latestTrendFile(names)
+    if (!file) {
+      trend = undefined
+      trendNote = 'trend の md がまだ無い'
+      return
+    }
+    trend = parseTrend(String(await $.fs.read(`${dir}/${file}`)))
+    trendNote = ''
+  } catch (err) {
+    trendNote = `trend を読めない（${String(err).slice(0, 40)}）`
+  }
+}
 let copied = ''
 const NEXT_EVENTS = 5
 
@@ -944,6 +974,53 @@ export const register: Register = (on, options) => {
     const now = await $.clock.now()
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
+    const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
+    await loadTrend($, repo, now)
+
+    if (trendItem) {
+      const it = trendItem
+      return (
+        <Box flexDirection="column">
+          <Button key="back" label={trendList ? '← trend の一覧' : '← dash'} hotkey="b" plain onPress={() => { trendItem = undefined; copied = ''; $.ui.invalidate('ui.render') }} />
+          <Box marginTop={1}><Text bold wrap="wrap">{it.ja || it.title}</Text></Box>
+          <Text wrap="wrap">{it.title}</Text>
+          <Box flexDirection="row" columnGap={2} marginTop={1}>
+            <Text color="yellow">{starText(it.stars)}</Text>
+            <Text dimColor>{it.source}</Text>
+            {it.category !== '' && <Text dimColor>{it.category}</Text>}
+          </Box>
+          <Text color="cyan" wrap="wrap">{it.url}</Text>
+          <Box flexDirection="row" marginTop={1}>
+            <Button key="copy-url" label="URL をコピー" hotkey="c" onPress={(press: any) => copyText($, 'URL ', it.url, press)} />
+          </Box>
+          {copied !== '' && <Text color="green">{copied}</Text>}
+        </Box>
+      )
+    }
+
+    if (trendList && trend) {
+      const min = trendList.minStars
+      const shown = trend.items.filter(x => x.stars >= min)
+      const sources = [...new Set(shown.map(x => x.source))]
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="back" label="← dash" hotkey="b" plain onPress={() => { trendList = undefined; $.ui.invalidate('ui.render') }} />
+            <Text bold>{`trend ${trend.date}  ${shown.length} / ${trend.items.length} 件`}</Text>
+            <Button key="filter" label={min > 0 ? 'すべて出す' : '★3 以上だけ'} hotkey="s" plain onPress={() => { trendList = { minStars: min > 0 ? 0 : 3 }; $.ui.invalidate('ui.render') }} />
+          </Box>
+          {sources.map(src => (
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>{rule(src)}</Text>
+              {shown.filter(x => x.source === src).map(x => (
+                <Button key={`tr-${x.order}`} label={clip(`${starText(x.stars)} ${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; copied = ''; $.ui.invalidate('ui.render') }} />
+              ))}
+            </Box>
+          ))}
+        </Box>
+      )
+    }
+
     if (taskDetail) {
       const { task: t, section } = taskDetail
       if (hubs.length === 0) await loadHubs($, repo)
@@ -1015,7 +1092,6 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
 
     // plan usage: two short lines
     const limitLines = limitRows(limits, now)
@@ -1108,6 +1184,20 @@ export const register: Register = (on, options) => {
           ))}
           {Array.from({ length: NEXT_EVENTS - Math.max(1, next.length) }, () => <Text> </Text>)}
         </Box>
+
+        <Box marginTop={1} marginBottom={1}><Text dimColor>{rule(trend ? `trend ${trend.date.slice(5).replace('-', '/')}（${trend.items.length} 件・★3 以上 ${trend.items.filter(x => x.stars >= 3).length} 件）` : `trend  ${trendNote}`)}</Text></Box>
+        {(() => {
+          const top = trend ? topItems(trend.items, TREND_ROWS) : []
+          return (
+            <Box flexDirection="column">
+              {top.map(x => (
+                <Button key={`trend-${x.order}`} label={clip(`${pad('★'.repeat(x.stars), 6)}${pad(x.short, 5)}${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; trendList = undefined; copied = ''; $.ui.invalidate('ui.render') }} />
+              ))}
+              {Array.from({ length: TREND_ROWS - top.length }, () => <Text> </Text>)}
+              {trend && <Button key="trend-all" label="全部を見る" hotkey="t" plain onPress={() => { trendList = { minStars: 0 }; trendItem = undefined; $.ui.invalidate('ui.render') }} />}
+            </Box>
+          )
+        })()}
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('tasks')}</Text></Box>
         {taskNote !== '' && <Text dimColor>{taskNote}</Text>}
