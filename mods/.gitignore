@@ -1,0 +1,3 @@
+# Claude Code writes these into a mod folder when it loads the mod
+*/tsconfig.json
+*/.claude-plugin/types/

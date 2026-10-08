@@ -238,21 +238,79 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
 }
 
 // ---- tasks: ideas/task-review/tasks.md ---------------------------------
+// A line is "- ⬜ [PJ] what — @owner — MM/DD（deadline note）". Only lines
+// under a "## " heading count, so the file's own preamble is never a task.
 
-export type TaskLine = { section?: string; done?: boolean; text: string }
+export type Task = { done: boolean; tag: string; title: string; owner: string; deadline?: { month: number; day: number } }
+export type TaskSection = { title: string; tasks: Task[] }
 
-export function parseTasks(md: string): TaskLine[] {
-  const out: TaskLine[] = []
+function plain(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim()
+}
+
+export function parseTask(done: boolean, body: string): Task {
+  let rest = plain(body)
+  let tag = ''
+  const t = rest.match(/^\[([^\]]+)\]\s*/)
+  if (t) {
+    tag = t[1]
+    rest = rest.slice(t[0].length)
+  }
+  // the deadline note is the parenthetical that ends the line, after the parts
+  let deadline: Task['deadline']
+  const tail = rest.match(/（([^（）]*)）$/)
+  // " — " separates the parts; tasks.md also writes "）— " with no space before it
+  const parts = rest.split(/\s?— /)
+  const title = parts[0].trim()
+  let owner = ''
+  for (const part of parts.slice(1)) {
+    const at = part.match(/@([A-Za-z0-9_\-・@]+)/)
+    if (at) {
+      const names = part.match(/@[A-Za-z0-9_\-]+/g) ?? []
+      const others = names.map(n => n.slice(1)).filter(n => n !== 'user')
+      owner = others.map(n => n.replace(/^claude-/, '')).join('・')
+      if (/未依頼/.test(part)) owner += owner ? ' 未依頼' : ''
+    }
+  }
+  if (tail && parts.length > 1) {
+    const d = tail[1].match(/(\d{1,2})\/(\d{1,2})/)
+    if (d) deadline = { month: Number(d[1]), day: Number(d[2]) }
+  }
+  return { done, tag, title, owner, deadline }
+}
+
+export function parseTasks(md: string): TaskSection[] {
+  const out: TaskSection[] = []
   for (const raw of md.split('\n')) {
     const h = raw.match(/^## (.+)$/)
     if (h) {
-      out.push({ section: h[1].trim(), text: h[1].trim() })
+      out.push({ title: h[1].trim(), tasks: [] })
       continue
     }
     const t = raw.match(/^- (⬜|✅) (.+)$/)
-    if (t) out.push({ done: t[1] === '✅', text: t[2].replace(/ — \d{2}\/\d{2}(?=$|（)/, '').trim() })
+    if (t && out.length > 0) out[out.length - 1].tasks.push(parseTask(t[1] === '✅', t[2]))
   }
   return out
+}
+
+// days from today to the deadline (this year, or next year if it is long past)
+export function daysLeft(now: number, d: { month: number; day: number }): number {
+  const today = new Date(dayStart(now))
+  let target = new Date(today.getFullYear(), d.month - 1, d.day)
+  if (target.getTime() < today.getTime() - 180 * 86400000) target = new Date(today.getFullYear() + 1, d.month - 1, d.day)
+  return Math.round((target.getTime() - today.getTime()) / 86400000)
+}
+
+export function tagColor(tag: string): string {
+  if (/^\d\d_[A-Z]/.test(tag)) return 'cyan'
+  if (/^[A-Z]\d\d/.test(tag)) return 'magenta'
+  return 'gray'
+}
+
+export function shortTag(tag: string, width: number): string {
+  const first = tag.split('/')[0]
+  const t = tag.includes('/') ? `${first}+` : first
+  return pad(cells(t) > width ? clip(t, width) : t, width)
 }
 
 export function clip(text: string, width: number): string {
@@ -420,7 +478,7 @@ export const register: Register = (on, options) => {
     const week = weekGrid(calendar, now, dayWidth)
 
     // tasks: grows; the pane scrolls
-    let tasks: TaskLine[] = []
+    let tasks: TaskSection[] = []
     let taskNote = ''
     if (repo) {
       try {
@@ -484,13 +542,36 @@ export const register: Register = (on, options) => {
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('tasks')}</Text></Box>
         {taskNote !== '' && <Text dimColor>{taskNote}</Text>}
-        {tasks.map(t =>
-          t.section !== undefined ? (
-            <Text bold>{t.text}</Text>
-          ) : (
-            <Text dimColor={t.done}>{clip(`${t.done ? '✅' : '⬜'} ${t.text}`, width)}</Text>
-          ),
-        )}
+        {tasks.map(section => {
+          const open = section.tasks.filter(t => !t.done)
+          const done = section.tasks.filter(t => t.done)
+          const head = `残り ${open.length}`
+          return (
+            <Box flexDirection="column" marginBottom={1}>
+              <Box flexDirection="row">
+                <Text bold>{pad(section.title, width - cells(head))}</Text>
+                <Text dimColor>{head}</Text>
+              </Box>
+              {[...open, ...done].map(t => {
+                const left = t.deadline ? daysLeft(now, t.deadline) : undefined
+                const due = t.deadline ? `〆${t.deadline.month}/${t.deadline.day}` : ''
+                const who = t.owner ? `→ ${t.owner}` : ''
+                const meta = [who, due].filter(Boolean).join('  ')
+                const titleWidth = Math.max(8, width - 3 - 6 - (meta ? cells(meta) + 2 : 0))
+                const dueColor = t.done || left === undefined ? undefined : left < 0 ? 'red' : left <= 3 ? 'yellow' : undefined
+                return (
+                  <Box flexDirection="row">
+                    <Text dimColor={t.done}>{t.done ? '✅ ' : '⬜ '}</Text>
+                    <Text color={t.done ? undefined : tagColor(t.tag)} dimColor={t.done}>{shortTag(t.tag, 5) + ' '}</Text>
+                    <Text dimColor={t.done}>{pad(clip(t.title, titleWidth), titleWidth)}</Text>
+                    {who !== '' && <Text dimColor>{'  ' + who}</Text>}
+                    {due !== '' && <Text color={dueColor} dimColor={dueColor === undefined}>{'  ' + due}</Text>}
+                  </Box>
+                )
+              })}
+            </Box>
+          )
+        })}
       </Box>
     )
   })
