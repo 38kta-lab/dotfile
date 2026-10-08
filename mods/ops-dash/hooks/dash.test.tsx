@@ -185,6 +185,8 @@ test('on both surfaces and placements the pane draws', OPTIONS as any, async ($,
   for (const surface of ['terminal', 'desktop'] as const)
     for (const placement of ['dock', 'inline'] as const) {
       const all = (await texts($, placement, surface)).join('\n')
+      expect(all).toContain('─ system usage')
+      expect(all.indexOf('─ system usage')).toBeLessThan(all.indexOf('─ sessions'))
       expect(all).toContain('─ sessions')
       expect(all).toContain('─ calendar')
       expect(all).toContain('─ tasks')
