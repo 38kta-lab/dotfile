@@ -74,6 +74,13 @@ If today's brief does not exist:
    git push
    ```
    Commit even when nothing but the heading changed, so every session reads the same list.
+   Then, if `ideas/to-read.md` has uncommitted changes (the dash appends papers there), look at the diff and commit it separately in the same run (user 2026-10-12):
+   ```bash
+   git add ideas/to-read.md
+   git commit -m "docs: 📚 to-read: dash の「読みたい」で足した分 (YYYY-MM-DD)"
+   git push
+   ```
+   If the diff is anything other than appended `- ⬜` lines, do not commit it; report it instead.
 9. Report (see Reporting).
 
 ## Reporting
@@ -86,7 +93,7 @@ Loaded ideas/task-review/md/morning-2026-10-08.md → tasks.md
     ⬜ [事務] 会議の議題の連絡（15:00 〆）
     ⬜ [Z90] 現状確認＋実作業
   committed 1a2b3c4 and pushed
-  not committed (other changes): ideas/to-read.md
+  committed to-read.md (+1 line) and pushed
 ```
 
 ## During the day
@@ -133,6 +140,6 @@ Mark the line `✅`. Calendar read: `python scripts/google_calendar_read.py --st
 
 ## Safety
 
-Writes only `ideas/task-review/tasks.md`. Commits and pushes only that file (and `done/YYYY-MM.md` when it changed) at the end of the morning run. Other uncommitted files are reported, not committed.
+Writes only `ideas/task-review/tasks.md`. Commits and pushes only that file (and `done/YYYY-MM.md` when it changed) at the end of the morning run, plus `ideas/to-read.md` in its own commit when it only gained appended lines. Other uncommitted files are reported, not committed.
 
 Do not auto-run on session start — it is explicitly user-triggered.
