@@ -461,8 +461,17 @@ async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: 
 const ALERT = 'alert'
 const MAIL_ROWS = 12
 export const MAIL_DAYS = 21
+const MAIL_ERR = /できなかった|取れなかった|渡しません|日時は|ありません/
+const NOTE_MS = 15000
+// What the pane says after an action: a failure stays until the next action;
+// "Done にした" and the like go after 15 s (user 10/12: it stayed on for good).
+export function noteShown(note: string, at: number, now: number, err: RegExp): string {
+  if (!note) return ''
+  return err.test(note) || now - at < NOTE_MS ? note : ''
+}
 let mailFeed: MailFeed | undefined
 let mailNote = ''
+let mailNoteAt = 0
 let mailSeen: Set<string> | undefined
 const mailDone = new Set<string>()
 let mailSel = new Set<string>()
@@ -491,6 +500,7 @@ async function mailOpen($: any, python: string, repo: string, item: MailItem): P
 // ---- Slack in the alert pane (scripts/slack/slack_feed.py, every 5 minutes) ----
 let slackFeed: ReturnType<typeof parseSlack> | undefined
 let slackNote = ''
+let slackNoteAt = 0
 let slackBusy = false
 let slackSel = new Set<string>() // row keys
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
@@ -533,11 +543,11 @@ async function fetchSlack($: any, python: string, repo: string): Promise<void> {
   try {
     const r = await $.process.run([python, `${repo}/scripts/slack/slack_feed.py`], { cwd: repo, timeoutMs: 240000 })
     const feed = parseSlack(String(r.stdout ?? ''))
-    if (feed.error) { slackNote = `Slack を取れなかった（${feed.error.slice(0, 80)}）`; return }
+    if (feed.error) { slackNoteAt = Date.now(); slackNote = `Slack を取れなかった（${feed.error.slice(0, 80)}）`; return }
     slackFeed = feed
-    slackNote = feed.errors.length ? `取れなかった workspace・チャンネルあり: ${feed.errors.length}（${feed.errors[0].slice(0, 50)}）` : ''
+    slackNoteAt = Date.now(); slackNote = feed.errors.length ? `取れなかった workspace・チャンネルあり: ${feed.errors.length}（${feed.errors[0].slice(0, 50)}）` : ''
   } catch (err) {
-    slackNote = `Slack を取れなかった（${String(err).slice(0, 60)}）`
+    slackNoteAt = Date.now(); slackNote = `Slack を取れなかった（${String(err).slice(0, 60)}）`
   } finally {
     slackBusy = false
     $.ui.invalidate('ui.render')
@@ -556,10 +566,10 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
     if (r.exitCode === 0) {
       for (const id of ids) slackDone.add(id)
       slackSel = new Set()
-      slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
-    } else slackNote = `済みにできなかった（exit ${r.exitCode}）`
+      slackNoteAt = Date.now(); slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
+    } else slackNoteAt = Date.now(); slackNote = `済みにできなかった（exit ${r.exitCode}）`
   } catch (err) {
-    slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
+    slackNoteAt = Date.now(); slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -573,7 +583,7 @@ async function fetchMail($: any, python: string, repo: string): Promise<void> {
     const r = await $.process.run([python, `${repo}/scripts/gmail/alert_feed.py`, '--days', String(MAIL_DAYS), '--max', '500'], { cwd: repo, timeoutMs: 180000 })
     const feed = parseFeed(String(r.stdout ?? ''))
     if (feed.error) {
-      mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
+      mailNoteAt = Date.now(); mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
       return
     }
     mailSeen = new Set(feed.items.map(x => x.id))
@@ -583,7 +593,7 @@ async function fetchMail($: any, python: string, repo: string): Promise<void> {
     // A fetch clears only its own earlier failure, not what an action said.
     if (mailNote.startsWith('Gmail を取れなかった')) mailNote = ''
   } catch (err) {
-    mailNote = `Gmail を取れなかった（${String(err).slice(0, 60)}）`
+    mailNoteAt = Date.now(); mailNote = `Gmail を取れなかった（${String(err).slice(0, 60)}）`
   } finally {
     mailBusy = false
     $.ui.invalidate('ui.render')
@@ -597,19 +607,19 @@ function mailSelected(): MailItem[] {
 async function mailMarkDone($: any, python: string, repo: string): Promise<void> {
   const items = mailSelected()
   if (items.length === 0) return
-  mailNote = `Done のラベルを付けています（${items.length} 件）…`
+  mailNoteAt = Date.now(); mailNote = `Done のラベルを付けています（${items.length} 件）…`
   $.ui.invalidate('ui.render')
   try {
     const r = await $.process.run(doneArgv(python, repo, items.map(x => x.id)), { cwd: repo, timeoutMs: 60000 })
     if (r.exitCode === 0) {
       for (const x of items) mailDone.add(x.id)
       mailSel = new Set()
-      mailNote = `Done にした: ${items.length} 件`
+      mailNoteAt = Date.now(); mailNote = `Done にした: ${items.length} 件`
     } else {
-      mailNote = `Done にできなかった（exit ${r.exitCode}: ${String(r.stderr ?? '').trim().slice(-80)}）`
+      mailNoteAt = Date.now(); mailNote = `Done にできなかった（exit ${r.exitCode}: ${String(r.stderr ?? '').trim().slice(-80)}）`
     }
   } catch (err) {
-    mailNote = `Done にできなかった（${String(err).slice(0, 60)}）`
+    mailNoteAt = Date.now(); mailNote = `Done にできなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -617,10 +627,10 @@ async function mailMarkDone($: any, python: string, repo: string): Promise<void>
 async function mailAsk($: any, ask: string): Promise<void> {
   const text = detailPrompt(mailSelected(), ask)
   if (!text) {
-    mailNote = '人事などの区分を含むので、モデルには渡しません'
+    mailNoteAt = Date.now(); mailNote = '人事などの区分を含むので、モデルには渡しません'
   } else {
     const r = await $.prompt.fill({ text })
-    mailNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメールだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
+    mailNoteAt = Date.now(); mailNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメールだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
     if (r.isFilled) mailSel = new Set()
   }
   mailMode = { kind: 'list' }
@@ -630,22 +640,22 @@ async function mailAsk($: any, ask: string): Promise<void> {
 async function mailCalendar($: any, python: string, repo: string, title: string, whenText: string): Promise<void> {
   const when = parseWhen(whenText)
   if ('error' in when) {
-    mailNote = when.error
+    mailNoteAt = Date.now(); mailNote = when.error
     $.ui.invalidate('ui.render')
     return
   }
-  mailNote = 'カレンダーに入れています…'
+  mailNoteAt = Date.now(); mailNote = 'カレンダーに入れています…'
   mailMode = { kind: 'list' }
   $.ui.invalidate('ui.render')
   try {
     const r = await $.process.run(calendarArgv(python, repo, title, when), { cwd: repo, timeoutMs: 60000 })
-    mailNote = r.exitCode === 0 ? `カレンダーに入れた: ${when.start.replace('T', ' ').slice(0, 16)}  ${title}` : `カレンダーに入れられなかった（exit ${r.exitCode}）`
+    mailNoteAt = Date.now(); mailNote = r.exitCode === 0 ? `カレンダーに入れた: ${when.start.replace('T', ' ').slice(0, 16)}  ${title}` : `カレンダーに入れられなかった（exit ${r.exitCode}）`
     if (r.exitCode === 0) {
       mailSel = new Set()
       await fetchCalendar($, python, repo)
     }
   } catch (err) {
-    mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
+    mailNoteAt = Date.now(); mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -1347,7 +1357,7 @@ export const register: Register = (on, options) => {
           <Button key="mail-reload" label={mailBusy ? '取得中…' : '更新'} hotkey="r" plain onPress={() => fetchMail($, python, repo)} />
         </Box>
         <Box marginTop={1}><Text dimColor>{rule(`Gmail  未処理 ${personal.length} 件（未読 ${unread}）・一斉配信 ${bulk.length} 件  取得 ${fetched}`)}</Text></Box>
-        {mailNote !== '' && <Text color={/できなかった|取れなかった|渡しません|日時は|ありません/.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
+        {noteShown(mailNote, mailNoteAt, nowMs, MAIL_ERR) !== '' && <Text color={MAIL_ERR.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
         {!mailFeed && mailNote === '' && <Text dimColor>読み込んでいます…（最初の取得は 15 秒ほど）</Text>}
         {shown.map(x => (
           <Box flexDirection="row" columnGap={1}>
@@ -1395,7 +1405,7 @@ export const register: Register = (on, options) => {
         )}
 
         <Box marginTop={1}><Text dimColor>{rule(`Slack  ${slackFeed ? `${slackCount()} 件（見るチャンネル ${slackFeed.watched}）  取得 ${slackFeed.fetched_at ? hhmm(Date.parse(slackFeed.fetched_at)) : '—'}` : '読み込んでいます…'}`)}</Text></Box>
-        {slackNote !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
+        {noteShown(slackNote, slackNoteAt, nowMs, /できなかった|取れなかった/) !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
         {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
         {(() => {
           // By conversation (user 10/12: raw rows could not be read), in two

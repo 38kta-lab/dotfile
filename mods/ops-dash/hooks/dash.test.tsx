@@ -468,3 +468,13 @@ test('band: counts, then the next event not yet started and the time to it', () 
   expect(bandParts(3, undefined, evs, now)).toEqual(['Gmail 3', 'Slack –', '次 10:00 山田さん 打ち合わせ あと 15時間'])
   expect(bandParts(undefined, 0, [], now)).toEqual(['Gmail –', 'Slack 0', '次の予定なし'])
 })
+
+import { noteShown } from './register'
+
+test('noteShown: a note that went well goes after 15 s; a failure stays', () => {
+  const err = /できなかった/
+  expect(noteShown('Done にした: 1 件', 1000, 1000 + 14000, err)).toBe('Done にした: 1 件')
+  expect(noteShown('Done にした: 1 件', 1000, 1000 + 16000, err)).toBe('')
+  expect(noteShown('Done にできなかった（exit 1）', 1000, 1000 + 600000, err)).toBe('Done にできなかった（exit 1）')
+  expect(noteShown('', 0, 0, err)).toBe('')
+})
