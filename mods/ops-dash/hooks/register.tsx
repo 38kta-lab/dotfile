@@ -494,8 +494,9 @@ let slackNote = ''
 let slackBusy = false
 let slackSel = new Set<string>() // row keys
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
-let slackPage = 0
-const SLACK_CONVS = 6 // conversations per page
+let slackPage = 0 // DMs
+let slackPageCh = 0 // channels
+const SLACK_CONVS = 4 // conversations per page, in each of the two parts (DM / channels)
 // The channel chooser (user 10/12): channels of every workspace, one mark each,
 // pressed to cycle 見る → メンションだけ → 件数だけ → 見ない. Names stay on the terminal.
 let chanView: { page: number; list?: import('./alert').SlackChannel[]; def: string; note: string } | undefined
@@ -1397,34 +1398,48 @@ export const register: Register = (on, options) => {
         {slackNote !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
         {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
         {(() => {
-          // By conversation (user 10/12: raw rows could not be read): the heading
-          // says where and how many (no link: knowing the place is enough); the
-          // newest three messages go under it, each on its own line.
+          // By conversation (user 10/12: raw rows could not be read), in two
+          // parts (user 10/12): DMs and group DMs above, channels below, each
+          // with its own pages. The heading says where and how many; the newest
+          // three messages go under it, each on its own line.
           const convs = slackConversations(slackFeed?.items ?? [], slackDone, nowMs)
-          const pagesS = Math.max(1, Math.ceil(convs.length / SLACK_CONVS))
-          if (slackPage >= pagesS) slackPage = pagesS - 1
-          const shownS = convs.slice(slackPage * SLACK_CONVS, (slackPage + 1) * SLACK_CONVS)
           const selIds = convs.filter(c => slackSel.has(c.key)).flatMap(c => c.ids)
+          const part = (title: string, list: typeof convs, page: number, setPage: (n: number) => void, keyp: string) => {
+            const pages = Math.max(1, Math.ceil(list.length / SLACK_CONVS))
+            const p = Math.min(page, pages - 1)
+            const shown = list.slice(p * SLACK_CONVS, (p + 1) * SLACK_CONVS)
+            const n = list.reduce((k, c) => k + c.ids.length, 0)
+            return (
+              <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="row" columnGap={2}>
+                  <Text bold>{`${title}  ${list.length} 件の会話・${n} 件`}</Text>
+                  {pages > 1 && <Button key={`${keyp}-prev`} label="← 前" plain dimColor={p === 0} onPress={() => { setPage(Math.max(0, p - 1)); redraw() }} />}
+                  {pages > 1 && <Text dimColor>{`${p + 1}/${pages}`}</Text>}
+                  {pages > 1 && <Button key={`${keyp}-next`} label="次 →" plain dimColor={p >= pages - 1} onPress={() => { setPage(Math.min(pages - 1, p + 1)); redraw() }} />}
+                </Box>
+                {list.length === 0 && <Text dimColor>    新しいものは無い</Text>}
+                {shown.map(c => (
+                  <Box key={`slk-${c.key}`} flexDirection="column">
+                    <Box flexDirection="row" columnGap={1}>
+                      <Button key={`slack-sel-${c.key}`} label={slackSel.has(c.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(c.key)) slackSel.delete(c.key); else slackSel.add(c.key); redraw() }} />
+                      <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
+                      <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}${c.mention ? '（メンション）' : ''}`}</Text>
+                    </Box>
+                    {c.msgs.slice(0, SLACK_MSGS).map((m, i) => <Text key={`slkm-${c.key}-${i}`} wrap="truncate">{clip(`    ${m.when} ${m.from}: ${m.head}`, width - 1)}</Text>)}
+                    {c.msgs.length > SLACK_MSGS && <Text dimColor>{`    …ほか ${c.msgs.length - SLACK_MSGS} 件`}</Text>}
+                  </Box>
+                ))}
+              </Box>
+            )
+          }
           return (
             <Box flexDirection="column">
-              {shownS.map(c => (
-                <Box key={`slk-${c.key}`} flexDirection="column">
-                  <Box flexDirection="row" columnGap={1}>
-                    <Button key={`slack-sel-${c.key}`} label={slackSel.has(c.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(c.key)) slackSel.delete(c.key); else slackSel.add(c.key); redraw() }} />
-                    <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
-                    <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}${c.mention ? '（メンション）' : ''}`}</Text>
-                  </Box>
-                  {c.msgs.slice(0, SLACK_MSGS).map((m, i) => <Text key={`slkm-${c.key}-${i}`} wrap="truncate">{clip(`    ${m.when} ${m.from}: ${m.head}`, width - 1)}</Text>)}
-                  {c.msgs.length > SLACK_MSGS && <Text dimColor>{`    …ほか ${c.msgs.length - SLACK_MSGS} 件`}</Text>}
-                </Box>
-              ))}
-              <Box flexDirection="row" columnGap={2}>
+              {part('DM・グループ DM', convs.filter(c => c.isDm), slackPage, n => { slackPage = n }, 'slack-dm')}
+              {part('チャンネル', convs.filter(c => !c.isDm), slackPageCh, n => { slackPageCh = n }, 'slack-ch')}
+              <Box flexDirection="row" columnGap={2} marginTop={1}>
                 {selIds.length > 0 && <Button key="slack-done" label={`済みにする（${selIds.length} 件）`} hotkey="z" onPress={() => slackMarkDone($, python, repo, selIds)} />}
                 <Button key="slack-reload" label={slackBusy ? '取得中…' : 'Slack を更新'} plain onPress={() => fetchSlack($, python, repo)} />
                 <Button key="slack-channels" label="チャンネルを選ぶ" hotkey="w" plain onPress={() => { chanView = { page: 0, def: 'mention', note: '' }; void chanLoad($, python, repo); redraw() }} />
-                {pagesS > 1 && <Button key="slack-prev" label="← 前" plain dimColor={slackPage === 0} onPress={() => { slackPage = Math.max(0, slackPage - 1); redraw() }} />}
-                {pagesS > 1 && <Text dimColor>{`${slackPage + 1}/${pagesS}`}</Text>}
-                {pagesS > 1 && <Button key="slack-next" label="次 →" plain dimColor={slackPage >= pagesS - 1} onPress={() => { slackPage = Math.min(pagesS - 1, slackPage + 1); redraw() }} />}
               </Box>
             </Box>
           )

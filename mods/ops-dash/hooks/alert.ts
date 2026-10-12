@@ -187,6 +187,7 @@ export type SlackConv = {
   latest: string
   countOnly: boolean
   mention: boolean
+  isDm: boolean // a DM or group DM (the pane lists them apart from channels)
   msgs: { when: string; from: string; head: string }[] // newest first
 }
 
@@ -199,7 +200,7 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
     const key = x.id.split(':').slice(0, 2).join(':')
     let c = by.get(key)
     if (!c) {
-      c = { key, workspace: x.label || x.workspace, place: slackPlace(x), ids: [], latest: x.date, countOnly: x.count_only, mention: !!x.mention, msgs: [] }
+      c = { key, workspace: x.label || x.workspace, place: slackPlace(x), ids: [], latest: x.date, countOnly: x.count_only, mention: !!x.mention, isDm: x.kind === 'dm' || x.kind === 'group-dm', msgs: [] }
       by.set(key, c)
     }
     c.ids.push(x.id)
