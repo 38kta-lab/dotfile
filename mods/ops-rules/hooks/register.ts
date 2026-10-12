@@ -169,9 +169,11 @@ export function readsMailBody(command: string): boolean {
 // The model may run it only with --counts (numbers per workspace) or --done
 // (marks, no output of messages); anything else is the pane's (10/12).
 export function readsSlackHeads(command: string): boolean {
-  const m = command.match(/slack_feed(\.py)?\b([^|;&\n]*)/)
+  // Only a run of the script counts (python … slack_feed.py, or the path as the
+  // command): the name in an editor's argument or a heredoc is not a run (10/12).
+  const m = command.match(/(?:\bpython[\w.]*(?:\s+-\S+)*\s+|(?:^|[;&|(]\s*))[^\s'"=]*slack_feed\.py\b([^|;&\n]*)/m)
   if (!m) return false
-  return !/--counts\b|--done\b|--help\b|-h\b/.test(m[2])
+  return !/--counts\b|--done\b|--help\b|-h\b/.test(m[1])
 }
 
 const SLACK_HEADS_DENY =

@@ -329,6 +329,12 @@ test('readsSlackHeads: slack_feed.py with no flag or --days is the pane\'s; --co
   expect(readsSlackHeads('python scripts/slack/slack_feed.py --counts')).toBe(false)
   expect(readsSlackHeads('python scripts/slack/slack_feed.py --done a:b:1')).toBe(false)
   expect(readsSlackHeads('grep -n slack scripts/README.md')).toBe(false)
+  expect(readsSlackHeads('/x/python3 -I scripts/slack/slack_feed.py')).toBe(true)
+  expect(readsSlackHeads('cd s && ./slack_feed.py')).toBe(true)
+  // the name as an argument or in a heredoc is not a run
+  expect(readsSlackHeads("python3 - edit.py <<'E'\np='scripts/slack/slack_feed.py'; s=open(p).read()\nE")).toBe(false)
+  expect(readsSlackHeads('F=slack_feed; python3 - "$F.py" <<E')).toBe(false)
+  expect(readsSlackHeads('git add scripts/slack/slack_feed.py')).toBe(false)
 })
 
 test('a Bash call with slack_feed.py (no --counts) is refused in any session, without asking', async ($, on) => {
