@@ -17,6 +17,7 @@ export type MailItem = {
   unread: boolean
   bulk: boolean
   sensitive?: string
+  unsubscribe?: string // the List-Unsubscribe link (https, else mailto), for the person to open
 }
 
 export type MailFeed = { fetched_at: string; items: MailItem[]; error?: string; fetched_new?: number }
@@ -116,4 +117,24 @@ export function detailPrompt(items: readonly MailItem[], ask: string): string | 
     '',
     `頼むこと: ${ask.trim() || '要点と、私がすべきことを短く'}`,
   ].join('\n')
+}
+
+// Bulk mail by sender, most mail first: the name, how many, the newest date,
+// the ids (to mark them all Done) and the newest unsubscribe link.
+export type Sender = { name: string; count: number; latest: string; ids: string[]; link: string }
+
+export function senders(bulk: readonly MailItem[]): Sender[] {
+  const by = new Map<string, Sender>()
+  for (const x of bulk) {
+    const name = x.from_name || x.from
+    const s = by.get(name) ?? { name, count: 0, latest: '', ids: [], link: '' }
+    s.count += 1
+    s.ids.push(x.id)
+    if (!s.latest || Date.parse(x.date) > Date.parse(s.latest)) {
+      s.latest = x.date
+      if (x.unsubscribe) s.link = x.unsubscribe
+    } else if (!s.link && x.unsubscribe) s.link = x.unsubscribe
+    by.set(name, s)
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count || Date.parse(b.latest) - Date.parse(a.latest))
 }

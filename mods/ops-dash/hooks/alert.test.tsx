@@ -60,7 +60,7 @@ test('detailPrompt: lists the chosen mail and the ask; refuses when any is sensi
 
 // ---- the pane, with a made-up feed ----
 
-const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sensitive: '人事' }), m('3', { bulk: true })] }
+const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sensitive: '人事' }), m('3', { bulk: true, unsubscribe: 'https://list.example/stop' })] }
 
 function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
@@ -227,4 +227,40 @@ test('on a remote surface the body is not drawn', OPTIONS as any, async ($, on) 
   await desk.unmount()
   expect(t).not.toContain('Body line one of 1')
   expect(t).toContain('本文は端末の画面でだけ表示します')
+})
+
+import { senders } from './alert'
+
+test('senders: bulk mail by sender, most first, with the newest link and every id', () => {
+  const b = (id: string, name: string, date: string, link = '') => ({ id, from: `${name} <n@example.org>`, from_name: name, subject: 's', date, labels: [], unread: false, bulk: true, unsubscribe: link })
+  const out = senders([
+    b('1', 'News A', '2026-10-01T09:00:00+09:00', 'https://a.example/old'),
+    b('2', 'News A', '2026-10-05T09:00:00+09:00', 'https://a.example/new'),
+    b('3', 'Shop B', '2026-10-06T09:00:00+09:00'),
+    b('4', 'News A', '2026-10-03T09:00:00+09:00'),
+  ])
+  expect(out.map(x => [x.name, x.count, x.link, x.ids.sort().join(',')])).toEqual([
+    ['News A', 3, 'https://a.example/new', '1,2,4'],
+    ['Shop B', 1, '', '3'],
+  ])
+})
+
+test('配信元ごと: bulk by sender with a 停止 link (opened by the person, nothing sent); 全部 Done labels its ids', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  expect(runs.find(a => String(a[1]).endsWith('alert_feed.py'))).toEqual(['/py', '/repo/scripts/gmail/alert_feed.py', '--days', '21', '--max', '500'])
+  await ui.press({ key: 'mail-senders' })
+  await settle()
+  const links = (await ui.findAll({ type: 'Link' })).map((l: any) => String(l.props?.href))
+  expect(links).toEqual(['https://list.example/stop'])
+  expect(await texts(ui)).toContain('Sender 3')
+  const before = runs.length
+  await ui.press({ key: 'snd-done-Sender 3' })
+  await settle()
+  const done = runs.slice(before).find(a => String(a[1]).endsWith('gmail_label.py'))
+  expect(done).toEqual(['/py', '/repo/scripts/gmail_label.py', '--message-id', '3', '--add-label', '9. Done/Triage'])
+  await ui.unmount()
 })

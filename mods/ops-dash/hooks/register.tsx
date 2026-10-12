@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, senders, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -471,7 +471,7 @@ let mailPage = 0
 let mailMode: { kind: 'list' } | { kind: 'ask' } | { kind: 'cal-title'; item: MailItem } | { kind: 'cal-when'; item: MailItem; title: string } = { kind: 'list' }
 let mailBusy = false
 // One mail opened from the list: its body, fetched when opened, not kept.
-let mailView: { kind: 'list' } | { kind: 'body'; item: MailItem; body?: MailBody; full: boolean } = { kind: 'list' }
+let mailView: { kind: 'list' } | { kind: 'body'; item: MailItem; body?: MailBody; full: boolean } | { kind: 'senders'; page: number } = { kind: 'list' }
 const MAIL_BODY_LINES = 40
 
 async function mailOpen($: any, python: string, repo: string, item: MailItem): Promise<void> {
@@ -1178,7 +1178,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'Pane', requestId: ALERT }, async ($, e) => {
-    const { Box, Text, Button, Input } = $.ui.resolve(e)
+    const { Box, Text, Button, Input, Link } = $.ui.resolve(e)
     const width = Math.max(40, e.props.bodyColumns ?? 84)
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
     const redraw = () => $.ui.invalidate('ui.render')
@@ -1228,6 +1228,43 @@ export const register: Register = (on, options) => {
       )
     }
 
+    if (mailView.kind === 'senders') {
+      // Bulk mail by sender, to stop what is not wanted: the link opens in the
+      // person's browser (nothing is sent from here), then 全部 Done clears them.
+      const v = mailView
+      const all = senders(bulk)
+      const spages = Math.max(1, Math.ceil(all.length / MAIL_ROWS))
+      const page = Math.min(v.page, spages - 1)
+      const rows = all.slice(page * MAIL_ROWS, (page + 1) * MAIL_ROWS)
+      const nameWidth = Math.max(12, width - 30)
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="mail-senders-back" label="← 一覧" hotkey="b" plain onPress={() => { mailView = { kind: 'list' }; redraw() }} />
+            <Text bold>{`一斉配信の配信元 ${all.length}（${bulk.length} 件）`}</Text>
+          </Box>
+          <Text dimColor wrap="wrap">「停止」はブラウザで配信停止のページを開くだけ（ここからは何も送らない）。止めたら「全部 Done」で一覧から消す</Text>
+          {mailNote !== '' && <Text color={/できなかった|取れなかった/.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
+          {rows.map(x => (
+            <Box key={`snd-${x.name}`} flexDirection="row" columnGap={1}>
+              {x.link ? <Link href={x.link} label="停止" /> : <Text dimColor>リンク無し</Text>}
+              <Text>{pad(clip(x.name, nameWidth), nameWidth)}</Text>
+              <Text dimColor>{`${String(x.count).padStart(3)} 件 ${shortDate(x.latest).slice(0, 5)}`}</Text>
+              <Button key={`snd-done-${x.name}`} label="全部 Done" plain onPress={() => { mailSel = new Set(x.ids); void mailMarkDone($, python, repo) }} />
+            </Box>
+          ))}
+          {Array.from({ length: Math.max(0, MAIL_ROWS - rows.length) }, () => <Text> </Text>)}
+          {spages > 1 && (
+            <Box flexDirection="row" columnGap={2}>
+              <Button key="snd-prev" label="← 前" hotkey="p" plain dimColor={page === 0} onPress={() => { mailView = { kind: 'senders', page: Math.max(0, page - 1) }; redraw() }} />
+              <Text dimColor>{`${page + 1}/${spages}`}</Text>
+              <Button key="snd-next" label="次 →" hotkey="n" plain dimColor={page >= spages - 1} onPress={() => { mailView = { kind: 'senders', page: Math.min(spages - 1, page + 1) }; redraw() }} />
+            </Box>
+          )}
+        </Box>
+      )
+    }
+
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={2}>
@@ -1246,6 +1283,7 @@ export const register: Register = (on, options) => {
         {Array.from({ length: Math.max(0, MAIL_ROWS - shown.length) }, () => <Text> </Text>)}
         <Box flexDirection="row" columnGap={2}>
           {bulk.length > 0 && <Button key="mail-bulk" label={`${mailBulkOpen ? '▾' : '▸'} 一斉配信 ${bulk.length} 件`} hotkey="g" plain onPress={() => { mailBulkOpen = !mailBulkOpen; mailPage = 0; redraw() }} />}
+          {bulk.length > 0 && <Button key="mail-senders" label="配信元ごと（停止）" hotkey="u" plain onPress={() => { mailView = { kind: 'senders', page: 0 }; redraw() }} />}
           {pages > 1 && <Button key="mail-prev" label="← 前" hotkey="p" plain dimColor={mailPage === 0} onPress={() => { mailPage = Math.max(0, mailPage - 1); redraw() }} />}
           {pages > 1 && <Text dimColor>{`${mailPage + 1}/${pages}`}</Text>}
           {pages > 1 && <Button key="mail-next" label="次 →" hotkey="n" plain dimColor={mailPage >= pages - 1} onPress={() => { mailPage = Math.min(pages - 1, mailPage + 1); redraw() }} />}
