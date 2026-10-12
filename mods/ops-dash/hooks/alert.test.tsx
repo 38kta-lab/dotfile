@@ -63,7 +63,7 @@ test('detailPrompt: lists the chosen mail and the ask; refuses when any is sensi
 const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sensitive: '人事' }), m('3', { bulk: true, unsubscribe: 'https://list.example/stop' })] }
 
 const SLACK = { fetched_at: '2026-10-08T05:40:00Z', watched: 2, errors: [], items: [
-  { id: 'ws-a:C1:1.0', workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T14:00:00+09:00', count_only: false, from_name: 'Taro', head: 'hello there', url: 'https://app.slack.com/client/T1/C1' },
+  { id: 'ws-a:C1:1.0', workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T14:00:00+09:00', count_only: false, from_name: 'Taro', head: 'hello there', label: 'org-a' },
   { id: 'ws-a:C2:2.0', workspace: 'ws-a', kind: 'private', channel: 'careful', date: '2026-10-08T13:00:00+09:00', count_only: true },
 ] }
 
@@ -303,7 +303,7 @@ test('Slack in the pane: rows (a count-only channel shows only how many); 済み
   expect(tx).toContain('Taro: hello there')
   expect(tx).toContain('#careful')
   expect(tx).toContain('ws-a · 1 件（件数だけ）')
-  expect((await ui.findAll({ type: 'Link' })).map((l: any) => String(l.props?.href))).toContain('https://app.slack.com/client/T1/C1')
+  expect(tx).toContain('org-a · 1 件')
   await ui.press({ key: 'slack-sel-ws-a:C1' })
   await settle()
   await ui.press({ key: 'slack-done' })

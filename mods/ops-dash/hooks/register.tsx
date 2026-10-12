@@ -1375,8 +1375,8 @@ export const register: Register = (on, options) => {
         {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
         {(() => {
           // By conversation (user 10/12: raw rows could not be read): the heading
-          // says where and how many, with a link to open it in Slack; the newest
-          // three messages go under it, each on its own line.
+          // says where and how many (no link: knowing the place is enough); the
+          // newest three messages go under it, each on its own line.
           const convs = slackConversations(slackFeed?.items ?? [], slackDone, nowMs)
           const pagesS = Math.max(1, Math.ceil(convs.length / SLACK_CONVS))
           if (slackPage >= pagesS) slackPage = pagesS - 1
@@ -1388,7 +1388,6 @@ export const register: Register = (on, options) => {
                 <Box key={`slk-${c.key}`} flexDirection="column">
                   <Box flexDirection="row" columnGap={1}>
                     <Button key={`slack-sel-${c.key}`} label={slackSel.has(c.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(c.key)) slackSel.delete(c.key); else slackSel.add(c.key); redraw() }} />
-                    {c.url ? <Link href={c.url} label="開く" /> : <Text dimColor>    </Text>}
                     <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
                     <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}`}</Text>
                   </Box>

@@ -152,7 +152,7 @@ export type SlackItem = {
   count_only: boolean
   from_name?: string
   head?: string
-  url?: string // the conversation in Slack, for the person to open
+  label?: string // the workspace name to show (an org-wide DM may name the org instead)
 }
 export type SlackFeed = { fetched_at: string; items: SlackItem[]; errors: string[]; watched: number; error?: string }
 
@@ -203,7 +203,6 @@ export type SlackConv = {
   key: string // "<workspace>:<channel id>"
   workspace: string
   place: string
-  url?: string
   ids: string[]
   latest: string
   countOnly: boolean
@@ -219,7 +218,7 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
     const key = x.id.split(':').slice(0, 2).join(':')
     let c = by.get(key)
     if (!c) {
-      c = { key, workspace: x.workspace, place: slackPlace(x), url: x.url, ids: [], latest: x.date, countOnly: x.count_only, msgs: [] }
+      c = { key, workspace: x.label || x.workspace, place: slackPlace(x), ids: [], latest: x.date, countOnly: x.count_only, msgs: [] }
       by.set(key, c)
     }
     c.ids.push(x.id)
