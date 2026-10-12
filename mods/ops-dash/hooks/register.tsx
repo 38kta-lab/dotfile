@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, senders, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, senders, parseSlack, slackRows, slackDoneArgv, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -488,6 +488,52 @@ async function mailOpen($: any, python: string, repo: string, item: MailItem): P
 }
 
 // Headers only (scripts/gmail/alert_feed.py); nothing here reaches the model.
+// ---- Slack in the alert pane (scripts/slack/slack_feed.py, every 5 minutes) ----
+let slackFeed: ReturnType<typeof parseSlack> | undefined
+let slackNote = ''
+let slackBusy = false
+let slackSel = new Set<string>() // row keys
+const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
+let slackPage = 0
+const SLACK_ROWS = 10
+
+async function fetchSlack($: any, python: string, repo: string): Promise<void> {
+  if (!python || !repo || slackBusy) return
+  slackBusy = true
+  try {
+    const r = await $.process.run([python, `${repo}/scripts/slack/slack_feed.py`], { cwd: repo, timeoutMs: 240000 })
+    const feed = parseSlack(String(r.stdout ?? ''))
+    if (feed.error) { slackNote = `Slack を取れなかった（${feed.error.slice(0, 80)}）`; return }
+    slackFeed = feed
+    slackNote = feed.errors.length ? `取れなかった workspace・チャンネルあり: ${feed.errors.length}（${feed.errors[0].slice(0, 50)}）` : ''
+  } catch (err) {
+    slackNote = `Slack を取れなかった（${String(err).slice(0, 60)}）`
+  } finally {
+    slackBusy = false
+    $.ui.invalidate('ui.render')
+  }
+}
+
+export function slackCount(): number | undefined {
+  if (!slackFeed) return undefined
+  return slackFeed.items.filter(x => !slackDone.has(x.id)).length
+}
+
+async function slackMarkDone($: any, python: string, repo: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  try {
+    const r = await $.process.run(slackDoneArgv(python, repo, ids), { cwd: repo, timeoutMs: 30000 })
+    if (r.exitCode === 0) {
+      for (const id of ids) slackDone.add(id)
+      slackSel = new Set()
+      slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
+    } else slackNote = `済みにできなかった（exit ${r.exitCode}）`
+  } catch (err) {
+    slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
 async function fetchMail($: any, python: string, repo: string): Promise<void> {
   if (!python || !repo || mailBusy) return
   mailBusy = true
@@ -1006,6 +1052,8 @@ export const register: Register = (on, options) => {
           // No toasts (user 10/12): the band shows the counts and the next event.
           void fetchMail($, python, repo)
           $.clock.every(300000, () => fetchMail($, python, repo))
+          void fetchSlack($, python, repo)
+          $.clock.every(300000, () => fetchSlack($, python, repo))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
           // Open the three panes at start, without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
@@ -1162,7 +1210,7 @@ export const register: Register = (on, options) => {
     // Display only (user 10/12): the panes open with /dash /hubs /notes /alert.
     const now = await $.clock.now()
     const gmail = mailFeed ? splitMail(mailFeed.items, mailDone).personal.filter(x => x.unread).length : undefined
-    const parts = bandParts(gmail, undefined, calendar, now)
+    const parts = bandParts(gmail, slackCount(), calendar, now)
     return (
       <Box flexDirection="row" columnGap={2}>
         {parts.map((t, i) => <Text key={`band-${i}`} dimColor={t.endsWith('–') || t === '次の予定なし'}>{t}</Text>)}
@@ -1320,8 +1368,33 @@ export const register: Register = (on, options) => {
           </Box>
         )}
 
-        <Box marginTop={1}><Text dimColor>{rule('Slack')}</Text></Box>
-        <Text dimColor>準備中（チャンネルの整理と workspace の追加の後に作る）</Text>
+        <Box marginTop={1}><Text dimColor>{rule(`Slack  ${slackFeed ? `${slackCount()} 件（見るチャンネル ${slackFeed.watched}）  取得 ${slackFeed.fetched_at ? hhmm(Date.parse(slackFeed.fetched_at)) : '—'}` : '読み込んでいます…'}`)}</Text></Box>
+        {slackNote !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
+        {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
+        {(() => {
+          const rows = slackRows(slackFeed?.items ?? [], slackDone)
+          const pagesS = Math.max(1, Math.ceil(rows.length / SLACK_ROWS))
+          if (slackPage >= pagesS) slackPage = pagesS - 1
+          const shownS = rows.slice(slackPage * SLACK_ROWS, (slackPage + 1) * SLACK_ROWS)
+          const selIds = rows.filter(r => slackSel.has(r.key)).flatMap(r => r.ids)
+          return (
+            <Box flexDirection="column">
+              {shownS.map(r => (
+                <Box key={`slk-${r.key}`} flexDirection="row" columnGap={1}>
+                  <Button key={`slack-sel-${r.key}`} label={slackSel.has(r.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(r.key)) slackSel.delete(r.key); else slackSel.add(r.key); redraw() }} />
+                  <Text dimColor={r.countOnly} wrap="truncate">{clip(r.text, width - 5)}</Text>
+                </Box>
+              ))}
+              <Box flexDirection="row" columnGap={2}>
+                {selIds.length > 0 && <Button key="slack-done" label={`済みにする（${selIds.length} 件）`} hotkey="z" onPress={() => slackMarkDone($, python, repo, selIds)} />}
+                <Button key="slack-reload" label={slackBusy ? '取得中…' : 'Slack を更新'} plain onPress={() => fetchSlack($, python, repo)} />
+                {pagesS > 1 && <Button key="slack-prev" label="← 前" plain dimColor={slackPage === 0} onPress={() => { slackPage = Math.max(0, slackPage - 1); redraw() }} />}
+                {pagesS > 1 && <Text dimColor>{`${slackPage + 1}/${pagesS}`}</Text>}
+                {pagesS > 1 && <Button key="slack-next" label="次 →" plain dimColor={slackPage >= pagesS - 1} onPress={() => { slackPage = Math.min(pagesS - 1, slackPage + 1); redraw() }} />}
+              </Box>
+            </Box>
+          )
+        })()}
       </Box>
     )
   })

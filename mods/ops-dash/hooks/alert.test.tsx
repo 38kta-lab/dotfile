@@ -62,12 +62,18 @@ test('detailPrompt: lists the chosen mail and the ask; refuses when any is sensi
 
 const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sensitive: '人事' }), m('3', { bulk: true, unsubscribe: 'https://list.example/stop' })] }
 
+const SLACK = { fetched_at: '2026-10-08T05:40:00Z', watched: 2, errors: [], items: [
+  { id: 'ws-a:C1:1.0', workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T14:00:00+09:00', count_only: false, from_name: 'Taro', head: 'hello there' },
+  { id: 'ws-a:C2:2.0', workspace: 'ws-a', kind: 'private', channel: 'careful', date: '2026-10-08T13:00:00+09:00', count_only: true },
+] }
+
 function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
     runs.push(e.argv)
     const isFeed = String(e.argv[1] ?? '').endsWith('alert_feed.py')
+    const isSlack = String(e.argv[1] ?? '').endsWith('slack_feed.py') && e.argv[2] !== '--done'
     const bodyOf = e.argv[2] === '--body' ? e.argv[3] : undefined
-    const out = bodyOf ? JSON.stringify({ id: bodyOf, from: `Sender ${bodyOf}`, date: '2026-10-08T14:32:00+09:00', subject: `Subject ${bodyOf}`, sensitive: bodyOf === '2' ? '人事' : null, body: `Body line one of ${bodyOf}\nBody line two` }) : isFeed ? JSON.stringify(FEED) : '[]'
+    const out = bodyOf ? JSON.stringify({ id: bodyOf, from: `Sender ${bodyOf}`, date: '2026-10-08T14:32:00+09:00', subject: `Subject ${bodyOf}`, sensitive: bodyOf === '2' ? '人事' : null, body: `Body line one of ${bodyOf}\nBody line two` }) : isFeed ? JSON.stringify(FEED) : isSlack ? JSON.stringify(SLACK) : '[]'
     return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('fs.read', () => ({ value: '' }))
@@ -262,5 +268,44 @@ test('配信元ごと: bulk by sender with a 停止 link (opened by the person, 
   await settle()
   const done = runs.slice(before).find(a => String(a[1]).endsWith('gmail_label.py'))
   expect(done).toEqual(['/py', '/repo/scripts/gmail_label.py', '--message-id', '3', '--add-label', '9. Done/Triage'])
+  await ui.unmount()
+})
+
+import { slackRows, parseSlack, slackDoneArgv } from './alert'
+
+test('slackRows: messages newest first; a count-only channel folds into one row with no sender or text; done ones gone', () => {
+  const s = (id: string, x: any) => ({ id, workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T10:00:00+09:00', count_only: false, ...x })
+  const rows = slackRows([
+    s('1', { from_name: 'Taro', head: 'hello', date: '2026-10-08T09:00:00+09:00' }),
+    s('2', { kind: 'dm', channel: '@Hanako', from_name: 'Hanako', head: 'see you', date: '2026-10-08T11:00:00+09:00' }),
+    s('3', { channel: 'careful', count_only: true }),
+    s('4', { channel: 'careful', count_only: true, date: '2026-10-08T08:00:00+09:00' }),
+    s('5', { from_name: 'Jiro', head: 'gone' }),
+  ], new Set(['5']))
+  expect(rows.map(r => r.text)).toEqual([
+    '10/08 11:00 ws-a @Hanako Hanako: see you',
+    '（件数だけ）ws-a #careful 2 件',
+    '10/08 09:00 ws-a #general Taro: hello',
+  ])
+  expect(rows[1].ids).toEqual(['3', '4'])
+  expect(parseSlack('nope').error).toBeDefined()
+  expect(slackDoneArgv('/py', '/repo', ['a', 'b'])).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--done', 'a', 'b'])
+})
+
+test('Slack in the pane: rows (a count-only channel shows only how many); 済み runs slack_feed.py --done for the chosen ids', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  const tx = await texts(ui)
+  expect(tx).toContain('ws-a #general Taro: hello there')
+  expect(tx).toContain('（件数だけ）ws-a #careful 1 件')
+  await ui.press({ key: 'slack-sel-ws-a:C1:1.0' })
+  await settle()
+  await ui.press({ key: 'slack-done' })
+  await settle()
+  expect(runs.find(a => a[2] === '--done')).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--done', 'ws-a:C1:1.0'])
+  expect(await texts(ui)).not.toContain('Taro: hello there')
   await ui.unmount()
 })

@@ -138,3 +138,59 @@ export function senders(bulk: readonly MailItem[]): Sender[] {
   }
   return [...by.values()].sort((a, b) => b.count - a.count || Date.parse(b.latest) - Date.parse(a.latest))
 }
+
+// ---- Slack: what scripts/slack/slack_feed.py prints for the pane ----------
+// A count-only channel (a careful one) has no sender and no text: the pane
+// shows how many, never what.
+
+export type SlackItem = {
+  id: string // "<workspace>:<channel id>:<ts>"
+  workspace: string
+  kind: string // public / private / dm / group-dm
+  channel: string // "#name" is not added: dm names start with "@"
+  date: string
+  count_only: boolean
+  from_name?: string
+  head?: string
+}
+export type SlackFeed = { fetched_at: string; items: SlackItem[]; errors: string[]; watched: number; error?: string }
+
+export function parseSlack(stdout: string): SlackFeed {
+  try {
+    const d = JSON.parse(stdout)
+    return { fetched_at: String(d.fetched_at ?? ''), items: Array.isArray(d.items) ? d.items : [], errors: Array.isArray(d.errors) ? d.errors : [], watched: Number(d.watched ?? 0), error: d.error }
+  } catch {
+    return { fetched_at: '', items: [], errors: [], watched: 0, error: '取得の結果を読めなかった' }
+  }
+}
+
+export function slackPlace(x: SlackItem): string {
+  return x.kind === 'dm' || x.kind === 'group-dm' ? x.channel : `#${x.channel}`
+}
+
+// The rows: messages one by one; a count-only channel folded into one row
+// "（件数だけ）ws #channel n 件" with all its ids.
+export type SlackRow = { key: string; ids: string[]; text: string; date: string; countOnly: boolean }
+
+export function slackRows(items: readonly SlackItem[], done: ReadonlySet<string>): SlackRow[] {
+  const live = items.filter(x => !done.has(x.id)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+  const rows: SlackRow[] = []
+  const folded = new Map<string, SlackRow>()
+  for (const x of live) {
+    if (x.count_only) {
+      const k = `${x.workspace}:${x.channel}`
+      const r = folded.get(k)
+      if (r) { r.ids.push(x.id); r.text = `（件数だけ）${x.workspace} ${slackPlace(x)} ${r.ids.length} 件`; continue }
+      const row = { key: `cnt-${k}`, ids: [x.id], text: `（件数だけ）${x.workspace} ${slackPlace(x)} 1 件`, date: x.date, countOnly: true }
+      folded.set(k, row)
+      rows.push(row)
+      continue
+    }
+    rows.push({ key: x.id, ids: [x.id], text: `${shortDate(x.date)} ${x.workspace} ${slackPlace(x)} ${x.from_name ?? ''}: ${x.head ?? ''}`, date: x.date, countOnly: false })
+  }
+  return rows
+}
+
+export function slackDoneArgv(python: string, repo: string, ids: readonly string[]): string[] {
+  return [python, `${repo}/scripts/slack/slack_feed.py`, '--done', ...ids]
+}

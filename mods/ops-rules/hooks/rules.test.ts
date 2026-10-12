@@ -320,3 +320,22 @@ test('a Bash call with alert_feed.py --body is refused in any session, without a
   expect(seen.ran).toEqual([])
   expect(seen.asked).toEqual([])
 })
+
+import { readsSlackHeads } from './register'
+
+test('readsSlackHeads: slack_feed.py with no flag or --days is the pane\'s; --counts / --done are fine', () => {
+  expect(readsSlackHeads('python scripts/slack/slack_feed.py')).toBe(true)
+  expect(readsSlackHeads('cd ~/life && /x/python3 scripts/slack/slack_feed.py --days 3 | head')).toBe(true)
+  expect(readsSlackHeads('python scripts/slack/slack_feed.py --counts')).toBe(false)
+  expect(readsSlackHeads('python scripts/slack/slack_feed.py --done a:b:1')).toBe(false)
+  expect(readsSlackHeads('grep -n slack scripts/README.md')).toBe(false)
+})
+
+test('a Bash call with slack_feed.py (no --counts) is refused in any session, without asking', async ($, on) => {
+  const seen: Seen = { asked: [], ran: [] }
+  setup(on, 'peer', 'Allow once', seen)
+  const r = await $.tool.call({ tool: 'Bash', command: 'python scripts/slack/slack_feed.py' })
+  expect(r.deny).toContain('alert pane only')
+  expect(seen.ran).toEqual([])
+  expect(seen.asked).toEqual([])
+})
