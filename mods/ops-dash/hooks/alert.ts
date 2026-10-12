@@ -152,6 +152,7 @@ export type SlackItem = {
   count_only: boolean
   from_name?: string
   head?: string
+  url?: string // the conversation in Slack, for the person to open
 }
 export type SlackFeed = { fetched_at: string; items: SlackItem[]; errors: string[]; watched: number; error?: string }
 
@@ -193,4 +194,36 @@ export function slackRows(items: readonly SlackItem[], done: ReadonlySet<string>
 
 export function slackDoneArgv(python: string, repo: string, ids: readonly string[]): string[] {
   return [python, `${repo}/scripts/slack/slack_feed.py`, '--done', ...ids]
+}
+
+// Slack grouped by conversation, the latest conversation first: one heading
+// (where, how many, when) and its newest messages under it. A count-only
+// channel keeps only its heading.
+export type SlackConv = {
+  key: string // "<workspace>:<channel id>"
+  workspace: string
+  place: string
+  url?: string
+  ids: string[]
+  latest: string
+  countOnly: boolean
+  msgs: { when: string; from: string; head: string }[] // newest first
+}
+
+export function slackConversations(items: readonly SlackItem[], done: ReadonlySet<string>, now: number): SlackConv[] {
+  const today = new Date(now).toDateString()
+  const when = (iso: string) => (new Date(Date.parse(iso)).toDateString() === today ? shortDate(iso).slice(-5) : shortDate(iso))
+  const by = new Map<string, SlackConv>()
+  const live = items.filter(x => !done.has(x.id)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+  for (const x of live) {
+    const key = x.id.split(':').slice(0, 2).join(':')
+    let c = by.get(key)
+    if (!c) {
+      c = { key, workspace: x.workspace, place: slackPlace(x), url: x.url, ids: [], latest: x.date, countOnly: x.count_only, msgs: [] }
+      by.set(key, c)
+    }
+    c.ids.push(x.id)
+    if (!x.count_only) c.msgs.push({ when: when(x.date), from: x.from_name ?? '', head: x.head ?? '' })
+  }
+  return [...by.values()]
 }

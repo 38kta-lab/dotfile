@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, senders, parseSlack, slackRows, slackDoneArgv, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, senders, parseSlack, slackConversations, slackDoneArgv, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -495,7 +495,8 @@ let slackBusy = false
 let slackSel = new Set<string>() // row keys
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
 let slackPage = 0
-const SLACK_ROWS = 10
+const SLACK_CONVS = 6 // conversations per page
+const SLACK_MSGS = 3 // newest messages under each
 
 async function fetchSlack($: any, python: string, repo: string): Promise<void> {
   if (!python || !repo || slackBusy) return
@@ -1227,6 +1228,7 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: ALERT }, async ($, e) => {
     const { Box, Text, Button, Input, Link } = $.ui.resolve(e)
+    const nowMs = await $.clock.now()
     const width = Math.max(40, e.props.bodyColumns ?? 84)
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
     const redraw = () => $.ui.invalidate('ui.render')
@@ -1372,17 +1374,26 @@ export const register: Register = (on, options) => {
         {slackNote !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
         {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
         {(() => {
-          const rows = slackRows(slackFeed?.items ?? [], slackDone)
-          const pagesS = Math.max(1, Math.ceil(rows.length / SLACK_ROWS))
+          // By conversation (user 10/12: raw rows could not be read): the heading
+          // says where and how many, with a link to open it in Slack; the newest
+          // three messages go under it, each on its own line.
+          const convs = slackConversations(slackFeed?.items ?? [], slackDone, nowMs)
+          const pagesS = Math.max(1, Math.ceil(convs.length / SLACK_CONVS))
           if (slackPage >= pagesS) slackPage = pagesS - 1
-          const shownS = rows.slice(slackPage * SLACK_ROWS, (slackPage + 1) * SLACK_ROWS)
-          const selIds = rows.filter(r => slackSel.has(r.key)).flatMap(r => r.ids)
+          const shownS = convs.slice(slackPage * SLACK_CONVS, (slackPage + 1) * SLACK_CONVS)
+          const selIds = convs.filter(c => slackSel.has(c.key)).flatMap(c => c.ids)
           return (
             <Box flexDirection="column">
-              {shownS.map(r => (
-                <Box key={`slk-${r.key}`} flexDirection="row" columnGap={1}>
-                  <Button key={`slack-sel-${r.key}`} label={slackSel.has(r.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(r.key)) slackSel.delete(r.key); else slackSel.add(r.key); redraw() }} />
-                  <Text dimColor={r.countOnly} wrap="truncate">{clip(r.text, width - 5)}</Text>
+              {shownS.map(c => (
+                <Box key={`slk-${c.key}`} flexDirection="column">
+                  <Box flexDirection="row" columnGap={1}>
+                    <Button key={`slack-sel-${c.key}`} label={slackSel.has(c.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(c.key)) slackSel.delete(c.key); else slackSel.add(c.key); redraw() }} />
+                    {c.url ? <Link href={c.url} label="開く" /> : <Text dimColor>    </Text>}
+                    <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
+                    <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}`}</Text>
+                  </Box>
+                  {c.msgs.slice(0, SLACK_MSGS).map((m, i) => <Text key={`slkm-${c.key}-${i}`} wrap="truncate">{clip(`    ${m.when} ${m.from}: ${m.head}`, width - 1)}</Text>)}
+                  {c.msgs.length > SLACK_MSGS && <Text dimColor>{`    …ほか ${c.msgs.length - SLACK_MSGS} 件`}</Text>}
                 </Box>
               ))}
               <Box flexDirection="row" columnGap={2}>

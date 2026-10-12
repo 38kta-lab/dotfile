@@ -63,7 +63,7 @@ test('detailPrompt: lists the chosen mail and the ask; refuses when any is sensi
 const FEED = { fetched_at: '2026-10-08T05:40:00Z', items: [m('1'), m('2', { sensitive: '人事' }), m('3', { bulk: true, unsubscribe: 'https://list.example/stop' })] }
 
 const SLACK = { fetched_at: '2026-10-08T05:40:00Z', watched: 2, errors: [], items: [
-  { id: 'ws-a:C1:1.0', workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T14:00:00+09:00', count_only: false, from_name: 'Taro', head: 'hello there' },
+  { id: 'ws-a:C1:1.0', workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T14:00:00+09:00', count_only: false, from_name: 'Taro', head: 'hello there', url: 'https://app.slack.com/client/T1/C1' },
   { id: 'ws-a:C2:2.0', workspace: 'ws-a', kind: 'private', channel: 'careful', date: '2026-10-08T13:00:00+09:00', count_only: true },
 ] }
 
@@ -299,13 +299,32 @@ test('Slack in the pane: rows (a count-only channel shows only how many); 済み
   await settle()
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
   const tx = await texts(ui)
-  expect(tx).toContain('ws-a #general Taro: hello there')
-  expect(tx).toContain('（件数だけ）ws-a #careful 1 件')
-  await ui.press({ key: 'slack-sel-ws-a:C1:1.0' })
+  expect(tx).toContain('#general')
+  expect(tx).toContain('Taro: hello there')
+  expect(tx).toContain('#careful')
+  expect(tx).toContain('ws-a · 1 件（件数だけ）')
+  expect((await ui.findAll({ type: 'Link' })).map((l: any) => String(l.props?.href))).toContain('https://app.slack.com/client/T1/C1')
+  await ui.press({ key: 'slack-sel-ws-a:C1' })
   await settle()
   await ui.press({ key: 'slack-done' })
   await settle()
   expect(runs.find(a => a[2] === '--done')).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--done', 'ws-a:C1:1.0'])
   expect(await texts(ui)).not.toContain('Taro: hello there')
   await ui.unmount()
+})
+
+import { slackConversations } from './alert'
+
+test('slackConversations: by conversation, latest first; newest messages first under it; count-only keeps no messages', () => {
+  const now = Date.parse('2026-10-08T20:00:00+09:00')
+  const s = (id: string, x: any) => ({ id, workspace: 'ws-a', kind: 'group-dm', channel: '@Taro・Hanako', date: '2026-10-08T10:00:00+09:00', count_only: false, ...x })
+  const c = slackConversations([
+    s('ws-a:G1:1', { from_name: 'Taro', head: 'one', date: '2026-10-07T09:00:00+09:00' }),
+    s('ws-a:G1:2', { from_name: 'Hanako', head: 'two', date: '2026-10-08T11:00:00+09:00' }),
+    s('ws-a:C9:3', { kind: 'private', channel: 'careful', count_only: true, date: '2026-10-08T12:00:00+09:00' }),
+    s('ws-a:G1:4', { from_name: 'Taro', head: 'gone' }),
+  ], new Set(['ws-a:G1:4']), now)
+  expect(c.map(x => [x.place, x.ids.length, x.countOnly])).toEqual([['#careful', 1, true], ['@Taro・Hanako', 2, false]])
+  expect(c[1].msgs).toEqual([{ when: '11:00', from: 'Hanako', head: 'two' }, { when: '10/07 09:00', from: 'Taro', head: 'one' }])
+  expect(c[0].msgs).toEqual([])
 })
