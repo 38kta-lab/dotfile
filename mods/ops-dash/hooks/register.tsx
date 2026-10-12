@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -490,6 +490,11 @@ async function mailOpen($: any, python: string, repo: string, item: MailItem): P
     const r = await $.process.run(bodyArgv(python, repo, item.id), { cwd: repo, timeoutMs: 60000 })
     const body = parseBody(String(r.stdout ?? ''), item.id)
     if (mailView.kind === 'body' && mailView.item.id === item.id) mailView = { ...mailView, body }
+    // The body came, so it was seen: mark it read in Gmail (a failure only leaves it unread).
+    if (!body.error && item.unread) {
+      const m = await $.process.run(readArgv(python, repo, item.id), { cwd: repo, timeoutMs: 60000 })
+      if (m.exitCode === 0) item.unread = false
+    }
   } catch (err) {
     if (mailView.kind === 'body' && mailView.item.id === item.id) mailView = { ...mailView, body: { id: item.id, error: String(err).slice(0, 80) } }
   }

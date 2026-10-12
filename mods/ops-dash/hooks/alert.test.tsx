@@ -322,3 +322,15 @@ test('チャンネルを選ぶ: every channel with its mark; pressing a mark cyc
   await settle()
   await ui.unmount()
 })
+
+test('opening an unread mail marks it read in Gmail (gmail_label.py --remove-label UNREAD) once the body has come', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await ui.press({ key: 'mail-1' })
+  await settle()
+  expect(runs.find(a => a.includes('--remove-label'))).toEqual(['/py', '/repo/scripts/gmail_label.py', '--message-id', '1', '--remove-label', 'UNREAD'])
+  await ui.unmount()
+})
