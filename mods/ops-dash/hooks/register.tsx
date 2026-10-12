@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, newIds, parseBody, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -184,8 +184,15 @@ export function isAllDay(ev: CalEvent): boolean {
   return !ev.start.includes('T')
 }
 
-// "[22_R] note と hub の整理 [status:focus]" → "22_R"; untagged → the title's start
+// "[22_R] note と hub の整理 [status:focus]" → "22_R"; untagged → the title's start.
+// A meeting names the person, not the project: "[21_Q][22_R] 【MTG】山田さん 打ち合わせ"
+// → "山田さん 打ち合わせ" (a tag alone read as the meeting before it, 10/12).
 export function shortTitle(title: string): string {
+  const mtg = title.match(/【MTG】\s*(.+)$/)
+  if (mtg) {
+    const name = mtg[1].replace(/\[[^\]]*\]/g, '').replace(/【[^】]*】/g, '').trim()
+    if (name) return name
+  }
   const tag = title.match(/^\[([^\]]+)\]/)
   if (tag && !tag[1].startsWith('status:')) return tag[1]
   return title.replace(/\[status:[^\]]+\]/g, '').replace(/【[^】]*】/g, '').trim()
@@ -292,6 +299,33 @@ export function upcoming(events: CalEvent[], now: number, n: number): CalEvent[]
     .filter(e => !isAllDay(e) && Date.parse(e.end) > now)
     .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
   return [...allDay, ...timed].slice(0, n)
+}
+
+// The next timed event that has not started yet (all-day ones are not "next").
+export function nextEvent(events: CalEvent[], now: number): CalEvent | undefined {
+  return events
+    .filter(e => !isAllDay(e) && Date.parse(e.start) > now)
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0]
+}
+
+// "あと 45分" / "あと 2時間5分" / "あと 1日3時間"
+export function untilLabel(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60000))
+  if (m < 60) return `あと ${m}分`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `あと ${h}時間${m % 60 ? `${m % 60}分` : ''}`
+  return `あと ${Math.floor(h / 24)}日${h % 24 ? `${h % 24}時間` : ''}`
+}
+
+// The band above the prompt: counts and the time to the next event. Counts
+// only (no sender, no subject), so it says nothing more than a toast would.
+export function bandParts(gmail: number | undefined, slack: number | undefined, events: CalEvent[], now: number, titleWidth = 20): string[] {
+  const ev = nextEvent(events, now)
+  return [
+    `Gmail ${gmail ?? '–'}`,
+    `Slack ${slack ?? '–'}`,
+    ev ? `次 ${hhmm(Date.parse(ev.start))} ${clip(shortTitle(ev.title), titleWidth)} ${untilLabel(Date.parse(ev.start) - now)}` : '次の予定なし',
+  ]
 }
 
 // "今日 14:30–16:30" / "明日 10:00–12:00" / "10/14(水) 終日"
@@ -453,9 +487,7 @@ async function mailOpen($: any, python: string, repo: string, item: MailItem): P
 }
 
 // Headers only (scripts/gmail/alert_feed.py); nothing here reaches the model.
-// `toast`: say "Gmail 新着 n 件" for ids not seen at the last look (never on
-// the first look of the session).
-async function fetchMail($: any, python: string, repo: string, toast: boolean): Promise<void> {
+async function fetchMail($: any, python: string, repo: string): Promise<void> {
   if (!python || !repo || mailBusy) return
   mailBusy = true
   try {
@@ -465,8 +497,6 @@ async function fetchMail($: any, python: string, repo: string, toast: boolean): 
       mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
       return
     }
-    const fresh = newIds(mailSeen, feed.items)
-    if (toast && fresh.length > 0) $.ui.toast(`Gmail 新着 ${fresh.length} 件`, { timeoutMs: 10000 })
     mailSeen = new Set(feed.items.map(x => x.id))
     mailFeed = feed
     for (const id of [...mailSel]) if (!mailSeen.has(id)) mailSel.delete(id)
@@ -539,60 +569,6 @@ async function mailCalendar($: any, python: string, repo: string, title: string,
     mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
-}
-
-// ---- toasts for the ops session: a peer finished or is waiting, an event soon ----
-
-export type Snap = { busy: boolean; waiting?: string; turnStartedAt?: number }
-
-// What changed since the last look, as lines to toast, and the new snapshot.
-// A name not seen before is only remembered: nothing is said on the first look.
-export function peerNotices(prev: Map<string, Snap> | undefined, records: SessionRecord[], now: number): { lines: string[]; snap: Map<string, Snap> } {
-  const snap = new Map<string, Snap>()
-  const lines: string[] = []
-  for (const r of records) {
-    if (!r || r.role === 'ops') continue
-    snap.set(r.name, { busy: r.busy, waiting: r.waiting, turnStartedAt: r.turnStartedAt })
-    const old = prev?.get(r.name)
-    if (!old) continue
-    if (!old.waiting && r.waiting) lines.push(`${r.name} が確認待ち: ${r.waiting.slice(0, 60)}`)
-    else if (old.busy && !r.busy && !r.waiting) lines.push(`${r.name} が終わりました${old.turnStartedAt ? `（作業 ${elapsed(now, old.turnStartedAt)}）` : ''}`)
-  }
-  return { lines, snap }
-}
-
-export const SOON_MS = 10 * 60000
-
-// Timed events starting within the next 10 minutes, each told once.
-export function eventNotices(events: CalEvent[], now: number, told: Set<string>): string[] {
-  const out: string[] = []
-  for (const ev of events) {
-    if (isAllDay(ev)) continue
-    const start = Date.parse(ev.start)
-    if (!(start > now && start - now <= SOON_MS)) continue
-    const id = `${ev.start}|${ev.title}`
-    if (told.has(id)) continue
-    told.add(id)
-    const mins = Math.max(1, Math.round((start - now) / 60000))
-    const title = ev.title.replace(/\[status:[^\]]+\]/g, '').trim()
-    out.push(`${hhmm(start)} ${title}（あと ${mins} 分）${ev.meetingUrl ? '  会議 URL あり（dash の予定から）' : ''}`)
-  }
-  return out
-}
-
-let noticeSnap: Map<string, Snap> | undefined
-const toldEvents = new Set<string>()
-
-async function checkNotices($: any): Promise<void> {
-  try {
-    const now = await $.clock.now()
-    const { records } = await readAll($)
-    const { lines, snap } = peerNotices(noticeSnap, records, now)
-    noticeSnap = snap
-    for (const l of [...lines, ...eventNotices(calendar, now, toldEvents)]) $.ui.toast(l, { timeoutMs: 10000 })
-  } catch {
-    // a missed look is caught by the next one
-  }
 }
 
 // The ops session's calendar, fetched every 10 minutes.
@@ -1024,10 +1000,9 @@ export const register: Register = (on, options) => {
           await $.command.register({ name: 'alert', description: 'Open the alerts: new Gmail (headers only) to mark Done, ask about, or put on the calendar; Slack later' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
-          void checkNotices($)
-          $.clock.every(30000, () => checkNotices($))
-          void fetchMail($, python, repo, false)
-          $.clock.every(300000, () => fetchMail($, python, repo, true))
+          // No toasts (user 10/12): the band shows the counts and the next event.
+          void fetchMail($, python, repo)
+          $.clock.every(300000, () => fetchMail($, python, repo))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
           // Open the three panes at start, without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
@@ -1180,26 +1155,20 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const me = await who($)
     if (me?.role !== 'ops' || e.props.hasSurvey) return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const go = async (id: string, title: string, columns: number) => {
-      if (id === NOTES) void notesLoad($, repo).then(() => $.ui.invalidate('ui.render'))
-      if (id === HUBS) await loadHubs($, repo)
-      const r = await $.ui.open({ id, title, columns, focus: true })
-      if (!r.isPlaced) $.ui.toast(`${title}: 端末が狭くて開けない（${r.reason ?? ''}）`)
-    }
+    const { Box, Text } = $.ui.resolve(e)
+    // Display only (user 10/12): the panes open with /dash /hubs /notes /alert.
+    const now = await $.clock.now()
+    const gmail = mailFeed ? splitMail(mailFeed.items, mailDone).personal.filter(x => x.unread).length : undefined
+    const parts = bandParts(gmail, undefined, calendar, now)
     return (
       <Box flexDirection="row" columnGap={2}>
-        <Text dimColor>pane</Text>
-        <Button key="band-dash" label="ops-dash" hotkey="d" plain onPress={() => go(PANE, 'ops-dash', 58)} />
-        <Button key="band-hubs" label="hubs" hotkey="h" plain onPress={() => go(HUBS, 'hubs', 84)} />
-        <Button key="band-notes" label="notes" hotkey="n" plain onPress={() => go(NOTES, 'notes', 84)} />
-        <Button key="band-alert" label={`alert${mailFeed ? ` ${splitMail(mailFeed.items, mailDone).personal.filter(x => x.unread).length}` : ''}`} hotkey="a" plain onPress={() => go(ALERT, 'alert', 84)} />
+        {parts.map((t, i) => <Text key={`band-${i}`} dimColor={t.endsWith('–') || t === '次の予定なし'}>{t}</Text>)}
       </Box>
     )
   })
 
   on('command.run', { command: 'alert' }, async $ => {
-    void fetchMail($, python, repo, false)
+    void fetchMail($, python, repo)
     const opened = await $.ui.open({ id: ALERT, title: 'alert', columns: 84, focus: true })
     if (opened.isPlaced) return { text: 'alert opened.' }
     return { text: `alert: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
@@ -1260,7 +1229,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={2}>
           <Text bold>alert</Text>
-          <Button key="mail-reload" label={mailBusy ? '取得中…' : '更新'} hotkey="r" plain onPress={() => fetchMail($, python, repo, false)} />
+          <Button key="mail-reload" label={mailBusy ? '取得中…' : '更新'} hotkey="r" plain onPress={() => fetchMail($, python, repo)} />
         </Box>
         <Box marginTop={1}><Text dimColor>{rule(`Gmail  未処理 ${personal.length} 件（未読 ${unread}）・一斉配信 ${bulk.length} 件  取得 ${fetched}`)}</Text></Box>
         {mailNote !== '' && <Text color={/できなかった|取れなかった|渡しません|日時は|ありません/.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}

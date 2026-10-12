@@ -406,65 +406,17 @@ test('jump buttons: calendar (c), trend (r), tasks (k) come first, and pressing 
 
 const BAND = { hasSurvey: false, isWorking: false, maxRows: 10, columns: 80, scroll: { bodyRows: 10 } } as any
 
-test('the band above the prompt has ops-dash / hubs / notes buttons in the ops session', OPTIONS as any, async ($, on) => {
+test('the band above the prompt shows counts and the next event, with no buttons (ops only)', OPTIONS as any, async ($, on) => {
   world(on, OPS, new Map(), false, [], TASKS_MD)
   await $.session.start(START as any)
   await settle()
   const band: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'AbovePrompt', props: BAND })
-  const buttons = (await band.findAll({ type: 'Button' })).map((b: any) => [String(b.props?.label), String(b.props?.hotkey)])
+  const buttons = await band.findAll({ type: 'Button' })
+  const texts = (await band.findAll({ type: 'Text' })).map((x: any) => String(x.text ?? x.props?.children ?? ''))
   await band.unmount()
-  expect(buttons.slice(0, 3)).toEqual([['ops-dash', 'd'], ['hubs', 'h'], ['notes', 'n']])
-  expect(buttons[3][0]).toMatch(/^alert/)
-  expect(buttons[3][1]).toBe('a')
-})
-
-test('pressing a band button opens that pane with focus', OPTIONS as any, async ($, on) => {
-  world(on, OPS, new Map(), false, [], TASKS_MD)
-  const opened: any[] = []
-  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
-  on('fs.list', () => ({ value: [] }))
-  await $.session.start(START as any)
-  await settle()
-  const before = opened.length
-  const band: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'AbovePrompt', props: BAND })
-  await band.press({ key: 'band-hubs' })
-  await settle()
-  await band.unmount()
-  const mine = opened.slice(before)
-  expect(mine.map(o => [o.id, o.focus])).toEqual([['hubs', true]])
-})
-
-// ---- toasts: a peer finished or is waiting, an event soon ----
-
-import { peerNotices, eventNotices } from './register'
-
-const rec = (name: string, x: Partial<any>) => ({ name, role: 'peer', busy: false, updatedAt: 0, ...x }) as any
-
-test('peerNotices: nothing on the first look; then finished and waiting, peers only', () => {
-  const t0 = Date.parse('2026-10-08T05:00:00Z')
-  const first = peerNotices(undefined, [rec('claude-21', { busy: true, turnStartedAt: t0 }), rec('ops', { role: 'ops', busy: true })], t0)
-  expect(first.lines).toEqual([])
-  const t1 = t0 + 12 * 60000
-  const second = peerNotices(first.snap, [rec('claude-21', { busy: false }), rec('ops', { role: 'ops', busy: false })], t1)
-  expect(second.lines).toEqual(['claude-21 が終わりました（作業 12分）'])
-  const third = peerNotices(second.snap, [rec('claude-21', { busy: true, waiting: 'config-guard: Bash a shell command that may change a protected file', turnStartedAt: t1 })], t1)
-  expect(third.lines.length).toBe(1)
-  expect(third.lines[0]).toMatch(/^claude-21 が確認待ち: config-guard/)
-  const fourth = peerNotices(third.snap, [rec('claude-21', { busy: true, waiting: 'config-guard: Bash a shell command that may change a protected file', turnStartedAt: t1 })], t1)
-  expect(fourth.lines).toEqual([])
-})
-
-test('eventNotices: a timed event within 10 minutes, once; not past, not far, not all-day', () => {
-  const now = Date.parse('2026-10-08T05:50:00Z') // 14:50 JST
-  const told = new Set<string>()
-  const evs = [
-    { title: '学会 B の部会 [status:meeting]', start: '2026-10-08T15:00:00+09:00', end: '2026-10-08T16:00:00+09:00', calendarId: 'x', meetingUrl: 'https://zoom.example/j/1' },
-    { title: '遠い予定', start: '2026-10-08T16:00:00+09:00', end: '2026-10-08T17:00:00+09:00', calendarId: 'x' },
-    { title: '過ぎた予定', start: '2026-10-08T14:00:00+09:00', end: '2026-10-08T15:30:00+09:00', calendarId: 'x' },
-    { title: '終日', start: '2026-10-08', end: '2026-10-09', calendarId: 'x' },
-  ] as any
-  expect(eventNotices(evs, now, told)).toEqual(['15:00 学会 B の部会（あと 10 分）  会議 URL あり（dash の予定から）'])
-  expect(eventNotices(evs, now + 60000, told)).toEqual([])
+  expect(buttons.length).toBe(0)
+  expect(texts.some((x: string) => x.startsWith('Gmail '))).toBe(true)
+  expect(texts.some((x: string) => x.startsWith('Slack '))).toBe(true)
 })
 
 import { weekGrid } from './register'
@@ -483,4 +435,36 @@ test('an hour row shows the event that starts in it, not one running on into it'
   expect(cell(15)).toBe('')
   expect(cell(17)).toBe('Z90')
   expect(cell(18)).toBe('')
+})
+
+import { shortTitle, bandParts, untilLabel } from './register'
+
+test('a meeting shows the name after 【MTG】, not its project tag', () => {
+  expect(shortTitle('[21_Q][22_R] 【MTG】山田さん 打ち合わせ（21_Q: 進捗）')).toBe('山田さん 打ち合わせ（21_Q: 進捗）')
+  expect(shortTitle('[21_Q] 論文の残り [status:focus]')).toBe('21_Q')
+  expect(shortTitle('学会 B の部会')).toBe('学会 B の部会')
+  const now = Date.parse('2026-10-08T19:00:00+09:00')
+  const evs = [
+    { title: '学会 B の部会', start: '2026-10-09T15:00:00+09:00', end: '2026-10-09T16:00:00+09:00', calendarId: 'primary' },
+    { title: '[21_Q] 【MTG】山田さん 打ち合わせ', start: '2026-10-09T16:00:00+09:00', end: '2026-10-09T17:00:00+09:00', calendarId: 'primary' },
+  ] as any
+  const w = weekGrid(evs, now, 12)
+  const cell = (h: number) => w.hours.find(r => r.label === String(h).padStart(2, '0'))!.cells[1].text.trim()
+  expect(cell(15)).toBe('学会 B の部')
+  expect(cell(16)).toBe('山田さん 打')
+})
+
+test('band: counts, then the next event not yet started and the time to it', () => {
+  expect(untilLabel(45 * 60000)).toBe('あと 45分')
+  expect(untilLabel(125 * 60000)).toBe('あと 2時間5分')
+  expect(untilLabel(120 * 60000)).toBe('あと 2時間')
+  expect(untilLabel(27 * 3600000)).toBe('あと 1日3時間')
+  const now = Date.parse('2026-10-08T19:00:00+09:00')
+  const evs = [
+    { title: '学会 B の部会', start: '2026-10-08T18:00:00+09:00', end: '2026-10-08T20:00:00+09:00', calendarId: 'primary' },
+    { title: '休み', start: '2026-10-09', end: '2026-10-10', calendarId: 'primary' },
+    { title: '[21_Q] 【MTG】山田さん 打ち合わせ', start: '2026-10-09T10:00:00+09:00', end: '2026-10-09T11:00:00+09:00', calendarId: 'primary' },
+  ] as any
+  expect(bandParts(3, undefined, evs, now)).toEqual(['Gmail 3', 'Slack –', '次 10:00 山田さん 打ち合わせ あと 15時間'])
+  expect(bandParts(undefined, 0, [], now)).toEqual(['Gmail –', 'Slack 0', '次の予定なし'])
 })
