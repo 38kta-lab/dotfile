@@ -460,6 +460,7 @@ async function readAll($: any): Promise<{ records: SessionRecord[]; dispatches: 
 
 const ALERT = 'alert'
 const MAIL_ROWS = 12
+export const MAIL_DAYS = 21
 let mailFeed: MailFeed | undefined
 let mailNote = ''
 let mailSeen: Set<string> | undefined
@@ -491,7 +492,9 @@ async function fetchMail($: any, python: string, repo: string): Promise<void> {
   if (!python || !repo || mailBusy) return
   mailBusy = true
   try {
-    const r = await $.process.run([python, `${repo}/scripts/gmail/alert_feed.py`], { cwd: repo, timeoutMs: 120000 })
+    // Three weeks back, not three days: what is not Done yet stays on the list
+    // until it is (user 10/12; about 200 headers, cached after the first look).
+    const r = await $.process.run([python, `${repo}/scripts/gmail/alert_feed.py`, '--days', String(MAIL_DAYS), '--max', '500'], { cwd: repo, timeoutMs: 180000 })
     const feed = parseFeed(String(r.stdout ?? ''))
     if (feed.error) {
       mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
