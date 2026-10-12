@@ -2,8 +2,8 @@
 """Push a daily lab-OS research-trend digest (Markdown) to the lab-OS ingest API.
 
 Reads the token/URL from the environment (source ~/.config/life/labos.env first):
-  LABOS_URL           default https://lab-os.example.ts.net
-  LABOS_INGEST_TOKEN  required (must match ymir's .env LABOS_INGEST_TOKEN)
+  LABOS_URL           required (the lab-OS address; kept only in labos.env, not in this public repo)
+  LABOS_INGEST_TOKEN  required (must match the lab-OS server's .env LABOS_INGEST_TOKEN)
 
 Usage:
   python3 push_trend.py --date 2026-09-10 --highlight "一行ハイライト" --md /tmp/trend.md
@@ -23,8 +23,12 @@ def main() -> int:
     ap.add_argument("--md", required=True, help="path to the Markdown body (JP)")
     ap.add_argument("--highlight-en", default="")
     ap.add_argument("--md-en", default="", help="optional path to EN Markdown body")
-    ap.add_argument("--url", default=os.environ.get("LABOS_URL", "https://lab-os.example.ts.net"))
+    # No default: the URL is reachable from outside (Funnel), so it stays out of this public repo.
+    ap.add_argument("--url", default=os.environ.get("LABOS_URL", ""))
     a = ap.parse_args()
+    if not a.url:
+        print("LABOS_URL not set (source ~/.config/life/labos.env)", file=sys.stderr)
+        return 2
 
     token = os.environ.get("LABOS_INGEST_TOKEN", "")
     if not token:

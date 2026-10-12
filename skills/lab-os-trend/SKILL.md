@@ -6,7 +6,7 @@ description: "Generate a lab-relevant new-paper trend digest for the Masuda Lab 
 # lab-OS Trend
 
 Build a **lab-relevant** new-paper trend for the 増田研 (Masuda Lab) and push it to lab-OS
-(https://lab-os.example.ts.net). This is separate from `daily-search-trend` (which scores by the
+(its address is `LABOS_URL` in `~/.config/life/labos.env`, kept out of this public repo). This is separate from `daily-search-trend` (which scores by the
 user's personal `portfolio/`). Here, score by **relevance to the lab's past papers**.
 
 ## What is different from daily-search-trend
@@ -60,7 +60,7 @@ So "today's issue" covers yesterday's new papers. Fetch with `--target-date <fet
    python3 <skill-dir>/scripts/push_trend.py --date <today> \
      --highlight "<1行ハイライト>" --md /tmp/labos-trend-<today>.md
    ```
-   `push_trend.py` needs `LABOS_INGEST_TOKEN` (and optionally `LABOS_URL`) in the environment — the cron
+   `push_trend.py` needs `LABOS_INGEST_TOKEN` and `LABOS_URL` in the environment — the cron
    wrapper sources `~/.config/life/labos.env`. On success it prints `200 {"ok": true, ...}`.
 
 ## Safety / rules
