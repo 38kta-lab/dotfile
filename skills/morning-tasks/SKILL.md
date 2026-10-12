@@ -67,7 +67,14 @@ If today's brief does not exist:
    - Subject: the bolded title, trimmed. Keep the brief's noun phrase; do not rephrase aggressively.
    - Owner: `@user` unless the brief or the hub names a session.
 7. Edit line by line with the Edit tool. Never rewrite the whole file.
-8. Report (see Reporting).
+8. **Commit and push `tasks.md`** (user 2026-10-12). Stage only `ideas/task-review/tasks.md` and, if it changed, `ideas/task-review/done/YYYY-MM.md`. Do not sweep in other modified files; list them in the report instead.
+   ```bash
+   git add ideas/task-review/tasks.md ideas/task-review/done/
+   git commit -m "docs: 📋 tasks — MM/DD の朝: <cleared/carried/added in one line>"
+   git push
+   ```
+   Commit even when nothing but the heading changed, so every session reads the same list.
+9. Report (see Reporting).
 
 ## Reporting
 
@@ -78,6 +85,8 @@ Loaded ideas/task-review/md/morning-2026-10-08.md → tasks.md
   added 2:
     ⬜ [事務] 会議の議題の連絡（15:00 〆）
     ⬜ [Z90] 現状確認＋実作業
+  committed 1a2b3c4 and pushed
+  not committed (other changes): ideas/to-read.md
 ```
 
 ## During the day
@@ -124,6 +133,6 @@ Mark the line `✅`. Calendar read: `python scripts/google_calendar_read.py --st
 
 ## Safety
 
-Writes only `ideas/task-review/tasks.md`. Does not commit or push unless the user asks.
+Writes only `ideas/task-review/tasks.md`. Commits and pushes only that file (and `done/YYYY-MM.md` when it changed) at the end of the morning run. Other uncommitted files are reported, not committed.
 
 Do not auto-run on session start — it is explicitly user-triggered.
