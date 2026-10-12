@@ -67,13 +67,20 @@ const SLACK = { fetched_at: '2026-10-08T05:40:00Z', watched: 2, errors: [], item
   { id: 'ws-a:C2:2.0', workspace: 'ws-a', kind: 'private', channel: 'careful', date: '2026-10-08T13:00:00+09:00', count_only: true },
 ] }
 
+const CHANNELS = { default: 'mention', channels: [
+  { id: 'C1', workspace: 'ws-a', kind: 'public', name: 'general', watch: '', effective: 'mention' },
+  { id: 'C2', workspace: 'ws-a', kind: 'private', name: 'careful', watch: 'count', effective: 'count' },
+] }
+
 function world(on: any, runs: string[][]) {
   on('process.run', (_$: any, e: any) => {
     runs.push(e.argv)
     const isFeed = String(e.argv[1] ?? '').endsWith('alert_feed.py')
-    const isSlack = String(e.argv[1] ?? '').endsWith('slack_feed.py') && e.argv[2] !== '--done'
+    const isChannels = e.argv[2] === '--channels'
+    const isSetWatch = e.argv[2] === '--set-watch'
+    const isSlack = String(e.argv[1] ?? '').endsWith('slack_feed.py') && !['--done', '--channels', '--set-watch'].includes(e.argv[2])
     const bodyOf = e.argv[2] === '--body' ? e.argv[3] : undefined
-    const out = bodyOf ? JSON.stringify({ id: bodyOf, from: `Sender ${bodyOf}`, date: '2026-10-08T14:32:00+09:00', subject: `Subject ${bodyOf}`, sensitive: bodyOf === '2' ? '人事' : null, body: `Body line one of ${bodyOf}\nBody line two` }) : isFeed ? JSON.stringify(FEED) : isSlack ? JSON.stringify(SLACK) : '[]'
+    const out = bodyOf ? JSON.stringify({ id: bodyOf, from: `Sender ${bodyOf}`, date: '2026-10-08T14:32:00+09:00', subject: `Subject ${bodyOf}`, sensitive: bodyOf === '2' ? '人事' : null, body: `Body line one of ${bodyOf}\nBody line two` }) : isFeed ? JSON.stringify(FEED) : isSlack ? JSON.stringify(SLACK) : isChannels ? JSON.stringify(CHANNELS) : isSetWatch ? JSON.stringify({ id: e.argv[3], watch: e.argv[4] }) : '[]'
     return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('fs.read', () => ({ value: '' }))
@@ -292,4 +299,26 @@ test('slackConversations: by conversation, latest first; newest messages first u
   expect(c.map(x => [x.place, x.ids.length, x.countOnly])).toEqual([['#careful', 1, true], ['@Taro・Hanako', 2, false]])
   expect(c[1].msgs).toEqual([{ when: '11:00', from: 'Hanako', head: 'two' }, { when: '10/07 09:00', from: 'Taro', head: 'one' }])
   expect(c[0].msgs).toEqual([])
+})
+
+test('チャンネルを選ぶ: every channel with its mark; pressing a mark cycles it and writes it with --set-watch', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await ui.press({ key: 'slack-channels' })
+  await settle()
+  let ls = await labels(ui)
+  expect(ls.some((l: string) => l.startsWith('メンションだけ'))).toBe(true)
+  expect(ls.some((l: string) => l.startsWith('件数だけ'))).toBe(true)
+  expect(await texts(ui)).toContain('#general')
+  await ui.press({ key: 'chan-w-C1' })
+  await settle()
+  expect(runs.find(a => a[2] === '--set-watch')).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--set-watch', 'C1', 'count'])
+  ls = await labels(ui)
+  expect(ls.filter((l: string) => l.startsWith('件数だけ')).length).toBe(2)
+  await ui.press({ key: 'chan-back' })
+  await settle()
+  await ui.unmount()
 })

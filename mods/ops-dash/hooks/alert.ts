@@ -132,6 +132,7 @@ export type SlackItem = {
   from_name?: string
   head?: string
   label?: string // the workspace name to show (an org-wide DM may name the org instead)
+  mention?: boolean // from a channel watched for mentions of the person only
 }
 export type SlackFeed = { fetched_at: string; items: SlackItem[]; errors: string[]; watched: number; error?: string }
 
@@ -185,6 +186,7 @@ export type SlackConv = {
   ids: string[]
   latest: string
   countOnly: boolean
+  mention: boolean
   msgs: { when: string; from: string; head: string }[] // newest first
 }
 
@@ -197,11 +199,42 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
     const key = x.id.split(':').slice(0, 2).join(':')
     let c = by.get(key)
     if (!c) {
-      c = { key, workspace: x.label || x.workspace, place: slackPlace(x), ids: [], latest: x.date, countOnly: x.count_only, msgs: [] }
+      c = { key, workspace: x.label || x.workspace, place: slackPlace(x), ids: [], latest: x.date, countOnly: x.count_only, mention: !!x.mention, msgs: [] }
       by.set(key, c)
     }
     c.ids.push(x.id)
     if (!x.count_only) c.msgs.push({ when: when(x.date), from: x.from_name ?? '', head: x.head ?? '' })
   }
   return [...by.values()]
+}
+
+// ---- choosing the channels (the feed script's --channels / --set-watch) ----
+
+export type SlackChannel = { id: string; workspace: string; kind: string; name: string; watch: string; effective: string }
+
+export function parseChannels(stdout: string): { channels: SlackChannel[]; default: string; error?: string } {
+  try {
+    const d = JSON.parse(stdout)
+    if (d.error) return { channels: [], default: 'mention', error: String(d.error) }
+    return { channels: Array.isArray(d.channels) ? d.channels : [], default: String(d.default ?? 'mention') }
+  } catch {
+    return { channels: [], default: 'mention', error: '一覧を読めなかった' }
+  }
+}
+
+export const WATCH_LABEL: Record<string, string> = { y: '見る', count: '件数だけ', mention: 'メンションだけ', n: '見ない' }
+const CYCLE = ['y', 'mention', 'count', 'n']
+
+// The next mark when the person presses a channel's mark: 見る → メンションだけ → 件数だけ → 見ない → 見る
+export function nextWatch(effective: string): string {
+  const i = CYCLE.indexOf(effective)
+  return CYCLE[(i + 1) % CYCLE.length]
+}
+
+export function setWatchArgv(python: string, repo: string, id: string, watch: string): string[] {
+  return [python, `${repo}/scripts/slack/slack_feed.py`, '--set-watch', id, watch]
+}
+
+export function channelsArgv(python: string, repo: string): string[] {
+  return [python, `${repo}/scripts/slack/slack_feed.py`, '--channels']
 }

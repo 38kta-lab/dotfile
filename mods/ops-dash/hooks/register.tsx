@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDoneArgv, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -496,6 +496,34 @@ let slackSel = new Set<string>() // row keys
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
 let slackPage = 0
 const SLACK_CONVS = 6 // conversations per page
+// The channel chooser (user 10/12): channels of every workspace, one mark each,
+// pressed to cycle 見る → メンションだけ → 件数だけ → 見ない. Names stay on the terminal.
+let chanView: { page: number; list?: import('./alert').SlackChannel[]; def: string; note: string } | undefined
+const CHAN_ROWS = 14
+
+async function chanLoad($: any, python: string, repo: string): Promise<void> {
+  try {
+    const r = await $.process.run(channelsArgv(python, repo), { cwd: repo, timeoutMs: 30000 })
+    const d = parseChannels(String(r.stdout ?? ''))
+    chanView = { page: chanView?.page ?? 0, list: d.channels, def: d.default, note: d.error ? `一覧を読めなかった（${d.error.slice(0, 60)}）` : '' }
+  } catch (err) {
+    chanView = { page: 0, list: [], def: 'mention', note: `一覧を読めなかった（${String(err).slice(0, 60)}）` }
+  }
+  $.ui.invalidate('ui.render')
+}
+
+async function chanSet($: any, python: string, repo: string, id: string, watch: string): Promise<void> {
+  try {
+    const r = await $.process.run(setWatchArgv(python, repo, id, watch), { cwd: repo, timeoutMs: 30000 })
+    if (r.exitCode === 0 && chanView?.list) {
+      chanView.list = chanView.list.map(c => (c.id === id ? { ...c, watch, effective: watch } : c))
+      chanView.note = ''
+    } else if (chanView) chanView.note = `書き換えられなかった（exit ${r.exitCode}）`
+  } catch (err) {
+    if (chanView) chanView.note = `書き換えられなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
 const SLACK_MSGS = 3 // newest messages under each
 
 async function fetchSlack($: any, python: string, repo: string): Promise<void> {
@@ -1248,6 +1276,39 @@ export const register: Register = (on, options) => {
     }
     const back = () => { mailMode = { kind: 'list' }; redraw() }
 
+    if (chanView) {
+      const v = chanView
+      const list = v.list ?? []
+      const pagesC = Math.max(1, Math.ceil(list.length / CHAN_ROWS))
+      const page = Math.min(v.page, pagesC - 1)
+      const rows = list.slice(page * CHAN_ROWS, (page + 1) * CHAN_ROWS)
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" columnGap={2}>
+            <Button key="chan-back" label="← 戻る" hotkey="b" plain onPress={() => { chanView = undefined; void fetchSlack($, python, repo); redraw() }} />
+            <Text bold>{`Slack のチャンネル ${list.length}`}</Text>
+          </Box>
+          <Text dimColor wrap="wrap">{`印を押すと 見る → メンションだけ → 件数だけ → 見ない と変わる。印の無いものは既定（${WATCH_LABEL[v.def] ?? v.def}）。DM・グループ DM はここに出さない（既定で見る）。戻ると取り直す`}</Text>
+          {v.note !== '' && <Text color="red" wrap="wrap">{v.note}</Text>}
+          {!v.list && <Text dimColor>読み込んでいます…</Text>}
+          {rows.map(c => (
+            <Box key={`chan-${c.id}`} flexDirection="row" columnGap={1}>
+              <Button key={`chan-w-${c.id}`} label={pad(WATCH_LABEL[c.effective] ?? c.effective, 14)} plain dimColor={!c.watch} onPress={() => chanSet($, python, repo, c.id, nextWatch(c.effective))} />
+              <Text wrap="truncate">{clip(`${c.kind === 'private' ? '🔒' : '#'}${c.name}`, Math.max(12, width - 34))}</Text>
+              <Text dimColor>{c.workspace}</Text>
+            </Box>
+          ))}
+          {pagesC > 1 && (
+            <Box flexDirection="row" columnGap={2}>
+              <Button key="chan-prev" label="← 前" hotkey="p" plain dimColor={page === 0} onPress={() => { v.page = Math.max(0, page - 1); redraw() }} />
+              <Text dimColor>{`${page + 1}/${pagesC}`}</Text>
+              <Button key="chan-next" label="次 →" hotkey="n" plain dimColor={page >= pagesC - 1} onPress={() => { v.page = Math.min(pagesC - 1, page + 1); redraw() }} />
+            </Box>
+          )}
+        </Box>
+      )
+    }
+
     if (mailView.kind === 'body') {
       const v = mailView
       const it = v.item
@@ -1351,7 +1412,7 @@ export const register: Register = (on, options) => {
                   <Box flexDirection="row" columnGap={1}>
                     <Button key={`slack-sel-${c.key}`} label={slackSel.has(c.key) ? '☑' : '☐'} plain onPress={() => { if (slackSel.has(c.key)) slackSel.delete(c.key); else slackSel.add(c.key); redraw() }} />
                     <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
-                    <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}`}</Text>
+                    <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}${c.mention ? '（メンション）' : ''}`}</Text>
                   </Box>
                   {c.msgs.slice(0, SLACK_MSGS).map((m, i) => <Text key={`slkm-${c.key}-${i}`} wrap="truncate">{clip(`    ${m.when} ${m.from}: ${m.head}`, width - 1)}</Text>)}
                   {c.msgs.length > SLACK_MSGS && <Text dimColor>{`    …ほか ${c.msgs.length - SLACK_MSGS} 件`}</Text>}
@@ -1360,6 +1421,7 @@ export const register: Register = (on, options) => {
               <Box flexDirection="row" columnGap={2}>
                 {selIds.length > 0 && <Button key="slack-done" label={`済みにする（${selIds.length} 件）`} hotkey="z" onPress={() => slackMarkDone($, python, repo, selIds)} />}
                 <Button key="slack-reload" label={slackBusy ? '取得中…' : 'Slack を更新'} plain onPress={() => fetchSlack($, python, repo)} />
+                <Button key="slack-channels" label="チャンネルを選ぶ" hotkey="w" plain onPress={() => { chanView = { page: 0, def: 'mention', note: '' }; void chanLoad($, python, repo); redraw() }} />
                 {pagesS > 1 && <Button key="slack-prev" label="← 前" plain dimColor={slackPage === 0} onPress={() => { slackPage = Math.max(0, slackPage - 1); redraw() }} />}
                 {pagesS > 1 && <Text dimColor>{`${slackPage + 1}/${pagesS}`}</Text>}
                 {pagesS > 1 && <Button key="slack-next" label="次 →" plain dimColor={slackPage >= pagesS - 1} onPress={() => { slackPage = Math.min(pagesS - 1, slackPage + 1); redraw() }} />}
