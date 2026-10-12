@@ -134,7 +134,7 @@ If no night brief exists for today, plan from Calendar + Gmail + inbox/hubs as u
 - **`⬜` lines are open.** Carry them into the plan and keep their owner: an `@claude-<slug>` line is another session's work, so plan around it rather than assigning it to the user.
 - **Read only.** Never write `tasks.md` from this skill. The cron brief runs without `LIFE_ROLE=ops`, and the config-guard mod refuses the write. `morning-tasks` (in the ops session) turns the brief into tasks.md lines.
 
-(Why: 2026-10-08、前日に完了とした「会議の議題の連絡」が翌朝の brief に「未了なら最優先」として再掲された。完了の記録がセッション内の TaskList にしかなく、brief から見えなかったため。)
+(Why: 2026-10-08、前日に完了とした事務の連絡が翌朝の brief に「未了なら最優先」として再掲された。完了の記録がセッション内の TaskList にしかなく、brief から見えなかったため。)
 
 ## Note Inputs
 
@@ -178,7 +178,7 @@ rg "^\|\s*\d{4}-\d{2}-\d{2}" projects/active/*.md
 - **Deadline-Bound 節の date 言及** (`- [ ] YYYY-MM-DD ...` 形式 or 本文の `2026-06-08 (月)` 形式) も同様に抽出して deadline-driven task として扱う。
 
 例: yamada hub の `| 2026-06-08 (月) 13:00 | MTG | ... | こちら側の方法論 1-pager (#93) + ... |` 行があれば、brief で:
-- 6/8 当日: `## Calendar` 直下に「13:00 学変 A MTG (山田 ⇄ 自分)」
+- 6/8 当日: `## Calendar` 直下に「13:00 共同研究 MTG (山田さん ⇄ 自分)」
 - 6/4-6/7 (prep 期間): `## 今日やるべきこと` に「6/8 MTG prep: #93/#94/#95 を草稿 v1 で山田さんへ事前共有」
 
 pj_activity.json 側に `upcoming_checkpoints` / `upcoming_deadlines` フィールドがあれば優先利用 (`scripts/automation/pj_activity_feed.py` で生成、2026-06-04 拡張)。
@@ -200,7 +200,7 @@ pj_activity.json には Calendar event を hub に紐付けた結果が入って
 5. いずれも該当しないか候補多数 → `unlinked_calendar_events` 行き
 
 brief での扱い:
-- `## Calendar` セクションで Calendar event と PJ MTG / Checkpoint を統合表示する際、`next_calendar_events` 内の event は **対応 PJ slug + link_token** を併記 (例: `13:00 学変 A MTG (山田 ⇄ 自分) → A02 (alias [yamada])`)。
+- `## Calendar` セクションで Calendar event と PJ MTG / Checkpoint を統合表示する際、`next_calendar_events` 内の event は **対応 PJ slug + link_token** を併記 (例: `13:00 共同研究 MTG (山田さん ⇄ 自分) → A09 (alias [yamada])`)。
 - `unlinked_calendar_events` はそのまま列挙、PJ 紐付けなし。
 - PJ MTG / Checkpoint (hub 由来 `upcoming_checkpoints`) と Calendar event (`next_calendar_events`) が同一 PJ で同日に出てきたら **一行に統合** (Calendar event の `start` / `end` 時刻を優先、hub の goal / prep 情報を併記)。
 
@@ -260,9 +260,9 @@ rg "^\| [0-9-]+ \| (morning-brief|task-review) \|" outputs/skill-improvements/ju
   Slack / 口頭 / 手渡し / 共有ドライブのコメントでも成立する。Gmail に完了メールが無いときは
   「未完了」と断定せず、**ⓒ の PJ hub を必ず確認**し、それでも分からなければ
   「メール上は確認できず（Slack 等の可能性）」と**不確実性を明示**して挙げる。
-  (例: 21_Q で自分→共同研究者の Word 受け渡しを **Slack** で済ませたのに、
+  (例: ある PJ で共同研究者への Word の受け渡しを **Slack** で済ませたのに、
   「Word 受け渡しを示す新着メールが無い → 未完了として扱う」と断定し、9/12・9/13 の 2 日連続で
-  完了済みタスクを再掲した。21_Q hub の共同研究者節に「連絡・ファイル受け渡しは Slack」と明記済み。)
+  完了済みタスクを再掲した。その PJ の hub の共同研究者節に「連絡・ファイル受け渡しは Slack」と明記済み。)
 
 新しい判断ミスを user から訂正された場合は、その場で `outputs/skill-improvements/judgment-errors.md` に 1 行 append する (Date / Skill / Category / Bad / Correction / Root Cause / Status=open)。
 

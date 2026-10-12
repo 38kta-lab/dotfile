@@ -52,7 +52,7 @@ If today's brief does not exist:
 ## 待ち
 ```
 
-- One task per line. `[PJ]` is the hub slug prefix (`[21_Q]`, `[Z90]`) or `[事務]` for admin.
+- One task per line. `[PJ]` is the hub slug prefix (`[21_Q]`, `[M90]`) or `[事務]` for admin.
 - Owner is `@user`, `@ops`, or `@claude-<slug>` for a peer session.
 - `⬜` open, `✅` done. Keep the hub checkbox style (`- ⬜` / `- ✅`).
 
@@ -124,7 +124,7 @@ Set the owner to that session (`@claude-21`). Do not delete the line — that is
     --query 'subject:"<unique substring>"' \
     --add-label "9. Done/Triage" --max-results 5 --dry-run
   ```
-  Always dry-run first to confirm the query matches only the intended messages. Use unique substrings like `list-a 01234` rather than broad keywords. Then rerun without `--dry-run` and confirm each message carries the label.
+  Always dry-run first to confirm the query matches only the intended messages. Use unique substrings like a mailing list's serial number (`list-a 01234`) rather than broad keywords. Then rerun without `--dry-run` and confirm each message carries the label.
 - Why: marking the line done without tagging the email brings the item back in tomorrow's brief.
 
 ### 5. Already on Calendar
