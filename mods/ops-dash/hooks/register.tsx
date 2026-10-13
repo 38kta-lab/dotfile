@@ -39,6 +39,8 @@ const LIMITS = 'ops-dash:limits'
 const PANE = 'peers'
 // `/peers` is the built-in alias of /list-agents, so the command is /dash.
 const COMMAND = 'dash'
+// Every pane opens at one width, so switching tabs does not move the edge (user 10/13).
+const PANE_COLUMNS = 84
 
 type Me = { name: string; role: string; pj?: string }
 
@@ -890,7 +892,7 @@ async function goToHub($: any, slug: string): Promise<void> {
   openHub(slug)
   taskDetail = undefined
   closeEvent($)
-  await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
+  await $.ui.open({ id: HUBS, title: 'hubs', columns: PANE_COLUMNS, focus: true })
 }
 
 // ---- notes pane: a project's note → its contents → a number's pictures ----
@@ -1119,17 +1121,17 @@ export const register: Register = (on, options) => {
           // (10/08, seen on the terminal: hubs opened first stayed in front), and
           // its tab comes first. notes reads only the hubs here, nothing on the NAS.
           void loadHubs($, repo)
-            .then(() => $.ui.open({ id: PANE, title: 'ops-dash', columns: 58 }))
-            .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: 84 }))
+            .then(() => $.ui.open({ id: PANE, title: 'ops-dash', columns: PANE_COLUMNS }))
+            .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: PANE_COLUMNS }))
             .then(() => notesLoad($, repo))
-            .then(() => $.ui.open({ id: NOTES, title: 'notes', columns: 84 }))
+            .then(() => $.ui.open({ id: NOTES, title: 'notes', columns: PANE_COLUMNS }))
             // Which tab ends up in front is not the order of opening on every
             // terminal (10/08: with three, notes was in front). Only a focused
             // open raises a tab, so dash is opened again with focus when another
             // is in front; Esc hands the keyboard back to the prompt.
             .then(() => $.ui.panes())
             .then((panes: readonly { id: string; isShown: boolean }[]) =>
-              panes.some(p => p.id === PANE && p.isShown) ? undefined : $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true }))
+              panes.some(p => p.id === PANE && p.isShown) ? undefined : $.ui.open({ id: PANE, title: 'ops-dash', columns: PANE_COLUMNS, focus: true }))
             .catch((err: unknown) => $.ui.log(`ops-dash: could not open the panes at start: ${String(err)}`, { to: 'debug' }))
           $.clock.every(600000, () => fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render')))
         } catch (err) {
@@ -1209,7 +1211,7 @@ export const register: Register = (on, options) => {
     await figLoad($, repo)
     const newest = figList.find(x => !x.label.startsWith('共通'))
     figView = { kind: 'list' }
-    const opened = await $.ui.open({ id: FIG, title: 'fig', columns: 84, focus: true })
+    const opened = await $.ui.open({ id: FIG, title: 'fig', columns: PANE_COLUMNS, focus: true })
     if (newest) void figOpen($, newest)
     if (opened.isPlaced) return { text: 'fig opened.' }
     return { text: `fig: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
@@ -1277,7 +1279,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'alert' }, async $ => {
     void fetchMail($, python, repo)
-    const opened = await $.ui.open({ id: ALERT, title: 'alert', columns: 84, focus: true })
+    const opened = await $.ui.open({ id: ALERT, title: 'alert', columns: PANE_COLUMNS, focus: true })
     if (opened.isPlaced) return { text: 'alert opened.' }
     return { text: `alert: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
   })
@@ -1479,7 +1481,7 @@ export const register: Register = (on, options) => {
     notesView = { kind: 'list' }
     notesNote = ''
     void notesLoad($, repo).then(() => $.ui.invalidate('ui.render'))
-    const opened = await $.ui.open({ id: NOTES, title: 'notes', columns: 84, focus: true })
+    const opened = await $.ui.open({ id: NOTES, title: 'notes', columns: PANE_COLUMNS, focus: true })
     if (opened.isPlaced) return { text: 'notes opened.' }
     return { text: `notes: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
   })
@@ -1562,7 +1564,7 @@ export const register: Register = (on, options) => {
     await loadHubs($, repo)
     view = { kind: 'list' }
     back = []
-    const opened = await $.ui.open({ id: HUBS, title: 'hubs', columns: 84, focus: true })
+    const opened = await $.ui.open({ id: HUBS, title: 'hubs', columns: PANE_COLUMNS, focus: true })
     if (opened.isPlaced) return { text: 'hubs opened.' }
     return { text: `hubs: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
   })
@@ -1638,7 +1640,7 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: COMMAND }, async $ => {
-    const opened = await $.ui.open({ id: PANE, title: 'ops-dash', columns: 58, focus: true })
+    const opened = await $.ui.open({ id: PANE, title: 'ops-dash', columns: PANE_COLUMNS, focus: true })
     if (opened.isPlaced) return { text: 'ops-dash opened.' }
     return { text: `ops-dash: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
   })
