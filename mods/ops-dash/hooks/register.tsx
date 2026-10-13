@@ -572,7 +572,9 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
       for (const id of ids) slackDone.add(id)
       slackSel = new Set()
       slackNoteAt = Date.now(); slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
-    } else slackNoteAt = Date.now(); slackNote = `済みにできなかった（exit ${r.exitCode}）`
+    } else {
+      slackNoteAt = Date.now(); slackNote = `済みにできなかった（exit ${r.exitCode}）`
+    }
   } catch (err) {
     slackNoteAt = Date.now(); slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
   }

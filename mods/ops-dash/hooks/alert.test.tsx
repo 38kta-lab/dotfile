@@ -281,6 +281,8 @@ test('Slack in the pane: rows (a count-only channel shows only how many); 済み
   await ui.press({ key: 'slack-done' })
   await settle()
   expect(runs.find(a => a[2] === '--done')).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--done', 'ws-a:C1:1.0'])
+  expect(await texts(ui)).toContain('済みにした: 1 件')
+  expect(await texts(ui)).not.toContain('済みにできなかった')
   expect(await texts(ui)).not.toContain('Taro: hello there')
   await ui.unmount()
 })
