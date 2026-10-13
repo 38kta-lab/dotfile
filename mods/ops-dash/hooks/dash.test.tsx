@@ -471,10 +471,13 @@ test('band: counts, then the next event not yet started and the time to it', () 
 
 import { noteShown } from './register'
 
-test('noteShown: a note that went well goes after 15 s; a failure stays', () => {
+test('noteShown: a note that went well goes 15 s after it first shows; a failure stays; a new set shows again', () => {
   const err = /できなかった/
-  expect(noteShown('Done にした: 1 件', 1000, 1000 + 14000, err)).toBe('Done にした: 1 件')
-  expect(noteShown('Done にした: 1 件', 1000, 1000 + 16000, err)).toBe('')
-  expect(noteShown('Done にできなかった（exit 1）', 1000, 1000 + 600000, err)).toBe('Done にできなかった（exit 1）')
-  expect(noteShown('', 0, 0, err)).toBe('')
+  expect(noteShown('t1', 'Done にした: 1 件', 1, 1000, err)).toBe('Done にした: 1 件')
+  expect(noteShown('t1', 'Done にした: 1 件', 1, 1000 + 14000, err)).toBe('Done にした: 1 件')
+  expect(noteShown('t1', 'Done にした: 1 件', 1, 1000 + 16000, err)).toBe('')
+  expect(noteShown('t1', 'Done にした: 1 件', 2, 1000 + 17000, err)).toBe('Done にした: 1 件')
+  expect(noteShown('t2', 'Done にできなかった（exit 1）', 1, 1000, err)).toBe('Done にできなかった（exit 1）')
+  expect(noteShown('t2', 'Done にできなかった（exit 1）', 1, 1000 + 600000, err)).toBe('Done にできなかった（exit 1）')
+  expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })

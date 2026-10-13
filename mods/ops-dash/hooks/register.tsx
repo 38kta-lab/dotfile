@@ -465,13 +465,21 @@ const MAIL_ERR = /できなかった|取れなかった|渡しません|日時�
 const NOTE_MS = 15000
 // What the pane says after an action: a failure stays until the next action;
 // "Done にした" and the like go after 15 s (user 10/12: it stayed on for good).
-export function noteShown(note: string, at: number, now: number, err: RegExp): string {
+// The time a note first shows is taken from the mod's clock at render (Date.now
+// in a mod is not the wall clock, 10/13), keyed by the note's set count.
+const noteFirstShown = new Map<string, { seq: number; at: number }>()
+export function noteShown(key: string, note: string, seq: number, now: number, err: RegExp): string {
   if (!note) return ''
-  return err.test(note) || now - at < NOTE_MS ? note : ''
+  const seen = noteFirstShown.get(key)
+  if (!seen || seen.seq !== seq) {
+    noteFirstShown.set(key, { seq, at: now })
+    return note
+  }
+  return err.test(note) || now - seen.at < NOTE_MS ? note : ''
 }
 let mailFeed: MailFeed | undefined
 let mailNote = ''
-let mailNoteAt = 0
+let mailNoteSeq = 0 // bumped each time mailNote is set
 let mailSeen: Set<string> | undefined
 const mailDone = new Set<string>()
 let mailSel = new Set<string>()
@@ -505,7 +513,7 @@ async function mailOpen($: any, python: string, repo: string, item: MailItem): P
 // ---- Slack in the alert pane (scripts/slack/slack_feed.py, every 5 minutes) ----
 let slackFeed: ReturnType<typeof parseSlack> | undefined
 let slackNote = ''
-let slackNoteAt = 0
+let slackNoteSeq = 0
 let slackBusy = false
 let slackSel = new Set<string>() // row keys
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
@@ -548,11 +556,13 @@ async function fetchSlack($: any, python: string, repo: string): Promise<void> {
   try {
     const r = await $.process.run([python, `${repo}/scripts/slack/slack_feed.py`], { cwd: repo, timeoutMs: 240000 })
     const feed = parseSlack(String(r.stdout ?? ''))
-    if (feed.error) { slackNoteAt = Date.now(); slackNote = `Slack を取れなかった（${feed.error.slice(0, 80)}）`; return }
+    if (feed.error) { slackNoteSeq++; slackNote = `Slack を取れなかった（${feed.error.slice(0, 80)}）`; return }
     slackFeed = feed
-    slackNoteAt = Date.now(); slackNote = feed.errors.length ? `取れなかった workspace・チャンネルあり: ${feed.errors.length}（${feed.errors[0].slice(0, 50)}）` : ''
+    // A fetch clears only its own earlier failure, not what an action said (済みにした …).
+    if (feed.errors.length) { slackNoteSeq++; slackNote = `取れなかった workspace・チャンネルあり: ${feed.errors.length}（${feed.errors[0].slice(0, 50)}）` }
+    else if (/取れなかった/.test(slackNote)) { slackNoteSeq++; slackNote = '' }
   } catch (err) {
-    slackNoteAt = Date.now(); slackNote = `Slack を取れなかった（${String(err).slice(0, 60)}）`
+    slackNoteSeq++; slackNote = `Slack を取れなかった（${String(err).slice(0, 60)}）`
   } finally {
     slackBusy = false
     $.ui.invalidate('ui.render')
@@ -571,12 +581,12 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
     if (r.exitCode === 0) {
       for (const id of ids) slackDone.add(id)
       slackSel = new Set()
-      slackNoteAt = Date.now(); slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
+      slackNoteSeq++; slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
     } else {
-      slackNoteAt = Date.now(); slackNote = `済みにできなかった（exit ${r.exitCode}）`
+      slackNoteSeq++; slackNote = `済みにできなかった（exit ${r.exitCode}）`
     }
   } catch (err) {
-    slackNoteAt = Date.now(); slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
+    slackNoteSeq++; slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -590,7 +600,7 @@ async function fetchMail($: any, python: string, repo: string): Promise<void> {
     const r = await $.process.run([python, `${repo}/scripts/gmail/alert_feed.py`, '--days', String(MAIL_DAYS), '--max', '500'], { cwd: repo, timeoutMs: 180000 })
     const feed = parseFeed(String(r.stdout ?? ''))
     if (feed.error) {
-      mailNoteAt = Date.now(); mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
+      mailNoteSeq++; mailNote = `Gmail を取れなかった（${feed.error.slice(0, 80)}）`
       return
     }
     mailSeen = new Set(feed.items.map(x => x.id))
@@ -600,7 +610,7 @@ async function fetchMail($: any, python: string, repo: string): Promise<void> {
     // A fetch clears only its own earlier failure, not what an action said.
     if (mailNote.startsWith('Gmail を取れなかった')) mailNote = ''
   } catch (err) {
-    mailNoteAt = Date.now(); mailNote = `Gmail を取れなかった（${String(err).slice(0, 60)}）`
+    mailNoteSeq++; mailNote = `Gmail を取れなかった（${String(err).slice(0, 60)}）`
   } finally {
     mailBusy = false
     $.ui.invalidate('ui.render')
@@ -614,19 +624,19 @@ function mailSelected(): MailItem[] {
 async function mailMarkDone($: any, python: string, repo: string): Promise<void> {
   const items = mailSelected()
   if (items.length === 0) return
-  mailNoteAt = Date.now(); mailNote = `Done のラベルを付けています（${items.length} 件）…`
+  mailNoteSeq++; mailNote = `Done のラベルを付けています（${items.length} 件）…`
   $.ui.invalidate('ui.render')
   try {
     const r = await $.process.run(doneArgv(python, repo, items.map(x => x.id)), { cwd: repo, timeoutMs: 60000 })
     if (r.exitCode === 0) {
       for (const x of items) mailDone.add(x.id)
       mailSel = new Set()
-      mailNoteAt = Date.now(); mailNote = `Done にした: ${items.length} 件`
+      mailNoteSeq++; mailNote = `Done にした: ${items.length} 件`
     } else {
-      mailNoteAt = Date.now(); mailNote = `Done にできなかった（exit ${r.exitCode}: ${String(r.stderr ?? '').trim().slice(-80)}）`
+      mailNoteSeq++; mailNote = `Done にできなかった（exit ${r.exitCode}: ${String(r.stderr ?? '').trim().slice(-80)}）`
     }
   } catch (err) {
-    mailNoteAt = Date.now(); mailNote = `Done にできなかった（${String(err).slice(0, 60)}）`
+    mailNoteSeq++; mailNote = `Done にできなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -634,10 +644,10 @@ async function mailMarkDone($: any, python: string, repo: string): Promise<void>
 async function mailAsk($: any, ask: string): Promise<void> {
   const text = detailPrompt(mailSelected(), ask)
   if (!text) {
-    mailNoteAt = Date.now(); mailNote = '人事などの区分を含むので、モデルには渡しません'
+    mailNoteSeq++; mailNote = '人事などの区分を含むので、モデルには渡しません'
   } else {
     const r = await $.prompt.fill({ text })
-    mailNoteAt = Date.now(); mailNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメールだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
+    mailNoteSeq++; mailNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメールだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
     if (r.isFilled) mailSel = new Set()
   }
   mailMode = { kind: 'list' }
@@ -647,22 +657,22 @@ async function mailAsk($: any, ask: string): Promise<void> {
 async function mailCalendar($: any, python: string, repo: string, title: string, whenText: string): Promise<void> {
   const when = parseWhen(whenText)
   if ('error' in when) {
-    mailNoteAt = Date.now(); mailNote = when.error
+    mailNoteSeq++; mailNote = when.error
     $.ui.invalidate('ui.render')
     return
   }
-  mailNoteAt = Date.now(); mailNote = 'カレンダーに入れています…'
+  mailNoteSeq++; mailNote = 'カレンダーに入れています…'
   mailMode = { kind: 'list' }
   $.ui.invalidate('ui.render')
   try {
     const r = await $.process.run(calendarArgv(python, repo, title, when), { cwd: repo, timeoutMs: 60000 })
-    mailNoteAt = Date.now(); mailNote = r.exitCode === 0 ? `カレンダーに入れた: ${when.start.replace('T', ' ').slice(0, 16)}  ${title}` : `カレンダーに入れられなかった（exit ${r.exitCode}）`
+    mailNoteSeq++; mailNote = r.exitCode === 0 ? `カレンダーに入れた: ${when.start.replace('T', ' ').slice(0, 16)}  ${title}` : `カレンダーに入れられなかった（exit ${r.exitCode}）`
     if (r.exitCode === 0) {
       mailSel = new Set()
       await fetchCalendar($, python, repo)
     }
   } catch (err) {
-    mailNoteAt = Date.now(); mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
+    mailNoteSeq++; mailNote = `カレンダーに入れられなかった（${String(err).slice(0, 60)}）`
   }
   $.ui.invalidate('ui.render')
 }
@@ -1364,7 +1374,7 @@ export const register: Register = (on, options) => {
           <Button key="mail-reload" label={mailBusy ? '取得中…' : '更新'} hotkey="r" plain onPress={() => fetchMail($, python, repo)} />
         </Box>
         <Box marginTop={1}><Text dimColor>{rule(`Gmail  未処理 ${personal.length} 件（未読 ${unread}）・一斉配信 ${bulk.length} 件  取得 ${fetched}`)}</Text></Box>
-        {noteShown(mailNote, mailNoteAt, nowMs, MAIL_ERR) !== '' && <Text color={MAIL_ERR.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
+        {noteShown('mail', mailNote, mailNoteSeq, nowMs, MAIL_ERR) !== '' && <Text color={MAIL_ERR.test(mailNote) ? 'red' : 'green'} wrap="wrap">{mailNote}</Text>}
         {!mailFeed && mailNote === '' && <Text dimColor>読み込んでいます…（最初の取得は 15 秒ほど）</Text>}
         {shown.map(x => (
           <Box flexDirection="row" columnGap={1}>
@@ -1412,7 +1422,7 @@ export const register: Register = (on, options) => {
         )}
 
         <Box marginTop={1}><Text dimColor>{rule(`Slack  ${slackFeed ? `${slackCount()} 件（見るチャンネル ${slackFeed.watched}）  取得 ${slackFeed.fetched_at ? hhmm(Date.parse(slackFeed.fetched_at)) : '—'}` : '読み込んでいます…'}`)}</Text></Box>
-        {noteShown(slackNote, slackNoteAt, nowMs, /できなかった|取れなかった/) !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
+        {noteShown('slack', slackNote, slackNoteSeq, nowMs, /できなかった|取れなかった/) !== '' && <Text color={/できなかった|取れなかった/.test(slackNote) ? 'red' : 'green'} wrap="wrap">{slackNote}</Text>}
         {slackFeed && slackFeed.watched === 0 && <Text dimColor wrap="wrap">見るチャンネルがまだ無い（~/.config/life/slack-channels.tsv の watch の列に y か count を書く）</Text>}
         {(() => {
           // By conversation (user 10/12: raw rows could not be read), in two
