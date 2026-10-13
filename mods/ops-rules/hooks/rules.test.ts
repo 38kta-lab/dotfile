@@ -328,6 +328,7 @@ test('readsSlackHeads: slack_feed.py with no flag or --days is the pane\'s; --co
   expect(readsSlackHeads('cd ~/life && /x/python3 scripts/slack/slack_feed.py --days 3 | head')).toBe(true)
   expect(readsSlackHeads('python scripts/slack/slack_feed.py --counts')).toBe(false)
   expect(readsSlackHeads('python scripts/slack/slack_feed.py --done a:b:1')).toBe(false)
+  expect(readsSlackHeads('python scripts/slack/slack_feed.py --show ws:C1:1700000000.000100')).toBe(false)
   expect(readsSlackHeads('grep -n slack scripts/README.md')).toBe(false)
   expect(readsSlackHeads('/x/python3 -I scripts/slack/slack_feed.py')).toBe(true)
   expect(readsSlackHeads('cd s && ./slack_feed.py')).toBe(true)

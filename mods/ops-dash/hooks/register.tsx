@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDetailPrompt, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -518,6 +518,7 @@ let slackNote = ''
 let slackNoteSeq = 0
 let slackBusy = false
 let slackSel = new Set<string>() // row keys
+let slackMode: 'list' | 'ask' = 'list'
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
 let slackPage = 0 // DMs
 let slackPageCh = 0 // channels
@@ -590,6 +591,19 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
   } catch (err) {
     slackNoteSeq++; slackNote = `済みにできなかった（${String(err).slice(0, 60)}）`
   }
+  $.ui.invalidate('ui.render')
+}
+
+async function slackAsk($: any, ids: string[], ask: string): Promise<void> {
+  const text = slackDetailPrompt(slackFeed?.items ?? [], ids, ask)
+  if (!text) {
+    slackNoteSeq++; slackNote = '件数だけのチャンネルを含むので、モデルには渡しません'
+  } else {
+    const r = await $.prompt.fill({ text })
+    slackNoteSeq++; slackNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメッセージだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
+    if (r.isFilled) slackSel = new Set()
+  }
+  slackMode = 'list'
   $.ui.invalidate('ui.render')
 }
 
@@ -1433,6 +1447,7 @@ export const register: Register = (on, options) => {
           // three messages go under it, each on its own line.
           const convs = slackConversations(slackFeed?.items ?? [], slackDone, nowMs)
           const selIds = convs.filter(c => slackSel.has(c.key)).flatMap(c => c.ids)
+          const selCountOnly = convs.some(c => slackSel.has(c.key) && c.countOnly)
           const part = (title: string, list: typeof convs, page: number, setPage: (n: number) => void, keyp: string) => {
             const pages = Math.max(1, Math.ceil(list.length / SLACK_CONVS))
             const p = Math.min(page, pages - 1)
@@ -1467,9 +1482,17 @@ export const register: Register = (on, options) => {
               {part('チャンネル', convs.filter(c => !c.isDm), slackPageCh, n => { slackPageCh = n }, 'slack-ch')}
               <Box flexDirection="row" columnGap={2} marginTop={1}>
                 {selIds.length > 0 && <Button key="slack-done" label={`済みにする（${selIds.length} 件）`} hotkey="z" onPress={() => slackMarkDone($, python, repo, selIds)} />}
+                {selIds.length > 0 && !selCountOnly && slackMode === 'list' && <Button key="slack-ask" label="詳しく（モデルに頼む）" hotkey="k" plain onPress={() => { slackMode = 'ask'; redraw() }} />}
                 <Button key="slack-reload" label={slackBusy ? '取得中…' : 'Slack を更新'} plain onPress={() => fetchSlack($, python, repo)} />
                 <Button key="slack-channels" label="チャンネルを選ぶ" hotkey="w" plain onPress={() => { chanView = { page: 0, def: 'mention', note: '' }; void chanLoad($, python, repo); redraw() }} />
               </Box>
+              {selIds.length > 0 && selCountOnly && <Text dimColor>件数だけのチャンネルを含むので「詳しく」は出しません（済みはモデルを通さずにできます）</Text>}
+              {slackMode === 'ask' && selIds.length > 0 && (
+                <Box flexDirection="row" columnGap={2}>
+                  <Input key="slack-ask-input" label="頼むこと" placeholder="要点と、私がすべきことを短く" submitLabel="下書きに入れる" autoFocus onSubmit={(v: string) => slackAsk($, selIds, v)} />
+                  <Button key="slack-ask-cancel" label="やめる" plain onPress={() => { slackMode = 'list'; redraw() }} />
+                </Box>
+              )}
             </Box>
           )
         })()}

@@ -166,19 +166,21 @@ export function readsMailBody(command: string): boolean {
 }
 
 // slack_feed.py prints message heads (sender, first line) for the alert pane.
-// The model may run it only with --counts (numbers per workspace) or --done
-// (marks, no output of messages); anything else is the pane's (10/12).
+// The model may run it only with --counts (numbers per workspace), --done
+// (marks, no output of messages) or --show <id> (the messages the person chose
+// in the pane and handed over with 詳しく; it refuses count-only channels, 10/14);
+// anything else is the pane's (10/12).
 export function readsSlackHeads(command: string): boolean {
   // Only a run of the script counts (python … slack_feed.py, or the path as the
   // command): the name in an editor's argument or a heredoc is not a run (10/12).
   const m = command.match(/(?:\bpython[\w.]*(?:\s+-\S+)*\s+|(?:^|[;&|(]\s*))[^\s'"=]*slack_feed\.py\b([^|;&\n]*)/m)
   if (!m) return false
-  return !/--counts\b|--done\b|--help\b|-h\b/.test(m[1])
+  return !/--counts\b|--done\b|--show\b|--help\b|-h\b/.test(m[1])
 }
 
 const SLACK_HEADS_DENY =
   'ops-rules: slack_feed.py without --counts is for the alert pane only (it prints senders and first lines of Slack messages). ' +
-  'Run `slack_feed.py --counts` for the numbers per workspace.'
+  'Run `slack_feed.py --counts` for the numbers per workspace, or `slack_feed.py --show <id>` for a message the person chose.'
 
 const MAIL_BODY_DENY =
   'ops-rules: alert_feed.py --body is for the alert pane only (it shows a mail body on the terminal, sensitive ones included). ' +

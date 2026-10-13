@@ -336,3 +336,18 @@ test('opening an unread mail marks it read in Gmail (gmail_label.py --remove-lab
   expect(runs.find(a => a.includes('--remove-label'))).toEqual(['/py', '/repo/scripts/gmail_label.py', '--message-id', '1', '--remove-label', 'UNREAD'])
   await ui.unmount()
 })
+
+import { slackDetailPrompt } from './alert'
+
+test('slackDetailPrompt: lists the chosen messages (oldest first) and the ask; refuses a count-only channel', () => {
+  const s = (id: string, date: string, extra: object = {}) => ({ id, workspace: 'ws', label: 'Team', kind: 'public', channel: 'general', date, count_only: false, from_name: 'Alice', head: `head ${id}`, ...extra })
+  const items = [s('ws:C1:2', '2026-01-02T00:00:00Z'), s('ws:C1:1', '2026-01-01T00:00:00Z'), s('ws:C2:3', '2026-01-03T00:00:00Z', { count_only: true, from_name: undefined, head: undefined })]
+  const t = slackDetailPrompt(items, ['ws:C1:1', 'ws:C1:2'], '返事の案を')!
+  expect(t).toContain('--show <id>')
+  expect(t.indexOf('ws:C1:1')).toBeLessThan(t.indexOf('ws:C1:2'))
+  expect(t).toContain('Team #general Alice: head ws:C1:1')
+  expect(t).toContain('頼むこと: 返事の案を')
+  expect(slackDetailPrompt(items, ['ws:C1:1'], '')).toContain('頼むこと: 要点と、私がすべきことを短く')
+  expect(slackDetailPrompt(items, ['ws:C1:1', 'ws:C2:3'], 'x')).toBeUndefined()
+  expect(slackDetailPrompt(items, [], 'x')).toBeUndefined()
+})

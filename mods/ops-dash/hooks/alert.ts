@@ -214,6 +214,23 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
   return [...by.values()]
 }
 
+// The draft 詳しく puts in the prompt for Slack (user 10/14): the chosen
+// messages' ids and heads, and what to do. Only the person's send hands it to
+// the model, which reads each body with `slack_feed.py --show <id>`. A
+// count-only channel never gets 詳しく (its messages have no head to show).
+export function slackDetailPrompt(items: readonly SlackItem[], ids: readonly string[], ask: string): string | undefined {
+  const want = new Set(ids)
+  const chosen = items.filter(x => want.has(x.id)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+  if (chosen.length === 0 || chosen.some(x => x.count_only)) return undefined
+  const lines = chosen.map(x => `- id ${x.id} — ${shortDate(x.date)} ${x.label || x.workspace} ${slackPlace(x)} ${x.from_name ?? ''}: ${x.head ?? ''}`)
+  return [
+    'Slack の次のメッセージを読んで、頼んだことをしてください。本文は life repo で `python scripts/slack/slack_feed.py --show <id>` で取る（読むだけ。返信・投稿はしない）。',
+    ...lines,
+    '',
+    `頼むこと: ${ask.trim() || '要点と、私がすべきことを短く'}`,
+  ].join('\n')
+}
+
 // ---- choosing the channels (the feed script's --channels / --set-watch) ----
 
 export type SlackChannel = { id: string; workspace: string; kind: string; name: string; watch: string; effective: string }
