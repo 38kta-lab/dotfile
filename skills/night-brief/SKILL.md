@@ -25,6 +25,7 @@ End-of-day planning artifact for tomorrow that:
 
 - pre-decides `[status:X]` tag candidates per Calendar block (so M09 Slack scheduler can auto-apply when user patches them in)
 - carries over today's unfinished items (from `morning-<today>.md` + the `⬜` lines of `ideas/task-review/tasks.md`; `✅` lines are done and not carried over)
+  - items in `ideas/task-review/done/YYYY-MM.md` from the last 14 days are finished or dropped: do not carry them over, even if the morning brief still lists them
 - flags upcoming deadlines (next 7 days window)
 - gives a rough 1-day plan with time-block intent
 

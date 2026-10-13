@@ -132,9 +132,11 @@ If no night brief exists for today, plan from Calendar + Gmail + inbox/hubs as u
 
 - **`✅` lines are done.** Do not list them again under `## 今日やるべきこと` or `## 締切ウォッチ`, even when their deadline is still in the future. This is the signal for items finished in a session that left no email trace (e.g. 「議題なし」と判断しただけ).
 - **`⬜` lines are open.** Carry them into the plan and keep their owner: an `@claude-<slug>` line is another session's work, so plan around it rather than assigning it to the user.
+- **The done log stops zombies.** Also read `ideas/task-review/done/YYYY-MM.md` (this month, and last month in the first two weeks). Its lines from the last 14 days are items the user finished or dropped (e.g. 「返信不要」). Do not carry them over from a night brief or an earlier brief, and do not list them again, even if a brief or the email digest still mentions them. (`✅` lines leave tasks.md the next morning; the done log is what remains.)
 - **Read only.** Never write `tasks.md` from this skill. The cron brief runs without `LIFE_ROLE=ops`, and the config-guard mod refuses the write. `morning-tasks` (in the ops session) turns the brief into tasks.md lines.
 
 (Why: 2026-10-08、前日に完了とした事務の連絡が翌朝の brief に「未了なら最優先」として再掲された。完了の記録がセッション内の TaskList にしかなく、brief から見えなかったため。)
+(Why, done log: 2026-10-13、返信不要でメールも Done にした出欠の返信が、10/10 から 4 日続けて brief に出た。tasks.md に入ったことがなく、brief が前の brief の文を引き継ぎ続けたため。)
 
 ## Note Inputs
 
