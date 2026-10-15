@@ -1822,6 +1822,9 @@ export const register: Register = (on, options) => {
     // sessions: one line each
     const sorted = [...records].sort((a, b) => (a.role === 'ops' ? -1 : b.role === 'ops' ? 1 : a.name.localeCompare(b.name)))
     const peerBar = Math.max(6, Math.min(12, width - 40))
+    // The name and pj columns take the widest entry, so every bar starts at the same column (user 10/15).
+    const nameW = Math.max(10, ...sorted.map(r => cells(r.name) + 1))
+    const pjW = Math.max(5, ...sorted.map(r => cells(r.pj ?? '') + 1))
 
     // calendar: fixed height, then the next few events as buttons
     const next = upcoming(calendar, now, NEXT_EVENTS)
@@ -1877,8 +1880,8 @@ export const register: Register = (on, options) => {
         {sorted.map(r => (
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
-            <Text bold>{pad(r.name, 10)}</Text>
-            <Text dimColor>{pad(r.pj ?? '', 5)}</Text>
+            <Text bold>{pad(r.name, nameW)}</Text>
+            <Text dimColor>{pad(r.pj ?? '', pjW)}</Text>
             {r.contextPercent === undefined ? (
               <Text dimColor>{pad('ctx —', peerBar + 5)}</Text>
             ) : (
