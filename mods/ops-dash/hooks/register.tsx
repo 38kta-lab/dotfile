@@ -594,8 +594,11 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
   $.ui.invalidate('ui.render')
 }
 
+// workspace → Slack MCP server name, from pluginConfigs (machine-specific, not in this repo).
+let slackMcp: Record<string, string> = {}
+
 async function slackAsk($: any, ids: string[], ask: string): Promise<void> {
-  const text = slackDetailPrompt(slackFeed?.items ?? [], ids, ask)
+  const text = slackDetailPrompt(slackFeed?.items ?? [], ids, ask, slackMcp)
   if (!text) {
     slackNoteSeq++; slackNote = '件数だけのチャンネルを含むので、モデルには渡しません'
   } else {
@@ -1106,6 +1109,7 @@ export const register: Register = (on, options) => {
   resolved = false
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
+  slackMcp = (options.slack_mcp && typeof options.slack_mcp === 'object' ? options.slack_mcp : {}) as Record<string, string>
 
   on('session.start', async ($, e, next) => {
     const me = await who($)

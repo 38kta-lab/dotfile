@@ -350,4 +350,7 @@ test('slackDetailPrompt: lists the chosen messages (oldest first) and the ask; r
   expect(slackDetailPrompt(items, ['ws:C1:1'], '')).toContain('頼むこと: 要点と、私がすべきことを短く')
   expect(slackDetailPrompt(items, ['ws:C1:1', 'ws:C2:3'], 'x')).toBeUndefined()
   expect(slackDetailPrompt(items, [], 'x')).toBeUndefined()
+  // A workspace mapped to a Slack MCP server is read through it; others stay on --show.
+  expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { ws: 'slack-team' })).toContain('ws は MCP の slack-team で読んでよい')
+  expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { other: 'slack-other' })).not.toContain('MCP')
 })
