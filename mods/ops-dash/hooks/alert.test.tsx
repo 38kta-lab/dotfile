@@ -287,7 +287,21 @@ test('Slack in the pane: rows (a count-only channel shows only how many); 済み
   await ui.unmount()
 })
 
-import { slackConversations } from './alert'
+test('Slack in the pane: one message can be chosen by itself, and 済み goes to that id only', OPTIONS as any, async ($, on) => {
+  const runs: string[][] = []
+  world(on, runs)
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'alert', props: PROPS })
+  await ui.press({ key: 'slack-msg-ws-a:C1:1.0' })
+  await settle()
+  await ui.press({ key: 'slack-done' })
+  await settle()
+  expect(runs.find(a => a[2] === '--done')).toEqual(['/py', '/repo/scripts/slack/slack_feed.py', '--done', 'ws-a:C1:1.0'])
+  await ui.unmount()
+})
+
+import { slackConversations, slackSelectedIds } from './alert'
 
 test('slackConversations: by conversation, latest first; newest messages first under it; count-only keeps no messages', () => {
   const now = Date.parse('2026-10-08T20:00:00+09:00')
@@ -299,8 +313,17 @@ test('slackConversations: by conversation, latest first; newest messages first u
     s('ws-a:G1:4', { from_name: 'Taro', head: 'gone' }),
   ], new Set(['ws-a:G1:4']), now)
   expect(c.map(x => [x.place, x.ids.length, x.countOnly])).toEqual([['#careful', 1, true], ['@Taro・Hanako', 2, false]])
-  expect(c[1].msgs).toEqual([{ when: '11:00', from: 'Hanako', head: 'two' }, { when: '10/07 09:00', from: 'Taro', head: 'one' }])
+  expect(c[1].msgs).toEqual([{ id: 'ws-a:G1:2', when: '11:00', from: 'Hanako', head: 'two' }, { id: 'ws-a:G1:1', when: '10/07 09:00', from: 'Taro', head: 'one' }])
   expect(c[0].msgs).toEqual([])
+})
+
+test('slackSelectedIds: a ticked message goes alone; a ticked conversation brings all of its ids', () => {
+  const now = Date.parse('2026-10-08T20:00:00+09:00')
+  const s = (id: string) => ({ id, workspace: 'ws-a', kind: 'public', channel: 'general', date: '2026-10-08T10:00:00+09:00', count_only: false, from_name: 'Taro', head: id })
+  const c = slackConversations([s('ws-a:C1:1'), s('ws-a:C1:2'), s('ws-a:C1:3'), s('ws-a:C2:9')], new Set(), now)
+  expect(slackSelectedIds(c, new Set(), new Set(['ws-a:C1:2']))).toEqual(['ws-a:C1:2'])
+  expect(slackSelectedIds(c, new Set(['ws-a:C1']), new Set()).sort()).toEqual(['ws-a:C1:1', 'ws-a:C1:2', 'ws-a:C1:3'])
+  expect(slackSelectedIds(c, new Set(['ws-a:C1']), new Set(['ws-a:C1:2', 'ws-a:C2:9'])).sort()).toEqual(['ws-a:C1:1', 'ws-a:C1:2', 'ws-a:C1:3', 'ws-a:C2:9'])
 })
 
 test('チャンネルを選ぶ: every channel with its mark; pressing a mark cycles it and writes it with --set-watch', OPTIONS as any, async ($, on) => {

@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackSelectedIds, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -518,6 +518,8 @@ let slackNote = ''
 let slackNoteSeq = 0
 let slackBusy = false
 let slackSel = new Set<string>() // row keys
+// One message at a time (user 10/16: to answer each in its own thread), next to the whole conversation.
+let slackMsgSel = new Set<string>() // message ids
 let slackMode: 'list' | 'ask' = 'list'
 const slackDone = new Set<string>() // ids marked 済み this session (the script keeps them too)
 let slackPage = 0 // DMs
@@ -583,7 +585,7 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
     const r = await $.process.run(slackDoneArgv(python, repo, ids), { cwd: repo, timeoutMs: 30000 })
     if (r.exitCode === 0) {
       for (const id of ids) slackDone.add(id)
-      slackSel = new Set()
+      slackSel = new Set(); slackMsgSel = new Set()
       slackNoteSeq++; slackNote = `済みにした: ${ids.length} 件（手元の記録だけ。Slack の未読はそのまま）`
     } else {
       slackNoteSeq++; slackNote = `済みにできなかった（exit ${r.exitCode}）`
@@ -605,7 +607,7 @@ async function slackAsk($: any, ids: string[], ask: string): Promise<void> {
   } else {
     const r = await $.prompt.fill({ text })
     slackNoteSeq++; slackNote = r.isFilled ? 'プロンプトに下書きを入れた（直して送ると、選んだメッセージだけを読みます）' : `プロンプトに入れられなかった（${r.reason ?? '理由不明'}）`
-    if (r.isFilled) slackSel = new Set()
+    if (r.isFilled) { slackSel = new Set(); slackMsgSel = new Set() }
   }
   slackMode = 'list'
   $.ui.invalidate('ui.render')
@@ -1451,7 +1453,7 @@ export const register: Register = (on, options) => {
           // with its own pages. The heading says where and how many; the newest
           // three messages go under it, each on its own line.
           const convs = slackConversations(slackFeed?.items ?? [], slackDone, nowMs)
-          const selIds = convs.filter(c => slackSel.has(c.key)).flatMap(c => c.ids)
+          const selIds = slackSelectedIds(convs, slackSel, slackMsgSel)
           const selCountOnly = convs.some(c => slackSel.has(c.key) && c.countOnly)
           const part = (title: string, list: typeof convs, page: number, setPage: (n: number) => void, keyp: string) => {
             const pages = Math.max(1, Math.ceil(list.length / SLACK_CONVS))
@@ -1474,7 +1476,13 @@ export const register: Register = (on, options) => {
                       <Text bold={!c.countOnly} dimColor={c.countOnly} wrap="truncate">{clip(c.place, Math.max(10, width - 34))}</Text>
                       <Text dimColor>{`${c.workspace} · ${c.ids.length} 件${c.countOnly ? '（件数だけ）' : ''}${c.mention ? '（メンション）' : ''}`}</Text>
                     </Box>
-                    {c.msgs.slice(0, SLACK_MSGS).map((m, i) => <Text key={`slkm-${c.key}-${i}`} wrap="truncate">{clip(`    ${m.when} ${m.from}: ${m.head}`, width - 1)}</Text>)}
+                    {c.msgs.slice(0, SLACK_MSGS).map((m, i) => (
+                      <Box key={`slkm-${c.key}-${i}`} flexDirection="row" columnGap={1}>
+                        <Text>  </Text>
+                        <Button key={`slack-msg-${m.id}`} label={slackSel.has(c.key) || slackMsgSel.has(m.id) ? '☑' : '☐'} plain dimColor={slackSel.has(c.key)} onPress={() => { if (slackMsgSel.has(m.id)) slackMsgSel.delete(m.id); else slackMsgSel.add(m.id); redraw() }} />
+                        <Text wrap="truncate">{clip(`${m.when} ${m.from}: ${m.head}`, width - 8)}</Text>
+                      </Box>
+                    ))}
                     {c.msgs.length > SLACK_MSGS && <Text dimColor>{`    …ほか ${c.msgs.length - SLACK_MSGS} 件`}</Text>}
                   </Box>
                 ))}

@@ -193,7 +193,7 @@ export type SlackConv = {
   countOnly: boolean
   mention: boolean
   isDm: boolean // a DM or group DM (the pane lists them apart from channels)
-  msgs: { when: string; from: string; head: string }[] // newest first
+  msgs: { id: string; when: string; from: string; head: string }[] // newest first
 }
 
 export function slackConversations(items: readonly SlackItem[], done: ReadonlySet<string>, now: number): SlackConv[] {
@@ -209,9 +209,14 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
       by.set(key, c)
     }
     c.ids.push(x.id)
-    if (!x.count_only) c.msgs.push({ when: when(x.date), from: x.from_name ?? '', head: x.head ?? '' })
+    if (!x.count_only) c.msgs.push({ id: x.id, when: when(x.date), from: x.from_name ?? '', head: x.head ?? '' })
   }
   return [...by.values()]
+}
+
+// The ids the person chose: every id of a ticked conversation, plus each ticked message by itself.
+export function slackSelectedIds(convs: readonly SlackConv[], convSel: ReadonlySet<string>, msgSel: ReadonlySet<string>): string[] {
+  return [...new Set([...convs.filter(c => convSel.has(c.key)).flatMap(c => c.ids), ...convs.flatMap(c => c.msgs.map(m => m.id)).filter(id => msgSel.has(id))])]
 }
 
 // "team-a=slack-a, team-b=slack-b" → { 'team-a': 'slack-a', ... }. userConfig takes strings only:
