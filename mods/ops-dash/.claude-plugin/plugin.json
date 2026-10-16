@@ -17,6 +17,12 @@
       "title": "life repo",
       "description": "Absolute path of the repo holding scripts/google_calendar_read.py and ideas/task-review/tasks.md. Empty: no calendar and no tasks.",
       "default": ""
+    },
+    "slack_mcp": {
+      "type": "string",
+      "title": "Slack workspaces read through an MCP server",
+      "description": "workspace=server pairs, comma-separated (e.g. team-a=slack-a). Those workspaces may be read through the MCP server when 詳しく hands a Slack message to the model. Empty: --show only.",
+      "default": ""
     }
   }
 }

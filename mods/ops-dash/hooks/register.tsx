@@ -6,7 +6,7 @@ import { bytesToBase64, entryLines, frontValue, imageRows, isBase64, pngList, to
 import type { TocRow } from './notes'
 import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
-import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDetailPrompt, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
+import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -597,6 +597,7 @@ async function slackMarkDone($: any, python: string, repo: string, ids: string[]
 // workspace → Slack MCP server name, from pluginConfigs (machine-specific, not in this repo).
 let slackMcp: Record<string, string> = {}
 
+
 async function slackAsk($: any, ids: string[], ask: string): Promise<void> {
   const text = slackDetailPrompt(slackFeed?.items ?? [], ids, ask, slackMcp)
   if (!text) {
@@ -1109,7 +1110,7 @@ export const register: Register = (on, options) => {
   resolved = false
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
-  slackMcp = (options.slack_mcp && typeof options.slack_mcp === 'object' ? options.slack_mcp : {}) as Record<string, string>
+  slackMcp = parseSlackMcp(String(options.slack_mcp ?? ''))
 
   on('session.start', async ($, e, next) => {
     const me = await who($)

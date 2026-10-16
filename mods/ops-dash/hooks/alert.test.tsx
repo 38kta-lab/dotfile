@@ -337,7 +337,7 @@ test('opening an unread mail marks it read in Gmail (gmail_label.py --remove-lab
   await ui.unmount()
 })
 
-import { slackDetailPrompt } from './alert'
+import { slackDetailPrompt, parseSlackMcp } from './alert'
 
 test('slackDetailPrompt: lists the chosen messages (oldest first) and the ask; refuses a count-only channel', () => {
   const s = (id: string, date: string, extra: object = {}) => ({ id, workspace: 'ws', label: 'Team', kind: 'public', channel: 'general', date, count_only: false, from_name: 'Alice', head: `head ${id}`, ...extra })
@@ -353,4 +353,6 @@ test('slackDetailPrompt: lists the chosen messages (oldest first) and the ask; r
   // A workspace mapped to a Slack MCP server is read through it; others stay on --show.
   expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { ws: 'slack-team' })).toContain('ws は MCP の slack-team で読んでよい')
   expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { other: 'slack-other' })).not.toContain('MCP')
+  expect(parseSlackMcp('a=slack-a, b = slack-b,,bad')).toEqual({ a: 'slack-a', b: 'slack-b' })
+  expect(parseSlackMcp('')).toEqual({})
 })

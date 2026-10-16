@@ -214,6 +214,17 @@ export function slackConversations(items: readonly SlackItem[], done: ReadonlySe
   return [...by.values()]
 }
 
+// "team-a=slack-a, team-b=slack-b" → { 'team-a': 'slack-a', ... }. userConfig takes strings only:
+// an object here makes the whole options block fail to load (calendar and tasks vanished, 10/16).
+export function parseSlackMcp(text: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const pair of text.split(',')) {
+    const [w, srv] = pair.split('=').map(x => x.trim())
+    if (w && srv) out[w] = srv
+  }
+  return out
+}
+
 // The draft 詳しく puts in the prompt for Slack (user 10/14): the chosen
 // messages' ids and heads, and what to do. Only the person's send hands it to
 // the model, which reads each body with `slack_feed.py --show <id>`. A
