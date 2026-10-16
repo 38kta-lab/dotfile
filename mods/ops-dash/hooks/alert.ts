@@ -237,7 +237,12 @@ export function slackDetailPrompt(items: readonly SlackItem[], ids: readonly str
   // A workspace the person also connected as a Slack MCP server (pluginConfigs
   // slack_mcp: workspace → server name) may be read through it: the thread,
   // files and canvases too (user 10/16). The others stay on --show.
-  const viaMcp = [...new Set(chosen.map(x => x.workspace))].filter(w => mcp[w]).map(w => `${w} は MCP の ${mcp[w]}`)
+  // "slack-a@T0123": a workspace inside an Enterprise Grid, where the server opens the
+  // person's default workspace unless the team_id is passed (user 10/16).
+  const viaMcp = [...new Set(chosen.map(x => x.workspace))].filter(w => mcp[w]).map(w => {
+    const [srv, team] = mcp[w].split('@')
+    return team ? `${w} は MCP の ${srv}（team_id ${team}。list_user_channels などには必ず team_id を渡す）` : `${w} は MCP の ${srv}`
+  })
   return [
     'Slack の次のメッセージを読んで、頼んだことをしてください。本文は life repo で `python scripts/slack/slack_feed.py --show <id>` で取る（読むだけ。返信・投稿はしない）。',
     ...(viaMcp.length ? [`ただし ${viaMcp.join('、')} で読んでよい（スレッド・添付・キャンバスまで。読むだけ。返信・投稿はしない）。`] : []),

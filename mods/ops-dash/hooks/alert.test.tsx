@@ -353,6 +353,9 @@ test('slackDetailPrompt: lists the chosen messages (oldest first) and the ask; r
   // A workspace mapped to a Slack MCP server is read through it; others stay on --show.
   expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { ws: 'slack-team' })).toContain('ws は MCP の slack-team で読んでよい')
   expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { other: 'slack-other' })).not.toContain('MCP')
+  // Inside an Enterprise Grid the team_id goes with the server name.
+  expect(slackDetailPrompt(items, ['ws:C1:1'], 'x', { ws: 'slack-team@T0TEAM' })).toContain('ws は MCP の slack-team（team_id T0TEAM。')
+  expect(parseSlackMcp('a=slack-a@T0A')).toEqual({ a: 'slack-a@T0A' })
   expect(parseSlackMcp('a=slack-a, b = slack-b,,bad')).toEqual({ a: 'slack-a', b: 'slack-b' })
   expect(parseSlackMcp('')).toEqual({})
 })
