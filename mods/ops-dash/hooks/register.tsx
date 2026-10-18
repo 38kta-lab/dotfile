@@ -8,6 +8,8 @@ import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
 import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackSelectedIds, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
+import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, rowsText } from './threads'
+import type { ThreadRow } from './threads'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
 // store every session on this machine shares. The ops session reads them all.
@@ -1095,6 +1097,48 @@ export function hubLine(h: Hub, width: number): string {
   return clip(head + h.title.replace(/\s*\([^)]*\)\s*$/, ''), width)
 }
 
+// ---- threads: peers' replies to ops, by sender (threads.ts) ----------------
+
+const THREADS = 'threads'
+
+// LIFE_THREADS_DIR moves the files for a trial run; the real place is outside the repo.
+async function threadsDir($: any): Promise<string> {
+  const set = await $.env.get('LIFE_THREADS_DIR')
+  if (set) return String(set)
+  return `${String((await $.env.get('HOME')) ?? '')}/.local/share/life/threads`
+}
+
+async function threadRows($: any, path: string): Promise<ThreadRow[]> {
+  try {
+    return parseRows(String(await $.fs.read(path)))
+  } catch {
+    return []
+  }
+}
+
+// One write at a time: two replies landing together must not take one number.
+let threadWrites: Promise<unknown> = Promise.resolve()
+function serially<T>(work: () => Promise<T>): Promise<T> {
+  const run = threadWrites.then(work, work)
+  threadWrites = run.catch(() => undefined)
+  return run
+}
+
+async function threadAppend($: any, name: string, row: Omit<ThreadRow, 'n'>, numberIt: boolean): Promise<number | undefined> {
+  const path = fileOf(await threadsDir($), name)
+  return serially(async () => {
+    const rows = await threadRows($, path)
+    const n = numberIt ? nextNumber(rows) : undefined
+    await $.fs.write(path, rowsText([...rows, n === undefined ? row : { ...row, n }]))
+    return n
+  })
+}
+
+// Replies read in the running turn, waiting for what ops says of them.
+let threadPending: { name: string; n: number }[] = []
+// Who sits at which socket, as replies said: a send to a `uds:` address is filed under the name.
+const threadSocks = new Map<string, string>()
+
 // Who this session is, read once per load. Every hook asks, so a skipped
 // session.start (or a reload) never leaves the session silent.
 let self: Me | undefined
@@ -1227,6 +1271,28 @@ export const register: Register = (on, options) => {
     }
     return ran
   })
+
+  // ops: each peer's reply is kept in its thread and numbered; the model still
+  // gets the whole of it, the number put at the head of the body. Nothing is
+  // taken: a failed record leaves the reply as it came.
+  on('session.receive', async ($, e, next) => {
+    if (e.origin.kind !== 'peer' || e.agentId !== undefined) return next(e)
+    const me = await who($)
+    if (me?.role !== 'ops') return next(e)
+    const peer = parsePeer(e.text)
+    if (!peer) return next(e)
+    if (peer.sock) threadSocks.set(peer.sock, peer.name)
+    let n: number | undefined
+    try {
+      n = await threadAppend($, peer.name, { dir: 'in', at: await $.clock.now(), text: peer.body, read: false }, true)
+    } catch {
+      // the reply goes on unnumbered
+    }
+    if (n === undefined) return next(e)
+    threadPending.push({ name: peer.name, n })
+    $.ui.invalidate('ui.render')
+    return next({ ...e, text: numbered(e.text, label(peer.name, n)) })
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'fig' }, async $ => {
     await figLoad($, repo)
