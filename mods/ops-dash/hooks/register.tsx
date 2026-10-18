@@ -8,7 +8,7 @@ import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
 import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackSelectedIds, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
-import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, rowsText } from './threads'
+import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, peerOf, rowsText, splitAnswer } from './threads'
 import type { ThreadRow } from './threads'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -1230,10 +1230,27 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Every session: idle again, and when. ops: what ops told the person in a
+  // turn that read peers' replies goes under those replies in their threads.
+  // One reply, the whole answer; several, the part under each one's 【b-3】
+  // heading (ops-rules asks for them).
   on('turn.complete', async ($, e, next) => {
     const ran = await next(e)
     const me = await who($)
     if (me) await write($, me, { busy: false, lastTurnEndAt: await $.clock.now() })
+    if (me?.role !== 'ops' || e.agentId !== undefined || e.reason !== 'answer' || !e.answer.trim() || threadPending.length === 0) return ran
+    const read = threadPending
+    threadPending = []
+    try {
+      const parts = splitAnswer(e.answer, read.map(r => label(r.name, r.n)))
+      const now = await $.clock.now()
+      for (const r of read) {
+        await threadAppend($, r.name, { dir: 'ops', at: now, ref: r.n, text: parts.get(label(r.name, r.n)) ?? e.answer.trim() }, false)
+      }
+      $.ui.invalidate('ui.render')
+    } catch {
+      // ops said it in the conversation anyway; only the copy is lost
+    }
     return ran
   })
 
@@ -1264,6 +1281,18 @@ export const register: Register = (on, options) => {
           await $.store.set(DISPATCH + e.to.replace(/ \[[0-9a-f]+\]$/, ''), { at: now, line })
         } catch {
           // a lost dispatch record only blanks one cell
+        }
+        // The same send in the peer's thread, so request and reply read in one line.
+        // A `uds:` address is filed under the name a reply from it gave.
+        const to = peerOf(e.to)
+        const name = to.startsWith('uds:') ? threadSocks.get(to) : to
+        if (e.agentId === undefined && name) {
+          try {
+            await threadAppend($, name, { dir: 'out', at: now, text: e.text }, false)
+            $.ui.invalidate('ui.render')
+          } catch {
+            // the send went; only its copy in the thread is lost
+          }
         }
       } else if (/^ops\b/.test(e.to)) {
         await write($, me, { lastReportAt: now })

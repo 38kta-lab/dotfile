@@ -30,6 +30,9 @@ function world(on: any, vars: Record<string, string | undefined>, files = new Ma
   on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
   on('session.receive', (_$: any, e: any) => { got.push(e); return { text: e.text } })
+  on('session.send', () => ({ isDelivered: true }))
+  on('turn.start', (_$: any, e: any) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.panes', () => ({ value: [] }))
@@ -131,4 +134,81 @@ test('rows: a torn line is skipped; nextNumber and unread count the replies', ()
   expect(rows.length).toBe(3)
   expect(nextNumber(rows)).toBe(3)
   expect(unread(rows)).toBe(1)
+})
+
+// ---- what ops sent, and what ops made of the replies ----
+
+const done = (answer: string, reason = 'answer') => ({ reason, answer, durationMs: 1, isAborted: reason === 'aborted', turnId: 't1' }) as any
+const rowsOf = (files: Map<string, string>, name: string) => parseRows(files.get(`${DIR}/${name}.jsonl`) ?? '')
+
+test('ops: a send goes into the peer\'s thread, by name without the ref', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await $.session.send({ to: 'claude-worker-b [b43449]', text: '表を直してください' } as any)
+  expect(rowsOf(files, 'claude-worker-b')).toMatchObject([{ dir: 'out', text: '表を直してください' }])
+})
+
+test('ops: a send to the address a reply came from is filed under that reply\'s name', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('peer-a', '済み', '555'))
+  await $.session.send({ to: 'uds:/tmp/cc-socks/555.sock', text: 'ありがとう' } as any)
+  expect(rowsOf(files, 'peer-a').map(r => r.dir)).toEqual(['in', 'out'])
+})
+
+test('a peer\'s own sends are not threads', async ($, on) => {
+  const { files } = world(on, PEER)
+  await $.session.start(START)
+  await $.session.send({ to: 'ops', text: '報告' } as any)
+  expect([...files.keys()]).toEqual([])
+})
+
+test('one reply in a turn: the whole answer goes under it', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('peer-a', 'v2 で完成'))
+  await $.turn.complete(done('要点: v2 で完成。\nおすすめ: このまま進める'))
+  const rows = rowsOf(files, 'peer-a')
+  expect(rows[1]).toMatchObject({ dir: 'ops', ref: 1, text: '要点: v2 で完成。\nおすすめ: このまま進める' })
+  // the next turn reads no reply: nothing more is added
+  await $.turn.complete(done('別の話'))
+  expect(rowsOf(files, 'peer-a').length).toBe(2)
+})
+
+test('several replies in a turn: each gets the part under its heading', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('claude-worker-b', 'x'))
+  await receive($, frame('peer-c', 'y'))
+  await $.turn.complete(done('二通届きました。\n\n### 【worker-b-1】\nb はこのまま。\n\n**【peer-c-1】** c は待つ。\n続き'))
+  expect(rowsOf(files, 'claude-worker-b')[1].text).toBe('二通届きました。\n\nb はこのまま。')
+  expect(rowsOf(files, 'peer-c')[1].text).toBe('二通届きました。\n\nc は待つ。\n続き')
+})
+
+test('several replies and no headings: every one gets the whole answer', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('peer-a', 'x'))
+  await receive($, frame('peer-c', 'y'))
+  await $.turn.complete(done('まとめて答えます'))
+  expect(rowsOf(files, 'peer-a')[1].text).toBe('まとめて答えます')
+  expect(rowsOf(files, 'peer-c')[1].text).toBe('まとめて答えます')
+})
+
+test('a turn that ends without an answer keeps the replies for the next answer', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('peer-a', 'x'))
+  await $.turn.complete(done('', 'aborted'))
+  expect(rowsOf(files, 'peer-a').length).toBe(1)
+  await $.turn.complete(done('読みました'))
+  expect(rowsOf(files, 'peer-a')[1]).toMatchObject({ dir: 'ops', ref: 1, text: '読みました' })
+})
+
+test('splitAnswer: a heading only counts at the head of a line; a missing one gets the whole', () => {
+  const parts = splitAnswer('【a-1】 一つ目。a-2 のことは 【a-2】 として後で\n【a-3】：三つ目', ['a-1', 'a-2', 'a-3'])
+  expect(parts.get('a-1')).toBe('一つ目。a-2 のことは 【a-2】 として後で')
+  expect(parts.get('a-3')).toBe('三つ目')
+  expect(parts.get('a-2')).toBe('【a-1】 一つ目。a-2 のことは 【a-2】 として後で\n【a-3】：三つ目')
+  expect(splitAnswer(' 全部 ', ['a-1']).get('a-1')).toBe('全部')
 })
