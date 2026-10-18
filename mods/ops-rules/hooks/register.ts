@@ -134,6 +134,19 @@ const JAPANESE: { id: string; text: string; scope: 'session' } = {
     'コマンドの出力・コード・ファイル名が英語でも、説明の地の文は日本語で書く。長い作業の後の最終報告ほど英語になりやすいので、書き始める前に言語を確かめる。',
   scope: 'session',
 }
+// ---- ops: what ops makes of peers' replies, cut by reply ---------------------
+// ops-dash's threads tab numbers each peer reply (【b-3】 at the head of its
+// body) and files what ops answers in that turn under it. With several replies
+// in one turn it cuts the answer at a line that begins with a reply's number.
+const THREADS: { id: string; text: string; scope: 'session' } = {
+  id: 'ops-rules:threads',
+  text:
+    'peer の返事は、本文の頭に【b-3】のような番号が付いて届く（ops-dash の threads）。' +
+    '1 ターンに 2 通以上の返事を読んで user に答えるときは、返事ごとに、行頭にその番号を置いた見出し（例: 【b-3】）で分けて書き、' +
+    '各見出しの下にその返事の要点・おすすめ・user に決めてほしいことを書く。1 通だけのときは見出しは要らない。',
+  scope: 'session',
+}
+
 const RESTATE =
   '（ops-rules 自動）直前の返答が英語でした。同じ内容を日本語で言い直してください。作業はやり直さず、ツールも使わないでください。'
 
@@ -214,7 +227,14 @@ export const register: Register = on => {
 
   on('prompt.compose', async ($, e, next) => {
     const r = await next(e)
-    return { ...r, sections: [...r.sections.filter(x => x.id !== JAPANESE.id), JAPANESE] }
+    let ops = false
+    try {
+      ops = (await $.env.get('LIFE_ROLE')) === 'ops'
+    } catch {
+      // no role: the shared rules only
+    }
+    const mine = ops ? [JAPANESE, THREADS] : [JAPANESE]
+    return { ...r, sections: [...r.sections.filter(x => !mine.some(m => m.id === x.id) && x.id !== THREADS.id), ...mine] }
   })
 
   on('turn.complete', async ($, e, next) => {

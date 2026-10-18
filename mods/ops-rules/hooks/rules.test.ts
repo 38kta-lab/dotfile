@@ -300,6 +300,21 @@ test('the system prompt carries the Japanese rule once', async ($, on) => {
   expect(r.sections[1].text).toContain('日本語')
 })
 
+test('the ops session also carries the threads rule: several replies in a turn are answered under their numbers', async ($, on) => {
+  on('env.get', (_$: any, e: any, next: any) => (e.name === 'LIFE_ROLE' ? { value: 'ops' } : next(e)))
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'x', scope: 'shared' }] }))
+  const r: any = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] } as any)
+  expect(r.sections.map((x: any) => x.id)).toEqual(['intro', 'ops-rules:japanese', 'ops-rules:threads'])
+  expect(r.sections[2].text).toContain('行頭にその番号を置いた見出し（例: 【b-3】）')
+})
+
+test('a session other than ops does not carry the threads rule', async ($, on) => {
+  on('env.get', (_$: any, e: any, next: any) => (e.name === 'LIFE_ROLE' ? { value: 'peer' } : next(e)))
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'x', scope: 'shared' }] }))
+  const r: any = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] } as any)
+  expect(r.sections.map((x: any) => x.id)).toEqual(['intro', 'ops-rules:japanese'])
+})
+
 // ---- the model may not read mail bodies the alert pane shows ----
 
 import { readsMailBody } from './register'

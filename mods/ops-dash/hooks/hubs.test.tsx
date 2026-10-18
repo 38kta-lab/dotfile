@@ -158,12 +158,12 @@ test('the milestones tab of a hub is drawn as a list', () => {
   expect(md).not.toMatch(/^\|/m)
 })
 
-test('the ops session opens dash, hubs, then notes at start (the first opened is in front), without taking the keyboard', OPTIONS as any, async ($, on) => {
+test('the ops session opens dash, hubs, notes, then threads at start (the first opened is in front), without taking the keyboard', OPTIONS as any, async ($, on) => {
   world(on)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await new Promise(r => setTimeout(r, 20))
-  expect(OPENED.slice(0, 3).map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
-  expect(OPENED.slice(0, 3).every(o => o.focus === undefined)).toBe(true)
+  expect(OPENED.slice(0, 4).map(o => o.id)).toEqual(['peers', 'hubs', 'notes', 'threads'])
+  expect(OPENED.slice(0, 4).every(o => o.focus === undefined)).toBe(true)
 })
 
 test('consultText: where the hub is, the newest Current State, the first open next actions, then the ask', () => {
@@ -214,6 +214,6 @@ test('at start, when dash is already in front, nothing takes the keyboard', OPTI
   on('ui.panes', () => ({ value: [{ id: 'peers', title: 'ops-dash', isShown: true, isFocused: false, isPlaced: true }] }))
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as any)
   await new Promise(r => setTimeout(r, 20))
-  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs', 'notes'])
+  expect(OPENED.map(o => o.id)).toEqual(['peers', 'hubs', 'notes', 'threads'])
   expect(OPENED.every(o => o.focus === undefined)).toBe(true)
 })
