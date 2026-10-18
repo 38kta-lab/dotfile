@@ -116,6 +116,19 @@ export function splitAnswer(answer: string, tags: readonly string[]): Map<string
   return out
 }
 
+// Whether the reply numbered `tag` reached the model before its last answer:
+// the delivery (a user row holding 【tag】) comes before the last assistant row.
+export function readBefore(messages: readonly { role: string; text: string }[], tag: string): boolean {
+  const mark = `【${tag}】`
+  let got = -1
+  let answered = -1
+  messages.forEach((m, i) => {
+    if (m.role === 'user' && m.text.includes(mark)) got = i
+    if (m.role === 'assistant') answered = i
+  })
+  return got >= 0 && got < answered
+}
+
 // The order a thread reads in: by time, with what ops made of a reply right
 // under that reply (its own sends in that turn come after).
 export function threadOrder(rows: readonly ThreadRow[]): ThreadRow[] {

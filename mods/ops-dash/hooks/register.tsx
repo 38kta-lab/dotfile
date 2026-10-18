@@ -8,7 +8,7 @@ import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
 import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackSelectedIds, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
-import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, peerOf, replyPrompt, rowsText, splitAnswer, threadOrder, unread, wrapCells } from './threads'
+import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, peerOf, readBefore, replyPrompt, rowsText, splitAnswer, threadOrder, unread, wrapCells } from './threads'
 import type { ThreadRow } from './threads'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -1135,7 +1135,13 @@ async function threadAppend($: any, name: string, row: Omit<ThreadRow, 'n'>, num
 }
 
 // Replies read in the running turn, waiting for what ops says of them.
-let threadPending: { name: string; n: number }[] = []
+let threadPending: { name: string; n: number; seen?: boolean }[] = []
+function blockText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content.map((b: any) => (typeof b?.text === 'string' ? b.text : typeof b?.content === 'string' ? b.content : '')).join('\n')
+}
+
 // Who sits at which socket, as replies said: a send to a `uds:` address is filed under the name.
 const threadSocks = new Map<string, string>()
 
@@ -1317,8 +1323,20 @@ export const register: Register = (on, options) => {
     const me = await who($)
     if (me) await write($, me, { busy: false, lastTurnEndAt: await $.clock.now() })
     if (me?.role !== 'ops' || e.agentId !== undefined || e.reason !== 'answer' || !e.answer.trim() || threadPending.length === 0) return ran
-    const read = threadPending
-    threadPending = []
+    // Only the replies ops had read before it answered: one landing while the
+    // turn ran is often read in the next turn (trial run 10/19, the answers
+    // went one reply off). Read: its row entered the conversation
+    // (session.append), or the transcript has it before the last answer.
+    let messages: { role: string; text: string }[] = []
+    try {
+      const got = await $.session.messages()
+      if (Array.isArray(got)) messages = got
+    } catch {
+      // the rows seen at session.append decide alone
+    }
+    const read = threadPending.filter(p => p.seen || readBefore(messages, label(p.name, p.n)))
+    threadPending = threadPending.filter(p => !read.includes(p))
+    if (read.length === 0) return ran
     try {
       const parts = splitAnswer(e.answer, read.map(r => label(r.name, r.n)))
       const now = await $.clock.now()
@@ -1399,6 +1417,17 @@ export const register: Register = (on, options) => {
     threadPending.push({ name: peer.name, n })
     $.ui.invalidate('ui.render')
     return next({ ...e, text: numbered(e.text, label(peer.name, n)) })
+  }).catch(($, e, next) => next(e))
+
+  // A waiting reply is read once its row, number and all, enters ops's conversation.
+  on('session.append', async ($, e, next) => {
+    // Any row but the model's own (a delivery, a queued prompt's attachment): ops's
+    // headings name the numbers too.
+    if (threadPending.length > 0 && e.agentId === undefined && e.message.type !== 'assistant' && e.message.role !== 'assistant') {
+      const text = blockText(e.message.content)
+      for (const p of threadPending) if (text.includes(`【${label(p.name, p.n)}】`)) p.seen = true
+    }
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'fig' }, async $ => {

@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { label, nextNumber, numbered, parsePeer, parseRows, peerOf, replyPrompt, rowsText, shortName, splitAnswer, threadOrder, unread, wrapCells } from './threads'
+import { label, readBefore, nextNumber, numbered, parsePeer, parseRows, peerOf, replyPrompt, rowsText, shortName, splitAnswer, threadOrder, unread, wrapCells } from './threads'
 
 // Made-up peers and text only: this file is in a public repo.
 
@@ -142,6 +142,9 @@ test('rows: a torn line is skipped; nextNumber and unread count the replies', ()
 
 // ---- what ops sent, and what ops made of the replies ----
 
+// the reply's row entering the conversation, as a session appends it before ops answers
+const enters = ($: any, name: string, n: number, body = 'x') =>
+  $.session.append({ message: { type: 'user', content: [{ type: 'text', text: frame(name, `【${label(name, n)}】${body}`) }] } } as any)
 const done = (answer: string, reason = 'answer') => ({ reason, answer, durationMs: 1, isAborted: reason === 'aborted', turnId: 't1' }) as any
 const rowsOf = (files: Map<string, string>, name: string) => parseRows(files.get(`${DIR}/${name}.jsonl`) ?? '')
 
@@ -171,6 +174,7 @@ test('one reply in a turn: the whole answer goes under it', async ($, on) => {
   const { files } = world(on, OPS)
   await $.session.start(START)
   await receive($, frame('peer-a', 'v2 で完成'))
+  await enters($, 'peer-a', 1)
   await $.turn.complete(done('要点: v2 で完成。\nおすすめ: このまま進める'))
   const rows = rowsOf(files, 'peer-a')
   expect(rows[1]).toMatchObject({ dir: 'ops', ref: 1, text: '要点: v2 で完成。\nおすすめ: このまま進める' })
@@ -184,6 +188,8 @@ test('several replies in a turn: each gets the part under its heading', async ($
   await $.session.start(START)
   await receive($, frame('claude-worker-b', 'x'))
   await receive($, frame('peer-c', 'y'))
+  await enters($, 'claude-worker-b', 1)
+  await enters($, 'peer-c', 1)
   await $.turn.complete(done('二通届きました。\n\n### 【worker-b-1】\nb はこのまま。\n\n**【peer-c-1】** c は待つ。\n続き'))
   expect(rowsOf(files, 'claude-worker-b')[1].text).toBe('二通届きました。\n\nb はこのまま。')
   expect(rowsOf(files, 'peer-c')[1].text).toBe('二通届きました。\n\nc は待つ。\n続き')
@@ -194,6 +200,8 @@ test('several replies and no headings: every one gets the whole answer', async (
   await $.session.start(START)
   await receive($, frame('peer-a', 'x'))
   await receive($, frame('peer-c', 'y'))
+  await enters($, 'peer-a', 1)
+  await enters($, 'peer-c', 1)
   await $.turn.complete(done('まとめて答えます'))
   expect(rowsOf(files, 'peer-a')[1].text).toBe('まとめて答えます')
   expect(rowsOf(files, 'peer-c')[1].text).toBe('まとめて答えます')
@@ -203,6 +211,7 @@ test('a turn that ends without an answer keeps the replies for the next answer',
   const { files } = world(on, OPS)
   await $.session.start(START)
   await receive($, frame('peer-a', 'x'))
+  await enters($, 'peer-a', 1)
   await $.turn.complete(done('', 'aborted'))
   expect(rowsOf(files, 'peer-a').length).toBe(1)
   await $.turn.complete(done('読みました'))
@@ -332,4 +341,24 @@ test('threadOrder puts what ops said right under its reply; wrapCells counts wid
   expect(order.map(r => r.text)).toEqual(['a', 'o', 'b', 'c'])
   expect(wrapCells('ああああ', 4)).toEqual(['ああ', 'ああ'])
   expect(wrapCells('ab\ncd', 10)).toEqual(['ab', 'cd'])
+})
+
+test('a reply that lands while a turn runs, and is read only in the next turn, goes under the next answer', async ($, on) => {
+  const { files } = world(on, OPS)
+  await $.session.start(START)
+  await receive($, frame('peer-a', '数字は 3'))
+  // the sending turn ends before the reply reaches the model
+  await $.turn.complete(done('送りました。返事はまだです'))
+  expect(rowsOf(files, 'peer-a').length).toBe(1)
+  // the next turn: the reply's row enters the conversation, then ops answers
+  await $.session.append({ message: { type: 'user', content: [{ type: 'text', text: frame('peer-a', '【peer-a-1】数字は 3') }] } } as any)
+  await $.turn.complete(done('3 でした'))
+  expect(rowsOf(files, 'peer-a')[1]).toMatchObject({ dir: 'ops', ref: 1, text: '3 でした' })
+})
+
+test('readBefore: the reply must come before the last answer, and only a user row counts', () => {
+  const tag = 'peer-a-1'
+  expect(readBefore([{ role: 'user', text: '【peer-a-1】x' }, { role: 'assistant', text: 'y' }], tag)).toBe(true)
+  expect(readBefore([{ role: 'assistant', text: 'y' }, { role: 'user', text: '【peer-a-1】x' }], tag)).toBe(false)
+  expect(readBefore([{ role: 'assistant', text: '【peer-a-1】 について' }], tag)).toBe(false)
 })
