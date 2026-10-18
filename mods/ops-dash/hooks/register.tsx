@@ -8,7 +8,7 @@ import { latestTrendFile, parseTrend, starText, topItems } from './trend'
 import type { Trend, TrendItem } from './trend'
 import { bodyArgv, readArgv, calendarArgv, calendarTitle, detailPrompt, doneArgv, mailLine, parseBody, parseSlack, slackConversations, slackSelectedIds, slackDetailPrompt, parseSlackMcp, slackDoneArgv, parseChannels, nextWatch, setWatchArgv, channelsArgv, WATCH_LABEL, parseFeed, parseWhen, shortDate, splitMail } from './alert'
 import type { MailBody, MailFeed, MailItem } from './alert'
-import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, peerOf, rowsText, splitAnswer } from './threads'
+import { fileOf, label, nextNumber, numbered, parsePeer, parseRows, peerOf, replyPrompt, rowsText, splitAnswer, threadOrder, unread, wrapCells } from './threads'
 import type { ThreadRow } from './threads'
 
 // Each session started with LIFE_ROLE writes one record about itself to the
@@ -1139,6 +1139,82 @@ let threadPending: { name: string; n: number }[] = []
 // Who sits at which socket, as replies said: a send to a `uds:` address is filed under the name.
 const threadSocks = new Map<string, string>()
 
+// The tab: every peer's file, read again only when it changed.
+type ThreadFile = { name: string; rows: ThreadRow[] }
+const threadCache = new Map<string, { stamp: string; rows: ThreadRow[] }>()
+
+async function loadThreads($: any): Promise<ThreadFile[]> {
+  const dir = await threadsDir($)
+  let entries: any[] = []
+  try {
+    entries = await $.fs.list(dir)
+  } catch {
+    return []
+  }
+  const out: ThreadFile[] = []
+  for (const f of entries) {
+    const name = String(f.name)
+    if (f.kind !== 'file' || !name.endsWith('.jsonl')) continue
+    const path = `${dir}/${name}`
+    const stamp = `${f.mtimeMs}:${f.size}`
+    let c = threadCache.get(path)
+    if (!c || c.stamp !== stamp) {
+      c = { stamp, rows: await threadRows($, path) }
+      threadCache.set(path, c)
+    }
+    out.push({ name: name.replace(/\.jsonl$/, ''), rows: c.rows })
+  }
+  return out
+}
+
+async function threadMarkRead($: any, name: string): Promise<void> {
+  const path = fileOf(await threadsDir($), name)
+  try {
+    await serially(async () => {
+      const rows = await threadRows($, path)
+      if (unread(rows) === 0) return
+      await $.fs.write(path, rowsText(rows.map(r => (r.dir === 'in' ? { ...r, read: true } : r))))
+    })
+    thrNote = ''
+  } catch (err) {
+    thrNote = `既読にできなかった（${String(err).slice(0, 60)}）`
+  }
+  $.ui.invalidate('ui.render')
+}
+
+// The reply goes to ops, not to the peer (user 10/19): ops reads it and tells the peer.
+async function threadsReply($: any, name: string, row: ThreadRow | undefined, text: string): Promise<void> {
+  if (!text.trim()) {
+    thrNote = '空なので送りませんでした'
+  } else {
+    try {
+      const r = await $.prompt.submit({ text: replyPrompt(name, row, text), asUser: true })
+      if (r?.drop !== undefined) thrNote = `ops に送れなかった（${String(r.drop).slice(0, 60)}）`
+      else {
+        thrNote = `ops に送りました（ops が ${name} に伝えます）`
+        thrWriting = false
+      }
+    } catch (err) {
+      thrNote = `ops に送れなかった（${String(err).slice(0, 60)}）`
+    }
+  }
+  $.ui.invalidate('ui.render')
+}
+
+let thrPeer: string | undefined // the peer whose thread is shown
+let thrAt: number | undefined // the reply n / p moved to
+const thrOpen = new Set<string>() // rows shown whole
+let thrWriting = false
+let thrNote = ''
+let thrMore = 0 // older rows shown above the newest THREAD_ROWS
+const THREAD_ROWS = 12
+const THREAD_FOLD = 4
+
+// today "23:31", another day "10/17"
+export function threadWhen(now: number, ms: number): string {
+  return dayStart(ms) === dayStart(now) ? hhmm(ms) : `${new Date(ms).getMonth() + 1}/${new Date(ms).getDate()}`
+}
+
 // Who this session is, read once per load. Every hook asks, so a skipped
 // session.start (or a reload) never leaves the session silent.
 let self: Me | undefined
@@ -1171,6 +1247,7 @@ export const register: Register = (on, options) => {
           await $.command.register({ name: 'fig', description: 'Show draft figures any session drops in ~/.local/share/life/preview/ (newest first), and the shared palette' })
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: 'alert', description: 'Open the alerts: new Gmail (headers only) to mark Done, ask about, or put on the calendar; Slack later' })
+          await $.command.register({ name: THREADS, description: 'Open the threads: peers\' replies to ops by sender, numbered, with what ops sent and made of them; a reply typed here goes to ops' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
           // No toasts (user 10/12): the band shows the counts and the next event.
@@ -1179,7 +1256,7 @@ export const register: Register = (on, options) => {
           void fetchSlack($, python, repo)
           $.clock.every(300000, () => fetchSlack($, python, repo))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
-          // Open the three panes at start, without taking the keyboard. Opened
+          // Open the four panes at start (dash, hubs, notes, threads; user 10/19), without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
           // opened it); narrower, it waits until the terminal widens or its
           // command is run. dash first: the pane opened first is the one in front
@@ -1190,6 +1267,7 @@ export const register: Register = (on, options) => {
             .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: PANE_COLUMNS }))
             .then(() => notesLoad($, repo))
             .then(() => $.ui.open({ id: NOTES, title: 'notes', columns: PANE_COLUMNS }))
+            .then(() => $.ui.open({ id: THREADS, title: 'threads', columns: PANE_COLUMNS }))
             // Which tab ends up in front is not the order of opening on every
             // terminal (10/08: with three, notes was in front). Only a focused
             // open raises a tab, so dash is opened again with focus when another
@@ -1604,6 +1682,134 @@ export const register: Register = (on, options) => {
             </Box>
           )
         })()}
+      </Box>
+    )
+  })
+
+  on('command.run', { command: 'threads' }, async $ => {
+    thrWriting = false
+    const opened = await $.ui.open({ id: THREADS, title: 'threads', columns: PANE_COLUMNS, focus: true })
+    if (opened.isPlaced) return { text: 'threads opened.' }
+    return { text: `threads: the pane is waiting and not drawn yet (${opened.reason ?? 'no reason given'}).` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: THREADS }, async ($, e) => {
+    const { Box, Text, Button, Input } = $.ui.resolve(e)
+    const width = Math.max(40, e.props.bodyColumns ?? 84)
+    const now = await $.clock.now()
+    const redraw = () => $.ui.invalidate('ui.render')
+    const rule = (text: string) => clip(`── ${text} ` + '─'.repeat(width), width)
+    const files = await loadThreads($)
+    const { records } = await readAll($)
+    const latest = (f: ThreadFile) => f.rows.reduce((m, r) => Math.max(m, r.at), 0)
+    const peers = [...files].sort((a, b) => latest(b) - latest(a))
+    if (!thrPeer || !peers.some(p => p.name === thrPeer)) thrPeer = peers[0]?.name
+    const total = peers.reduce((k, p) => k + unread(p.rows), 0)
+    const cur = peers.find(p => p.name === thrPeer)
+    const ordered = cur ? threadOrder(cur.rows) : []
+    const replies = ordered.filter(r => r.dir === 'in')
+    const rowKey = (r: ThreadRow) => `thr-${r.dir}-${cur?.name}-${r.dir === 'in' ? r.n : `${r.at}-${r.ref ?? ''}`}`
+    const focusKey = async (key: string) => {
+      try {
+        await $.ui.focus({ requestId: THREADS, key })
+      } catch {
+        // the ring stays where it was
+      }
+    }
+
+    // the peers: unread, state (the sessions record dash reads), last time, last line
+    const nameW = Math.max(10, ...peers.map(p => cells(p.name) + 1))
+    const stateOf = (name: string) => {
+      const r = records.find(x => x.name === name)
+      return !r ? '—' : r.waiting ? '確認待ち' : r.busy ? '作業中' : '待機'
+    }
+    const peerLine = (p: ThreadFile) => {
+      const last = [...p.rows].sort((a, b) => b.at - a.at)[0]
+      const n = unread(p.rows)
+      const head = `${p.name === thrPeer ? '●' : ' '} ${pad(p.name, nameW)} ${pad(stateOf(p.name), 9)} ${pad(n ? `${n} 未読` : '', 8)} ${pad(last ? threadWhen(now, last.at) : '', 6)}`
+      const line = (last?.text ?? '').split('\n').find(l => l.trim())?.trim() ?? ''
+      return clip(`${head}${line}`, width - 2)
+    }
+    const pick = (name: string) => { thrPeer = name; thrAt = undefined; thrMore = 0; thrNote = ''; redraw() }
+    const step = (d: number) => {
+      if (peers.length === 0) return
+      const i = Math.max(0, peers.findIndex(p => p.name === thrPeer))
+      const next = peers[(i + d + peers.length) % peers.length]
+      pick(next.name)
+      void focusKey(`thr-peer-${next.name}`)
+    }
+    const move = (d: number) => {
+      if (replies.length === 0) return
+      const i = replies.findIndex(r => r.n === thrAt)
+      const j = i < 0 ? replies.length - 1 : Math.max(0, Math.min(replies.length - 1, i + d))
+      const r = replies[j]
+      thrAt = r.n
+      const back = ordered.length - ordered.indexOf(r)
+      if (back > THREAD_ROWS + thrMore) thrMore = back - THREAD_ROWS
+      redraw()
+      void focusKey(rowKey(r))
+    }
+
+    // the thread: newest at the bottom, a long one folded to 4 lines (Enter opens it)
+    const shown = ordered.slice(-(THREAD_ROWS + thrMore))
+    const heads = shown.map(r =>
+      r.dir === 'in' ? `${r.n === thrAt ? '▶' : ' '} ${label(cur!.name, r.n ?? 0)} ${threadWhen(now, r.at)}`
+        : r.dir === 'out' ? `  → ops ${threadWhen(now, r.at)}`
+          : `    ops ${threadWhen(now, r.at)}`)
+    const headW = Math.max(14, ...heads.map(h => cells(h) + 1))
+    const bodyW = Math.max(20, width - headW - 2)
+    const target = replies.find(r => r.n === thrAt) ?? replies[replies.length - 1]
+
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row">
+          <Text bold>{pad('threads', width - 8)}</Text>
+          <Text color={total ? 'yellow' : undefined} dimColor={!total}>{`未読 ${total}`}</Text>
+        </Box>
+        <Text dimColor>{rule('相手')}</Text>
+        {peers.length === 0 && <Text dimColor wrap="wrap">まだ返事は届いていません（peer の返事が ops に届くと、ここに相手ごとに並びます）</Text>}
+        {peers.map(p => (
+          <Button key={`thr-peer-${p.name}`} label={peerLine(p)} plain dimColor={p.name !== thrPeer && unread(p.rows) === 0} onPress={() => pick(p.name)} />
+        ))}
+        {cur && <Box marginTop={1}><Text dimColor>{rule(cur.name)}</Text></Box>}
+        {cur && ordered.length > shown.length && (
+          <Button key="thr-older" label={`↑ 前の ${ordered.length - shown.length} 件`} plain dimColor onPress={() => { thrMore += THREAD_ROWS; redraw() }} />
+        )}
+        {cur && shown.map((r, i) => {
+          const key = rowKey(r)
+          const lines = wrapCells(r.text, bodyW)
+          const open = thrOpen.has(key)
+          const body = open ? lines : lines.slice(0, THREAD_FOLD)
+          return (
+            <Box key={`${key}-box`} flexDirection="row">
+              <Button key={key} label={pad(heads[i], headW)} plain dimColor={r.dir === 'out'} onPress={() => { if (thrOpen.has(key)) thrOpen.delete(key); else thrOpen.add(key); if (r.dir === 'in') thrAt = r.n; redraw() }} />
+              <Box flexDirection="column">
+                {body.map(l => <Text color={r.dir === 'ops' ? 'cyan' : undefined} dimColor={r.dir === 'out'} bold={r.dir === 'in' && !r.read}>{l === '' ? ' ' : l}</Text>)}
+                {!open && lines.length > THREAD_FOLD && <Text dimColor>{`…あと ${lines.length - THREAD_FOLD} 行（Enter で全文）`}</Text>}
+              </Box>
+            </Box>
+          )
+        })}
+        <Text dimColor>{rule('')}</Text>
+        {thrNote !== '' && <Text color={/できなかった|送れなかった|空なので/.test(thrNote) ? 'red' : 'green'} wrap="wrap">{thrNote}</Text>}
+        {cur && thrWriting && (
+          <Box flexDirection="column">
+            <Text dimColor wrap="truncate">{clip(target ? `${label(cur.name, target.n ?? 0)} への返事（ops に送り、ops が ${cur.name} に伝える）` : `${cur.name} への返事（ops に送り、ops が伝える）`, width)}</Text>
+            <Input key="thr-reply" label="返事 >" placeholder="ops に頼むこと・相手に伝えること" submitLabel="送る" autoFocus onSubmit={(v: string) => threadsReply($, cur.name, target, v)} />
+            <Button key="thr-cancel" label="やめる" plain onPress={() => { thrWriting = false; redraw() }} />
+          </Box>
+        )}
+        {!thrWriting && (
+          <Box flexDirection="row" columnGap={2} flexWrap="wrap">
+            <Button key="thr-reply-open" label="返事" hotkey="r" plain dimColor={!cur} onPress={() => { if (cur) { thrWriting = true; thrNote = ''; redraw() } }} />
+            <Button key="thr-read" label="既読" hotkey="a" plain dimColor={!cur || unread(cur.rows) === 0} onPress={() => (cur ? threadMarkRead($, cur.name) : undefined)} />
+            <Button key="thr-next-peer" label="次の相手" hotkey="j" plain onPress={() => step(1)} />
+            <Button key="thr-prev-peer" label="前の相手" hotkey="k" plain onPress={() => step(-1)} />
+            <Button key="thr-next" label="次の返事" hotkey="n" plain onPress={() => move(1)} />
+            <Button key="thr-prev" label="前の返事" hotkey="p" plain onPress={() => move(-1)} />
+            <Button key="thr-back" label="一覧へ" hotkey="b" plain onPress={() => { thrAt = undefined; thrOpen.clear(); thrMore = 0; redraw(); if (thrPeer) void focusKey(`thr-peer-${thrPeer}`) }} />
+          </Box>
+        )}
       </Box>
     )
   })

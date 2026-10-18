@@ -11,6 +11,9 @@ const DIR = `${HOME}/.local/share/life/threads`
 
 function world(on: any, vars: Record<string, string | undefined>, files = new Map<string, string>(), opts: { failWrite?: boolean } = {}) {
   const got: any[] = []
+  const opened: any[] = []
+  const sent: any[] = []
+  const submitted: any[] = []
   on('env.get', (_$: any, e: any) => ({ value: vars[e.name] }))
   on('fs.read', (_$: any, e: any) => {
     if (!files.has(e.path)) throw new Error('ENOENT')
@@ -30,13 +33,14 @@ function world(on: any, vars: Record<string, string | undefined>, files = new Ma
   on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
   on('session.receive', (_$: any, e: any) => { got.push(e); return { text: e.text } })
-  on('session.send', () => ({ isDelivered: true }))
+  on('session.send', (_$: any, e: any) => { sent.push(e); return { isDelivered: true } })
+  on('prompt.submit', (_$: any, e: any) => { submitted.push(e); return { text: e.text } })
   on('turn.start', (_$: any, e: any) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   on('ui.status', () => ({ value: undefined }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
   on('ui.panes', () => ({ value: [] }))
-  return { files, got }
+  return { files, got, opened, sent, submitted }
 }
 
 const OPS = { LIFE_ROLE: 'ops', HOME }
@@ -211,4 +215,121 @@ test('splitAnswer: a heading only counts at the head of a line; a missing one ge
   expect(parts.get('a-3')).toBe('三つ目')
   expect(parts.get('a-2')).toBe('【a-1】 一つ目。a-2 のことは 【a-2】 として後で\n【a-3】：三つ目')
   expect(splitAnswer(' 全部 ', ['a-1']).get('a-1')).toBe('全部')
+})
+
+// ---- the tab ----
+
+const PROPS = { title: 'threads', isFocused: true, bodyColumns: 84, placement: 'dock', scroll: { bodyRows: 60 }, view: 'expanded' } as any
+const labels = async (ui: any) => (await ui.findAll({ type: 'Button' })).map((b: any) => String(b.props?.label ?? ''))
+const texts = async (ui: any) => (await ui.findAll({ type: 'Text' })).map((t: any) => String(t.text ?? t.props?.children ?? '')).join('\n')
+const AT = Date.parse('2026-10-08T05:00:00Z')
+
+function seeded(): Map<string, string> {
+  const files = new Map<string, string>()
+  const long = ['一行目', '二行目', '三行目', '四行目', '五行目', '六行目'].join('\n')
+  files.set(`${DIR}/claude-worker-b.jsonl`, rowsText([
+    { dir: 'out', at: AT, text: '表を直してください' },
+    { dir: 'in', at: AT + 60000, n: 1, text: '直しました', read: true },
+    { dir: 'in', at: AT + 120000, n: 2, text: long, read: false },
+    { dir: 'ops', at: AT + 180000, ref: 2, text: 'おすすめ: このまま進める' },
+  ]))
+  files.set(`${DIR}/peer-a.jsonl`, rowsText([{ dir: 'in', at: AT - 86400000, n: 1, text: '昨日の報告', read: false }]))
+  return files
+}
+
+const mountTab = ($: any) => $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'threads', props: PROPS })
+
+test('/threads is registered for ops and opens the tab', async ($, on) => {
+  const { opened } = world(on, OPS, seeded())
+  await $.session.start(START)
+  const r: any = await $.command.run({ command: 'threads', args: '' } as any)
+  expect(r.text).toBe('threads opened.')
+  expect(opened.some(o => o.id === 'threads' && o.focus === true && o.columns === 84)).toBe(true)
+})
+
+test('the tab lists peers newest first with unread counts, and the newest peer\'s thread in order: request, replies, ops under its reply', async ($, on) => {
+  world(on, OPS, seeded())
+  await $.session.start(START)
+  const ui: any = await mountTab($)
+  const l = await labels(ui)
+  const t = await texts(ui)
+  expect(t).toContain('未読 2')
+  const peerRows = l.filter((x: string) => x.includes('claude-worker-b') || x.includes('peer-a'))
+  expect(peerRows[0]).toMatch(/^● claude-worker-b .*1 未読/)
+  expect(peerRows[1]).toMatch(/^  peer-a .*1 未読 .*10\/7/)
+  const heads = l.filter((x: string) => /→ ops|worker-b-\d|^\s+ops /.test(x)).map((x: string) => x.trim())
+  expect(heads.map((x: string) => x.split(' ').slice(0, 2).join(' '))).toEqual(['→ ops', 'worker-b-1 14:01', 'worker-b-2 14:02', 'ops 14:03'])
+  // the long reply is folded to four lines
+  expect(t).toContain('四行目')
+  expect(t).not.toContain('五行目')
+  expect(t).toContain('…あと 2 行（Enter で全文）')
+  expect(t).toContain('おすすめ: このまま進める')
+  await ui.unmount()
+})
+
+test('Enter on a reply shows it whole; j moves to the next peer', async ($, on) => {
+  world(on, OPS, seeded())
+  await $.session.start(START)
+  const ui: any = await mountTab($)
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-in-claude-worker-b-2' })
+  expect(await texts(ui)).toContain('六行目')
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-next-peer' })
+  const t = await texts(ui)
+  expect(t).toContain('昨日の報告')
+  expect(t).not.toContain('直しました')
+  await ui.unmount()
+})
+
+test('a marks the shown peer\'s replies read in its file', async ($, on) => {
+  const { files } = world(on, OPS, seeded())
+  await $.session.start(START)
+  const ui: any = await mountTab($)
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-read' })
+  expect(unread(parseRows(files.get(`${DIR}/claude-worker-b.jsonl`)!))).toBe(0)
+  expect(unread(parseRows(files.get(`${DIR}/peer-a.jsonl`)!))).toBe(1)
+  expect(await texts(ui)).toContain('未読 1')
+  await ui.unmount()
+})
+
+test('r, then Enter in the field: the reply goes to ops as one prompt naming the reply it answers; nothing goes to the peer', async ($, on) => {
+  const { submitted, sent } = world(on, OPS, seeded())
+  await $.session.start(START)
+  const ui: any = await mountTab($)
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-prev' }) // to the newest reply, then one older
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-prev' })
+  await $.ui.press({ plugin: 'ops-dash', key: 'thr-reply-open' })
+  expect(await texts(ui)).toContain('worker-b-1 への返事')
+  await $.ui.input({ plugin: 'ops-dash', key: 'thr-reply', text: '次は図もお願いします' })
+  expect(submitted.length).toBe(1)
+  expect(submitted[0].text).toBe('【threads worker-b-1 への返事】次は図もお願いします\n> worker-b-1: 直しました')
+  // the person's own words, read bare by ops (not framed as a plugin's message)
+  expect(submitted[0].origin).toMatchObject({ kind: 'plugin', asUser: true })
+  expect(sent).toEqual([])
+  expect(await texts(ui)).toContain('ops に送りました')
+  await ui.unmount()
+})
+
+test('with no threads yet the tab says where they come from', async ($, on) => {
+  world(on, OPS)
+  await $.session.start(START)
+  const ui: any = await mountTab($)
+  expect(await texts(ui)).toContain('まだ返事は届いていません')
+  await ui.unmount()
+})
+
+test('replyPrompt quotes the first line of the reply; with none chosen it names the peer', () => {
+  expect(replyPrompt('claude-worker-b', { dir: 'in', at: 1, n: 3, text: '\n  一行目\n二行目' }, ' はい ')).toBe('【threads worker-b-3 への返事】はい\n> worker-b-3: 一行目')
+  expect(replyPrompt('peer-a', undefined, 'はい')).toBe('【threads peer-a への返事】はい')
+})
+
+test('threadOrder puts what ops said right under its reply; wrapCells counts wide characters as two', () => {
+  const order = threadOrder([
+    { dir: 'in', at: 1, n: 1, text: 'a' },
+    { dir: 'out', at: 3, text: 'c' },
+    { dir: 'ops', at: 4, ref: 1, text: 'o' },
+    { dir: 'in', at: 2, n: 2, text: 'b' },
+  ])
+  expect(order.map(r => r.text)).toEqual(['a', 'o', 'b', 'c'])
+  expect(wrapCells('ああああ', 4)).toEqual(['ああ', 'ああ'])
+  expect(wrapCells('ab\ncd', 10)).toEqual(['ab', 'cd'])
 })
