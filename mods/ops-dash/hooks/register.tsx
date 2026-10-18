@@ -1727,7 +1727,7 @@ export const register: Register = (on, options) => {
     const width = Math.max(40, e.props.bodyColumns ?? 84)
     const now = await $.clock.now()
     const redraw = () => $.ui.invalidate('ui.render')
-    const rule = (text: string) => clip(`── ${text} ` + '─'.repeat(width), width)
+    const rule = (text: string) => (text ? `─ ${text} ` + '─'.repeat(Math.max(0, width - cells(text) - 3)) : '─'.repeat(width))
     const files = await loadThreads($)
     const { records } = await readAll($)
     const latest = (f: ThreadFile) => f.rows.reduce((m, r) => Math.max(m, r.at), 0)
@@ -1754,9 +1754,11 @@ export const register: Register = (on, options) => {
     }
     const peerLine = (p: ThreadFile) => {
       const last = [...p.rows].sort((a, b) => b.at - a.at)[0]
+      // the line is the newest reply's first; the time, the thread's newest row
+      const said = [...p.rows].filter(r => r.dir === 'in').sort((a, b) => b.at - a.at)[0] ?? last
       const n = unread(p.rows)
       const head = `${p.name === thrPeer ? '●' : ' '} ${pad(p.name, nameW)} ${pad(stateOf(p.name), 9)} ${pad(n ? `${n} 未読` : '', 8)} ${pad(last ? threadWhen(now, last.at) : '', 6)}`
-      const line = (last?.text ?? '').split('\n').find(l => l.trim())?.trim() ?? ''
+      const line = (said?.text ?? '').split('\n').find(l => l.trim())?.trim() ?? ''
       return clip(`${head}${line}`, width - 2)
     }
     const pick = (name: string) => { thrPeer = name; thrAt = undefined; thrMore = 0; thrNote = ''; redraw() }

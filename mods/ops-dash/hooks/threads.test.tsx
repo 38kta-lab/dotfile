@@ -264,7 +264,8 @@ test('the tab lists peers newest first with unread counts, and the newest peer\'
   const t = await texts(ui)
   expect(t).toContain('未読 2')
   const peerRows = l.filter((x: string) => x.includes('claude-worker-b') || x.includes('peer-a'))
-  expect(peerRows[0]).toMatch(/^● claude-worker-b .*1 未読/)
+  // the newest reply's first line, not what ops said under it
+  expect(peerRows[0]).toMatch(/^● claude-worker-b .*1 未読 .*14:03 一行目$/)
   expect(peerRows[1]).toMatch(/^  peer-a .*1 未読 .*10\/7/)
   const heads = l.filter((x: string) => /→ ops|worker-b-\d|^\s+ops /.test(x)).map((x: string) => x.trim())
   expect(heads.map((x: string) => x.split(' ').slice(0, 2).join(' '))).toEqual(['→ ops', 'worker-b-1 14:01', 'worker-b-2 14:02', 'ops 14:03'])
