@@ -30,7 +30,7 @@ One default for every new slide and figure, so that decks do not drift. The valu
 
 1. **Start from the template**: `assets/slide-template/default_template_*.pptx` in the user's life repo (the source of truth; use the newest version, older ones go to `_old/`). The same version is copied to the user's iCloud Drive (`Documents/2_Areas/slide-template/`) for opening on other devices. Copy the template; never edit it in place. The rules are in `assets/slide-template/slide_default_spec_*.md` there and in `references/spec.md` here.
 2. **Make the figure parts first** (analysis, then figures), then place them at actual size.
-3. **Check before handing over**: run the lint script (`scripts/slide_lint/slide_lint.py` in the user's life repo; see its README), save and reopen the file in PowerPoint to confirm animations survive (`scripts/ppt_roundtrip_check.sh`), and look at every slide as an image.
+3. **Check before handing over** (the project session that builds a progress slide does this itself; see `references/workflow.md`, "Who builds what"): run the lint script (`scripts/slide_lint/slide_lint.py` in the user's life repo; see its README), save and reopen the file in PowerPoint to confirm animations survive (`scripts/ppt_roundtrip_check.sh`), and look at every slide as an image.
 4. **Hand over** with the file path and its md5. Only the main session puts files into iCloud (copy without overwriting, compare md5, move the old version to `_old/`, never delete).
 
 ## Rules that always apply
