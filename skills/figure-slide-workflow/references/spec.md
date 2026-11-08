@@ -27,6 +27,11 @@ Contrast ratios (white / dark #16181D): body #1F2933 14.76, gray #6B7280 4.83, #
 - Spares: white to blue; white, orange #E69F00, vermillion, wine.
 - Color bar and tick labels are 15 pt like the rest of the figure.
 
+## Alignment
+- Justified (both edges): body text, bullets, comment-box text, procedure steps, Why / How text, notes and sources. Centered: headings. Left: subheadings, section labels, table cells. Right: page number. Figure labels and short name lines (title slide, acknowledgements) are not set.
+- No manual line breaks (Shift+Enter) inside a justified paragraph: PowerPoint stretches the line before the break to the full width. Split into paragraphs instead.
+- Justified lines can open wide gaps. Measure the gap per line from the PowerPoint PDF (word gap divided by a normal space): 2.5 times or more must be rewritten (same meaning, different wording or word order); 2 to 2.5 times should be if possible. Check script: `scripts/slide_checks/generic/word_gap.py`.
+
 ## Progress slides (white background only)
 - Comment box: rectangle #0072B2, 30 % opacity (PowerPoint shows 70 % transparency), no line. Text 15 pt #1F2933 inside, 0.4 cm from the edge. Results with a dot, interpretation with an arrow.
 - A progress deck has no title slide (the title slide stays in the template for conference talks). Order: Why / How (required, first) -> Detail method (only when needed) -> result slides -> To discuss / Next steps.
