@@ -53,6 +53,8 @@ If today's brief does not exist:
 ```
 
 - One task per line. `[PJ]` is the hub slug prefix (`[21_Q]`, `[M90]`) or `[事務]` for admin.
+- **Title = what to do.** Before the first `（`, write 「何を、どうする」 in about 30 characters (e.g. 「図の線の交差を、枝を回して直す」). The dash shows only the text up to the first `（` as the title, so a title without a verb ("〜について", "〜の件") forces the reader to ask what to do. Put background, numbers and decisions after the `（`, or in the hub; keep a line to about 100 characters.
+- **Parent / child.** When one deadline has several jobs, write the parent line, then its children right after it as `- ⬜ [PJ] ▸ 〜する`. Do not indent children: the dash and the ops-rules mod read only lines that start with `- ⬜` / `- ✅`. When every child is ✅, mark the parent ✅ too.
 - Owner is `@user`, `@ops`, or `@claude-<slug>` for a peer session.
 - `⬜` open, `✅` done. Keep the hub checkbox style (`- ⬜` / `- ✅`).
 
@@ -64,7 +66,7 @@ If today's brief does not exist:
 4. Extract the numbered items under `## 今日やるべきこと` in the brief. One numbered item = one line, even when it has sub-bullets.
 5. **Skip what tasks.md already has.** If an open line already covers the item, keep the existing line (its owner and start date) instead of adding a duplicate.
 6. Add the rest under `## 今日 YYYY-MM-DD`, in brief order, as `- ⬜ [PJ] <subject> — @担当 — <today>（<deadline if the brief gives one>）`.
-   - Subject: the bolded title, trimmed. Keep the brief's noun phrase; do not rephrase aggressively.
+   - Subject: write 「何を、どうする」 (see "Title = what to do"). If the brief's bolded title is a noun phrase, add the verb; keep its words otherwise.
    - Owner: `@user` unless the brief or the hub names a session.
 7. Edit line by line with the Edit tool. Never rewrite the whole file.
 8. **Commit and push `tasks.md`** (user 2026-10-12). Stage only `ideas/task-review/tasks.md` and, if it changed, `ideas/task-review/done/YYYY-MM.md`. Do not sweep in other modified files; list them in the report instead.
