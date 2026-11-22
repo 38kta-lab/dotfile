@@ -2495,6 +2495,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" columnGap={2}>
           {jumps.map(j => <Button key={`jump-${j.hotkey}`} label={j.label} hotkey={j.hotkey} plain dimColor={!j.key} onPress={() => jump(j.key)} />)}
+          <Text dimColor>{`幅 ${width}${twoCol ? '・2列' : '・1列'}`}</Text>
         </Box>
         {twoCol ? (
           <Box flexDirection="column">

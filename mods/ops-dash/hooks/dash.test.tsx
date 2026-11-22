@@ -693,3 +693,12 @@ test('dash_layout single keeps one column even at 120 columns', { options: { pyt
   const w = await RULE_WIDTHS($, 120)
   for (const k of ['system usage', 'sessions', 'tasks', 'calendar', 'trend']) expect(w[k]).toBe(120)
 })
+
+test('LIVE-LIKE options (pane_background, resident_sessions, slack_mcp) at 120 columns still give two columns', { options: { python: '/usr/bin/python3', life_repo: '/home/u/life', slack_mcp: 'a=b', resident_sessions: 'claude-search', pane_background: '#06101a' } } as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const w = await RULE_WIDTHS($, 120)
+  console.log('LIVELIKE', JSON.stringify(w))
+  expect(w['sessions']).toBe(59)
+})
