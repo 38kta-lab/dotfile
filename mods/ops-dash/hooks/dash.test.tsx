@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel, mapColors, parsePalette, THEME_TEXT } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel, mapColors, parsePalette, THEME_TEXT, keywordsOf, hubOfKeyword, withPjTag } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -790,4 +790,29 @@ test('the dash draws with the theme colors: no color name is left in a pane', OP
   expect([...fills].filter(c => names.includes(c as string))).toEqual([])
   expect(colors.size + fills.size).toBeGreaterThan(0)
   await ui.unmount()
+})
+
+const KW_HUBS = [
+  { slug: '11_A_alpha', text: '---\ncalendar_keywords: alpha, GAMMA\n---\n# alpha' },
+  { slug: 'M08-beta', text: '---\ncalendar_keywords: beta club、BC\n---\n# beta' },
+  { slug: '12_B_nokey', text: '---\nsummary: "no keywords"\n---\n' },
+]
+
+test('keywordsOf reads the comma-separated words of a hub, in either comma', () => {
+  expect(keywordsOf(KW_HUBS[0].text)).toEqual(['alpha', 'GAMMA'])
+  expect(keywordsOf(KW_HUBS[1].text)).toEqual(['beta club', 'BC'])
+  expect(keywordsOf(KW_HUBS[2].text)).toEqual([])
+})
+
+test('an untagged event gets its hub tag from a keyword; a tagged one is left alone; none matching stays as it is', () => {
+  const ev = (title: string) => ({ title, start: '2026-11-24T09:00:00+09:00', end: '2026-11-24T10:00:00+09:00', calendarId: 'primary' })
+  expect(hubOfKeyword('alpha sync', KW_HUBS)).toBe('11_A_alpha')
+  expect(hubOfKeyword('gamma 12 form', KW_HUBS)).toBe('11_A_alpha')          // case-insensitive
+  expect(hubOfKeyword('beta club general meeting', KW_HUBS)).toBe('M08-beta')
+  expect(hubOfKeyword('[12_B] alpha sync', KW_HUBS)).toBeUndefined()              // already tagged: its tag decides
+  expect(hubOfKeyword('haircut', KW_HUBS)).toBeUndefined()
+  expect(withPjTag(ev('alpha sync'), KW_HUBS).title).toBe('[11_A] alpha sync')
+  expect(withPjTag(ev('beta club meeting'), KW_HUBS).title).toBe('[M08] beta club meeting')
+  expect(withPjTag(ev('[12_B] alpha sync'), KW_HUBS).title).toBe('[12_B] alpha sync')
+  expect(withPjTag(ev('haircut'), KW_HUBS).title).toBe('haircut')
 })

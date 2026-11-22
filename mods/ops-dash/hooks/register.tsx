@@ -515,6 +515,27 @@ export function hubOfTag(tag: string, slugs: readonly string[]): string | undefi
   return slugs.find(s => s.match(/^(\d{2}_[A-Z]|[A-Z]\d{2})/)?.[1] === first)
 }
 
+// A hub lists the words that mark its events in `calendar_keywords:` (comma-separated, e.g. "alpha, beta"), for events typed by hand
+// without a [PJ] tag. The hub is the source; the dash only reads it (user 2026-11-22).
+export function keywordsOf(hubText: string): string[] {
+  return (frontValue(hubText, 'calendar_keywords') ?? '').split(/[,、]/).map(x => x.trim()).filter(Boolean)
+}
+
+// The hub slug an untagged title belongs to: the first hub (in the given order) with a keyword the title contains. A title that
+// already starts with [..] is left to its tag.
+export function hubOfKeyword(title: string, hubs: readonly { slug: string; text: string }[]): string | undefined {
+  if (/^\[[^\]]+\]/.test(title)) return undefined
+  const low = title.toLowerCase()
+  return hubs.find(h => keywordsOf(h.text).some(k => low.includes(k.toLowerCase())))?.slug
+}
+
+// An event whose title has no [PJ] tag but names a hub's keyword gets "[11_A] " in front of its title, as if it had been typed so.
+export function withPjTag(ev: CalEvent, hubs: readonly { slug: string; text: string }[]): CalEvent {
+  const slug = hubOfKeyword(ev.title, hubs)
+  const code = slug?.match(/^(\d{2}_[A-Z]|[A-Z]\d{2})/)?.[1]
+  return code ? { ...ev, title: `[${code}] ${ev.title}` } : ev
+}
+
 export function hubOfEvent(ev: CalEvent, slugs: readonly string[]): string | undefined {
   const tag = ev.title.match(/^\[([^\]]+)\]/)?.[1]
   return tag ? hubOfTag(tag, slugs) : undefined
@@ -2349,7 +2370,8 @@ export const register: Register = (on, options) => {
     const nameW = Math.max(8, ...sorted.map(r => cells(shortName(r.name)) + 1))
 
     // calendar: fixed height, then the next few events as buttons
-    const next = upcoming(calendar, now, NEXT_EVENTS)
+    const calendarView = calendar.map(ev => withPjTag(ev, hubs))
+    const next = upcoming(calendarView, now, NEXT_EVENTS)
     const dayWidth = Math.max(5, Math.floor((width - 3) / 7))
     const week = weekGrid(calendar, now, dayWidth)
 
@@ -2444,7 +2466,7 @@ export const register: Register = (on, options) => {
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
       }
       const dayWidth = Math.max(5, Math.floor((w - 3) / 7))
-      const week = weekGrid(calendar, now, dayWidth)
+      const week = weekGrid(calendarView, now, dayWidth)
       return (
         <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule(`calendar  ${calendarNote}`)}</Text></Box>
