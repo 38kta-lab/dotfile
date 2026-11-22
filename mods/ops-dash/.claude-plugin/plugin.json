@@ -24,6 +24,12 @@
       "description": "workspace=server pairs, comma-separated (e.g. team-a=slack-a). Those workspaces may be read through the MCP server when 詳しく hands a Slack message to the model. Empty: --show only.",
       "default": ""
     },
+    "threads_pane": {
+      "type": "string",
+      "title": "Threads tab",
+      "description": "Set to 1 to register /threads and open the threads tab at start. Empty: off. Peer replies are still recorded and numbered either way.",
+      "default": ""
+    },
     "resident_sessions": {
       "type": "string",
       "title": "Resident sessions",

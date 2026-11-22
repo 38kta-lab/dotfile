@@ -12,6 +12,7 @@ const DIR = `${HOME}/.local/share/life/threads`
 function world(on: any, vars: Record<string, string | undefined>, files = new Map<string, string>(), opts: { failWrite?: boolean } = {}) {
   const got: any[] = []
   const opened: any[] = []
+  const registered: string[] = []
   const sent: any[] = []
   const submitted: any[] = []
   on('env.get', (_$: any, e: any) => ({ value: vars[e.name] }))
@@ -30,7 +31,7 @@ function world(on: any, vars: Record<string, string | undefined>, files = new Ma
   on('store.keys', () => ({ value: [] }))
   on('clock.now', () => ({ value: Date.parse('2026-10-08T05:30:00Z') }))
   on('clock.every', () => ({ value: undefined }))
-  on('command.register', (_$: any, e: any) => ({ value: { command: e.name } }))
+  on('command.register', (_$: any, e: any) => { registered.push(e.name); return { value: { command: e.name } } })
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
   on('session.receive', (_$: any, e: any) => { got.push(e); return { text: e.text } })
   on('session.send', (_$: any, e: any) => { sent.push(e); return { isDelivered: true } })
@@ -40,7 +41,7 @@ function world(on: any, vars: Record<string, string | undefined>, files = new Ma
   on('ui.status', () => ({ value: undefined }))
   on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
   on('ui.panes', () => ({ value: [] }))
-  return { files, got, opened, sent, submitted }
+  return { files, got, opened, sent, submitted, registered }
 }
 
 const OPS = { LIFE_ROLE: 'ops', HOME }
@@ -362,4 +363,23 @@ test('readBefore: the reply must come before the last answer, and only a user ro
   expect(readBefore([{ role: 'user', text: '【peer-a-1】x' }, { role: 'assistant', text: 'y' }], tag)).toBe(true)
   expect(readBefore([{ role: 'assistant', text: 'y' }, { role: 'user', text: '【peer-a-1】x' }], tag)).toBe(false)
   expect(readBefore([{ role: 'assistant', text: '【peer-a-1】 について' }], tag)).toBe(false)
+})
+
+const settleOnce = () => new Promise(r => setTimeout(r, 30))
+
+test('the threads tab is off by default: /threads is not registered and the tab is not opened at start', { options: { life_repo: '/home/u/life' } } as any, async ($, on) => {
+  const { opened, registered } = world(on, OPS, seeded())
+  await $.session.start(START)
+  await settleOnce()
+  expect(registered).toContain('hubs')
+  expect(registered).not.toContain('threads')
+  expect(opened.some(o => o.id === 'threads')).toBe(false)
+})
+
+test('with threads_pane set, /threads is registered and the tab is opened at start', { options: { life_repo: '/home/u/life', threads_pane: '1' } } as any, async ($, on) => {
+  const { opened, registered } = world(on, OPS, seeded())
+  await $.session.start(START)
+  await settleOnce()
+  expect(registered).toContain('threads')
+  expect(opened.some(o => o.id === 'threads')).toBe(true)
 })

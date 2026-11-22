@@ -1299,6 +1299,8 @@ export const register: Register = (on, options) => {
   liveCache = undefined
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
+  // The threads tab is off unless threads_pane is set (user 2026-11-22: it does not work for now). The recording and the numbers on peer replies stay.
+  const threadsPane = /^(1|true|yes|on)$/i.test(String(options.threads_pane ?? '').trim())
   const resident = String(options.resident_sessions ?? '').split(',').map(x => x.trim()).filter(Boolean)
   slackMcp = parseSlackMcp(String(options.slack_mcp ?? ''))
 
@@ -1315,7 +1317,7 @@ export const register: Register = (on, options) => {
           await $.command.register({ name: 'fig', description: 'Show draft figures any session drops in ~/.local/share/life/preview/ (newest first), and the shared palette' })
           await $.command.register({ name: 'hubs', description: 'Open the project hubs: a list, then one hub by section, with links to related hubs' })
           await $.command.register({ name: 'alert', description: 'Open the alerts: new Gmail (headers only) to mark Done, ask about, or put on the calendar; Slack later' })
-          await $.command.register({ name: THREADS, description: 'Open the threads: peers\' replies to ops by sender, numbered, with what ops sent and made of them; a reply typed here goes to ops' })
+          if (threadsPane) await $.command.register({ name: THREADS, description: 'Open the threads: peers\' replies to ops by sender, numbered, with what ops sent and made of them; a reply typed here goes to ops' })
           await $.command.register({ name: COMMAND, description: 'Open the ops dashboard: every session with a role (busy or idle, context, last turn, last report, last dispatch) and the plan usage' })
           $.clock.every(30000, () => $.ui.invalidate('ui.render'))
           // No toasts (user 10/12): the band shows the counts and the next event.
@@ -1324,7 +1326,7 @@ export const register: Register = (on, options) => {
           void fetchSlack($, python, repo)
           $.clock.every(300000, () => fetchSlack($, python, repo))
           void fetchCalendar($, python, repo).then(() => $.ui.invalidate('ui.render'))
-          // Open the four panes at start (dash, hubs, notes, threads; user 10/19), without taking the keyboard. Opened
+          // Open the panes at start (dash, hubs, notes, and threads when threads_pane is set; user 10/19), without taking the keyboard. Opened
           // unasked, a pane is drawn from 144 columns (110 once the person has
           // opened it); narrower, it waits until the terminal widens or its
           // command is run. dash first: the pane opened first is the one in front
@@ -1335,7 +1337,7 @@ export const register: Register = (on, options) => {
             .then(() => $.ui.open({ id: HUBS, title: 'hubs', columns: PANE_COLUMNS }))
             .then(() => notesLoad($, repo))
             .then(() => $.ui.open({ id: NOTES, title: 'notes', columns: PANE_COLUMNS }))
-            .then(() => $.ui.open({ id: THREADS, title: 'threads', columns: PANE_COLUMNS }))
+            .then(() => (threadsPane ? $.ui.open({ id: THREADS, title: 'threads', columns: PANE_COLUMNS }) : undefined))
             // Which tab ends up in front is not the order of opening on every
             // terminal (10/08: with three, notes was in front). Only a focused
             // open raises a tab, so dash is opened again with focus when another
