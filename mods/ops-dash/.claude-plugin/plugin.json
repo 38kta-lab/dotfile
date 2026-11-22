@@ -23,6 +23,12 @@
       "title": "Slack workspaces read through an MCP server",
       "description": "workspace=server pairs, comma-separated (e.g. team-a=slack-a). Those workspaces may be read through the MCP server when 詳しく hands a Slack message to the model. Empty: --show only.",
       "default": ""
+    },
+    "resident_sessions": {
+      "type": "string",
+      "title": "Resident sessions",
+      "description": "Session names, comma-separated, that stay in the sessions list however long they are idle (ops always does). Others idle for 7 days or more are hidden. Empty: only ops.",
+      "default": ""
     }
   }
 }

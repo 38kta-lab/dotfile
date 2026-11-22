@@ -32,6 +32,20 @@ export type SessionRecord = {
   updatedAt: number
 }
 
+// A session that has written nothing for STALE_DAYS stays on disk but leaves the list, unless it is resident:
+// ops always, and the names given in the resident_sessions option. One that is busy or waiting for a person stays too (user 2026-11-22).
+export const STALE_DAYS = 7
+export function visibleRecords(
+  records: SessionRecord[],
+  now: number,
+  resident: string[] = [],
+  staleDays: number = STALE_DAYS,
+): { shown: SessionRecord[]; hidden: number } {
+  const limit = staleDays * 24 * 60 * 60 * 1000
+  const shown = records.filter(r => r.role === 'ops' || resident.includes(r.name) || r.busy || !!r.waiting || now - (r.updatedAt ?? 0) < limit)
+  return { shown, hidden: records.length - shown.length }
+}
+
 export type Dispatch = { at: number; line: string }
 export type Limits = { at: number; windows: { kind: string; percentUsed: number; resetsAt?: string }[] }
 
@@ -1238,6 +1252,7 @@ export const register: Register = (on, options) => {
   resolved = false
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
+  const resident = String(options.resident_sessions ?? '').split(',').map(x => x.trim()).filter(Boolean)
   slackMcp = parseSlackMcp(String(options.slack_mcp ?? ''))
 
   on('session.start', async ($, e, next) => {
@@ -2015,8 +2030,9 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
-    const { records, limits } = await readAll($)
+    const { records: allRecords, limits } = await readAll($)
     const now = await $.clock.now()
+    const { shown: records, hidden: hiddenSessions } = visibleRecords(allRecords, now, resident)
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
@@ -2222,6 +2238,7 @@ export const register: Register = (on, options) => {
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
+        {hiddenSessions > 0 && <Text dimColor>{`${STALE_DAYS} 日以上動いていない ${hiddenSessions} 件は隠した`}</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>

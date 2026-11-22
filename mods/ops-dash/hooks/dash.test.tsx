@@ -481,3 +481,33 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t2', 'Done にできなかった（exit 1）', 1, 1000 + 600000, err)).toBe('Done にできなかった（exit 1）')
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
+
+import { visibleRecords, STALE_DAYS } from './register'
+import type { SessionRecord } from './register'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const STALE_NOW = Date.parse('2026-11-22T09:00:00Z')
+const rec = (name: string, role: string, ageDays: number, extra: Partial<SessionRecord> = {}): SessionRecord => ({ name, role, busy: false, updatedAt: STALE_NOW - ageDays * DAY_MS, ...extra })
+
+test('visibleRecords hides sessions idle for 7 days or more, and keeps ops, resident names, busy and waiting ones', () => {
+  const records = [
+    rec('ops', 'ops', 30),
+    rec('peer-resident', 'peer', 30),
+    rec('peer-old', 'peer', 7.1),
+    rec('peer-recent', 'peer', 6.9),
+    rec('peer-busy', 'peer', 40, { busy: true }),
+    rec('peer-waiting', 'peer', 40, { waiting: 'a question' }),
+    rec('peer-never', 'peer', 0, { updatedAt: 0 }),
+  ]
+  const { shown, hidden } = visibleRecords(records, STALE_NOW, ['peer-resident'])
+  expect(shown.map(r => r.name)).toEqual(['ops', 'peer-resident', 'peer-recent', 'peer-busy', 'peer-waiting'])
+  expect(hidden).toBe(2)
+  expect(STALE_DAYS).toBe(7)
+})
+
+test('visibleRecords keeps everything recent and counts nothing hidden', () => {
+  const { shown, hidden } = visibleRecords([rec('a', 'peer', 1), rec('b', 'peer', 3)], STALE_NOW)
+  expect(shown.length).toBe(2)
+  expect(hidden).toBe(0)
+})
+
