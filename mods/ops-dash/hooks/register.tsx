@@ -2342,7 +2342,7 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const sessionsBlock = (w: number) => {
+    const sessionsBlock = (w: number, first = false) => {
       const rule = (label: string) => {
         const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
@@ -2420,14 +2420,14 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const trendBlock = (w: number) => {
+    const trendBlock = (w: number, first = false) => {
       const rule = (label: string) => {
         const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
       }
       return (
         <Box flexDirection="column">
-        <Box marginTop={1} marginBottom={1}><Text dimColor>{rule(trend ? `trend ${trend.date.slice(5).replace('-', '/')}（${trend.items.length} 件・★3 以上 ${trend.items.filter(x => x.stars >= 3).length} 件）` : `trend  ${trendNote}`)}</Text></Box>
+        <Box marginTop={first ? 0 : 1} marginBottom={1}><Text dimColor>{rule(trend ? `trend ${trend.date.slice(5).replace('-', '/')}（${trend.items.length} 件・★3 以上 ${trend.items.filter(x => x.stars >= 3).length} 件）` : `trend  ${trendNote}`)}</Text></Box>
         {(() => {
           const top = trend ? topItems(trend.items, TREND_ROWS) : []
           return (
@@ -2485,11 +2485,12 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    // One column below 110 columns (or when dash_layout is "single"); from 110, usage across the top, then two columns:
-    // sessions and tasks on the left, calendar and trend on the right (user 2026-11-22: tasks kept sliding below the fold).
+    // One column below 110 columns (or when dash_layout is "single"). From 110: usage and sessions on the left with trend at their
+    // right (the room the short rows leave), then calendar and tasks across the full width, tasks staying under calendar (user 2026-11-22).
     const gap = 2
     const twoCol = dashLayout !== 'single' && width >= 110
-    const colW = Math.floor((width - gap) / 2)
+    const leftW = Math.min(60, Math.floor((width - gap) / 2))
+    const rightW = width - gap - leftW
 
     return (
       <Box flexDirection="column">
@@ -2499,17 +2500,17 @@ export const register: Register = (on, options) => {
         </Box>
         {twoCol ? (
           <Box flexDirection="column">
-            {usageBlock(width)}
             <Box flexDirection="row" columnGap={gap}>
-              <Box flexDirection="column" width={colW}>
-                {sessionsBlock(colW)}
-                {tasksBlock(colW)}
+              <Box flexDirection="column" width={leftW}>
+                {usageBlock(leftW)}
+                {sessionsBlock(leftW)}
               </Box>
-              <Box flexDirection="column" width={colW}>
-                {calendarBlock(colW)}
-                {trendBlock(colW)}
+              <Box flexDirection="column" width={rightW}>
+                {trendBlock(rightW, true)}
               </Box>
             </Box>
+            {calendarBlock(width)}
+            {tasksBlock(width)}
           </Box>
         ) : (
           <Box flexDirection="column">
