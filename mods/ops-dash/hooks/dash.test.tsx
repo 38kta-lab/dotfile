@@ -548,11 +548,9 @@ test('parseLiveNames reads names from the list, and gives undefined when the lis
   expect(parseLiveNames('{"error":"x"}')).toBeUndefined()
 })
 
-test('hiddenNote says how many were hidden and why', () => {
-  expect(hiddenNote(0, 0)).toBe('')
-  expect(hiddenNote(4, 0)).toBe('終了している 4 件は隠した')
-  expect(hiddenNote(0, 2)).toBe('7 日以上動いていない 2 件は隠した')
-  expect(hiddenNote(4, 2)).toBe('終了している 4 件、7 日以上動いていない 2 件は隠した')
+test('hiddenNote says how many idle sessions were hidden, and nothing for none', () => {
+  expect(hiddenNote(0)).toBe('')
+  expect(hiddenNote(2)).toBe('7 日以上動いていない 2 件は隠した')
 })
 
 test('the dash hides a session whose name is not among the running ones, and says so', async ($, on) => {
@@ -569,7 +567,7 @@ test('the dash hides a session whose name is not among the running ones, and say
     const all = (await texts($, 'dock')).join('\n')
     expect(all).toContain('peer-up')
     expect(all).not.toContain('peer-down')
-    expect(all).toContain('終了している 1 件は隠した')
+    expect(all).not.toContain('隠した')
     // The list could not be read: nothing is hidden for that reason.
     AGENTS = 'not json'
   } finally {

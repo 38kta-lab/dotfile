@@ -70,12 +70,9 @@ export function parseLiveNames(stdout: string): string[] | undefined {
   }
 }
 
-// The line under the sessions list that says how many were hidden, and why.
-export function hiddenNote(gone: number, stale: number): string {
-  const parts: string[] = []
-  if (gone > 0) parts.push(`終了している ${gone} 件`)
-  if (stale > 0) parts.push(`${STALE_DAYS} 日以上動いていない ${stale} 件`)
-  return parts.length ? `${parts.join('、')}は隠した` : ''
+// The line under the sessions list that says how many idle ones were hidden. Ones that are no longer running are hidden without a word (user 2026-11-22).
+export function hiddenNote(stale: number): string {
+  return stale > 0 ? `${STALE_DAYS} 日以上動いていない ${stale} 件は隠した` : ''
 }
 
 const LIVE_TTL_MS = 30_000
@@ -2083,7 +2080,7 @@ export const register: Register = (on, options) => {
     const { records: allRecords, limits } = await readAll($)
     const now = await $.clock.now()
     const live = await liveSessionNames($, now)
-    const { shown: records, hidden: hiddenSessions, gone: goneSessions } = visibleRecords(allRecords, now, resident, STALE_DAYS, live)
+    const { shown: records, hidden: hiddenSessions } = visibleRecords(allRecords, now, resident, STALE_DAYS, live)
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
@@ -2289,7 +2286,7 @@ export const register: Register = (on, options) => {
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
-        {(hiddenSessions > 0 || goneSessions > 0) && <Text dimColor>{hiddenNote(goneSessions, hiddenSessions)}</Text>}
+        {hiddenSessions > 0 && <Text dimColor>{hiddenNote(hiddenSessions)}</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
