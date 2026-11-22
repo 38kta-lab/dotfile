@@ -36,6 +36,12 @@
       "description": "The width, in columns, the panes of this mod ask for when they open (24 to 255; default 84). A request only: a width you dragged the dock to wins and is kept by Claude Code, and the dock is at most 45% of the terminal.",
       "default": ""
     },
+    "palette": {
+      "type": "string",
+      "title": "Color overrides",
+      "description": "Replaces colors the panes use, as name=hex pairs, comma-separated: red, green, yellow, blue, magenta, cyan, gray, white, black (black is the text on a colored box). The defaults are Rex's Abyssal Trench theme. Example: green=#52c79a,cyan=#3fbdc9",
+      "default": ""
+    },
     "pane_background": {
       "type": "string",
       "title": "Pane background",

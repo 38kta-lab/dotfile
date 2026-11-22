@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel, mapColors, parsePalette, THEME_TEXT } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -744,4 +744,50 @@ test('a usage row always fits its column: label 8 + bar + percent 5 + the longes
   }
   expect(limitBarWidth(44)).toBe(8)
   expect(limitBarWidth(90)).toBe(14)
+})
+
+test('mapColors swaps color names for the theme hex, boxes and text apart, and leaves hex, theme keys and other props alone', () => {
+  const el = (type: string, props: any) => ({ type, props: { ...props, children: undefined }, children: props.children })
+  const tree: any = el('Box', { backgroundColor: 'gray', children: [
+    el('Text', { color: 'green', bold: true, children: 'ok' }),
+    el('Text', { color: 'black', backgroundColor: 'blue', children: 'on a box' }),
+    el('Text', { color: 'gray', children: 'text gray' }),
+    el('Text', { color: '#123456', children: 'raw hex stays' }),
+    el('Text', { color: 'inactive', children: 'theme key stays' }),
+    el('Text', { dimColor: true, children: ['plain', el('Text', { color: 'red', children: 'nested' })] }),
+  ] })
+  const out: any = mapColors(tree)
+  expect(out.props.backgroundColor).toBe('#47606f')                 // gray as a box: dark
+  const k = out.children
+  expect(k[0].props.color).toBe('#52c79a')
+  expect(k[0].props.bold).toBe(true)
+  expect(k[1].props.color).toBe('#06101a')                          // black text on a box: the theme background
+  expect(k[1].props.backgroundColor).toBe('#4a90c9')
+  expect(k[2].props.color).toBe('#9db4c2')                          // gray as text: light
+  expect(k[3].props.color).toBe('#123456')
+  expect(k[4].props.color).toBe('inactive')
+  expect(k[5].children[1].props.color).toBe('#e26a6a')              // nested
+  expect(tree.props.backgroundColor).toBe('gray')                   // the original is not changed
+})
+
+test('parsePalette takes name=hex pairs for known names only', () => {
+  expect(parsePalette('green=#112233, cyan=#AABBCC')).toEqual({ green: '#112233', cyan: '#AABBCC' })
+  expect(parsePalette('green=112233,nope=#112233,red=#12')).toEqual({})
+  expect(parsePalette('')).toEqual({})
+  expect(THEME_TEXT.green).toBe('#52c79a')
+})
+
+test('the dash draws with the theme colors: no color name is left in a pane', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, EVENTS, TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock', 90) })
+  const texts = await ui.findAll({ type: 'Text' })
+  const colors = new Set(texts.map((x: any) => x.props?.color).filter(Boolean))
+  const fills = new Set(texts.map((x: any) => x.props?.backgroundColor).filter(Boolean))
+  const names = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'gray', 'white', 'black']
+  expect([...colors].filter(c => names.includes(c as string))).toEqual([])
+  expect([...fills].filter(c => names.includes(c as string))).toEqual([])
+  expect(colors.size + fills.size).toBeGreaterThan(0)
+  await ui.unmount()
 })

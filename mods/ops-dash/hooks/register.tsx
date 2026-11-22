@@ -78,12 +78,61 @@ export function hiddenNote(stale: number): string {
 // pane_background paints every pane of this mod one color (a hex such as "#050c15", or a theme key), so the panes can match the
 // conversation beside them. Empty: the pane's own color. The Box fills the pane's visible rows, not just its content (user 2026-11-22).
 let paneBackground = ''
+
+// The colors of the panes follow the terminal's theme (Rex's Abyssal Trench, from its themes.json), not Claude Code's own palette,
+// which painted green as yellow-green and magenta as pink (user 2026-11-22). The code names a color ("green", "cyan", ...); every
+// pane's render passes through mapColors, which swaps the name for the theme's hex. `gray` is two colors: the text one (light) and the
+// box one (dark); `black` is the text on a colored box, here the theme's background. The palette option overrides names ("green=#aabbcc").
+export const THEME_TEXT: Record<string, string> = {
+  red: '#e26a6a', green: '#52c79a', yellow: '#d4b25e', blue: '#4a90c9', magenta: '#9179c9', cyan: '#3fbdc9',
+  gray: '#9db4c2', white: '#dcebf3', black: '#06101a',
+}
+export const THEME_FILL: Record<string, string> = { ...THEME_TEXT, gray: '#47606f' }
+let paletteText: Record<string, string> = THEME_TEXT
+let paletteFill: Record<string, string> = THEME_FILL
+
+// "green=#52c79a,gray=#9db4c2": names to hex; anything that is not a name or not a hex is ignored.
+export function parsePalette(spec: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const part of spec.split(',')) {
+    const [name, hex] = part.split('=').map(x => x.trim())
+    if (name && hex && /^#[0-9a-fA-F]{6}$/.test(hex) && name in THEME_TEXT) out[name] = hex
+  }
+  return out
+}
+
+function themed(value: any, table: Record<string, string>): any {
+  return typeof value === 'string' && value in table ? table[value] : value
+}
+
+// Swaps the color names in an element tree: the text colors of `color` and `borderColor`, the box colors of `backgroundColor`.
+export function mapColors(node: any): any {
+  if (Array.isArray(node)) return node.map(mapColors)
+  if (!node || typeof node !== 'object' || !node.props || typeof node.props !== 'object') return node
+  const props: any = { ...node.props }
+  if ('color' in props) props.color = themed(props.color, paletteText)
+  if ('borderColor' in props) props.borderColor = themed(props.borderColor, paletteText)
+  if ('backgroundColor' in props) props.backgroundColor = themed(props.backgroundColor, paletteFill)
+  if (props.hover && typeof props.hover === 'object') {
+    props.hover = { ...props.hover }
+    if ('backgroundColor' in props.hover) props.hover.backgroundColor = themed(props.hover.backgroundColor, paletteFill)
+    if ('borderColor' in props.hover) props.hover.borderColor = themed(props.hover.borderColor, paletteText)
+  }
+  // The runtime keeps an element as { type, props, children }: the children sit beside props (a plain React element keeps them in props).
+  const out: any = { ...node, props }
+  if ('children' in node) out.children = mapColors(node.children)
+  if ('children' in props) props.children = mapColors(props.children)
+  return out
+}
+
 function paintPane($: any, e: any, tree: any): any {
-  if (!paneBackground || !tree) return tree
+  if (!tree) return tree
+  const mapped = mapColors(tree)
+  if (!paneBackground) return mapped
   const { Box } = $.ui.resolve(e)
   return (
     <Box flexDirection="column" backgroundColor={paneBackground} minHeight={e.props?.scroll?.bodyRows}>
-      {tree}
+      {mapped}
     </Box>
   )
 }
@@ -1351,6 +1400,9 @@ export const register: Register = (on, options) => {
   resolved = false
   liveState = undefined
   paneBackground = String(options.pane_background ?? '').trim()
+  const palette = parsePalette(String(options.palette ?? ''))
+  paletteText = { ...THEME_TEXT, ...palette }
+  paletteFill = { ...THEME_FILL, ...palette, ...(palette.gray ? { gray: palette.gray } : {}) }
   const askedColumns = Number(String(options.pane_columns ?? '').trim())
   PANE_COLUMNS = Number.isInteger(askedColumns) && askedColumns >= 24 && askedColumns <= 255 ? askedColumns : 84
   const dashLayout = String(options.dash_layout ?? '').trim()
