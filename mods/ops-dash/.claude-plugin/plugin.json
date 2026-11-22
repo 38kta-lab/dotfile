@@ -27,7 +27,7 @@
     "resident_sessions": {
       "type": "string",
       "title": "Resident sessions",
-      "description": "Session names, comma-separated, that stay in the sessions list however long they are idle (ops always does). Others idle for 7 days or more are hidden. Empty: only ops.",
+      "description": "Session names, comma-separated, that stay in the sessions list however long they are idle or whether or not they are running (ops always does). Others that are not in `claude agents --json`, or idle for 7 days or more, are hidden. Empty: only ops.",
       "default": ""
     }
   }

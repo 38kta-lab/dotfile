@@ -32,18 +32,67 @@ export type SessionRecord = {
   updatedAt: number
 }
 
-// A session that has written nothing for STALE_DAYS stays on disk but leaves the list, unless it is resident:
-// ops always, and the names given in the resident_sessions option. One that is busy or waiting for a person stays too (user 2026-11-22).
+// A session leaves the list when it is no longer running, or has written nothing for STALE_DAYS. Its record stays on disk.
+// "Running" is whether its name is in `claude agents --json` (live). live is undefined when that list could not be read: then nothing is
+// hidden for that reason. ops, the resident_sessions names, and one that is busy or waiting for a person always stay (user 2026-11-22).
 export const STALE_DAYS = 7
 export function visibleRecords(
   records: SessionRecord[],
   now: number,
   resident: string[] = [],
   staleDays: number = STALE_DAYS,
-): { shown: SessionRecord[]; hidden: number } {
+  live?: string[],
+): { shown: SessionRecord[]; hidden: number; gone: number } {
   const limit = staleDays * 24 * 60 * 60 * 1000
-  const shown = records.filter(r => r.role === 'ops' || resident.includes(r.name) || r.busy || !!r.waiting || now - (r.updatedAt ?? 0) < limit)
-  return { shown, hidden: records.length - shown.length }
+  const shown: SessionRecord[] = []
+  let hidden = 0
+  let gone = 0
+  for (const r of records) {
+    if (r.role === 'ops' || resident.includes(r.name) || r.busy || !!r.waiting) shown.push(r)
+    else if (live && !live.includes(r.name)) gone++
+    else if (now - (r.updatedAt ?? 0) >= limit) hidden++
+    else shown.push(r)
+  }
+  return { shown, hidden, gone }
+}
+
+// The names of the running sessions from the stdout of `claude agents --json`. undefined when it is not a list, or the list is empty
+// (this pane itself runs in a session, so an empty list means the read went wrong): the caller then hides nothing.
+export function parseLiveNames(stdout: string): string[] | undefined {
+  try {
+    const d = JSON.parse(stdout)
+    const list = Array.isArray(d) ? d : d?.agents
+    if (!Array.isArray(list)) return undefined
+    const names = list.map((a: any) => a?.name).filter((n: unknown): n is string => typeof n === 'string' && n !== '')
+    return names.length > 0 ? names : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// The line under the sessions list that says how many were hidden, and why.
+export function hiddenNote(gone: number, stale: number): string {
+  const parts: string[] = []
+  if (gone > 0) parts.push(`終了している ${gone} 件`)
+  if (stale > 0) parts.push(`${STALE_DAYS} 日以上動いていない ${stale} 件`)
+  return parts.length ? `${parts.join('、')}は隠した` : ''
+}
+
+const LIVE_TTL_MS = 30_000
+let liveCache: { at: number; names?: string[] } | undefined
+
+// Asks `claude agents --json` at most once in LIVE_TTL_MS. A failure (error, timeout, odd output) gives undefined and is cached for the same time.
+async function liveSessionNames($: any, now: number): Promise<string[] | undefined> {
+  if (liveCache && now - liveCache.at < LIVE_TTL_MS) return liveCache.names
+  let names: string[] | undefined
+  try {
+    const r = await $.process.run(['claude', 'agents', '--json'], { timeoutMs: 10000 })
+    names = r.exitCode === 0 ? parseLiveNames(String(r.stdout ?? '')) : undefined
+  } catch {
+    names = undefined
+  }
+  liveCache = { at: now, names }
+  return names
 }
 
 export type Dispatch = { at: number; line: string }
@@ -1250,6 +1299,7 @@ async function who($: any): Promise<Me | undefined> {
 
 export const register: Register = (on, options) => {
   resolved = false
+  liveCache = undefined
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
   const resident = String(options.resident_sessions ?? '').split(',').map(x => x.trim()).filter(Boolean)
@@ -2032,7 +2082,8 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const { records: allRecords, limits } = await readAll($)
     const now = await $.clock.now()
-    const { shown: records, hidden: hiddenSessions } = visibleRecords(allRecords, now, resident)
+    const live = await liveSessionNames($, now)
+    const { shown: records, hidden: hiddenSessions, gone: goneSessions } = visibleRecords(allRecords, now, resident, STALE_DAYS, live)
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
@@ -2238,7 +2289,7 @@ export const register: Register = (on, options) => {
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
-        {hiddenSessions > 0 && <Text dimColor>{`${STALE_DAYS} 日以上動いていない ${hiddenSessions} 件は隠した`}</Text>}
+        {(hiddenSessions > 0 || goneSessions > 0) && <Text dimColor>{hiddenNote(goneSessions, hiddenSessions)}</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>

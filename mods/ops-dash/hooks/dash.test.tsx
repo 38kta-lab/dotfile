@@ -3,8 +3,10 @@ import { test, expect } from 'claude-code/testing'
 // The world beneath the plugin, answered here: environment, the shared store
 // (a Map the test reads directly), the clock, commands, timers, and the
 // session and turn events themselves.
+// What `claude agents --json` answers in a test: undefined means it answers like every other command (the events).
+let AGENTS: string | undefined
 function world(on: any, vars: Record<string, string | undefined>, store = new Map<string, unknown>(), refuseCommand = false, events: unknown[] = [], tasksMd = '') {
-  on('process.run', () => ({ value: { exitCode: 0, stdout: JSON.stringify(events), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('process.run', (_$: any, e: any) => ({ value: { exitCode: 0, stdout: e.argv[0] === 'claude' && AGENTS !== undefined ? AGENTS : JSON.stringify(events), stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('fs.read', () => ({ value: tasksMd }))
   on('env.get', (_$: any, e: any, next: any) => (e.name in vars ? { value: vars[e.name] } : next(e)))
   on('store.get', (_$: any, e: any) => ({ value: store.get(e.key) }))
@@ -482,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -511,3 +513,66 @@ test('visibleRecords keeps everything recent and counts nothing hidden', () => {
   expect(hidden).toBe(0)
 })
 
+
+test('visibleRecords hides sessions that are not running, but keeps ops, resident, busy and waiting ones', () => {
+  const records = [
+    rec('ops', 'ops', 0),
+    rec('peer-running', 'peer', 0),
+    rec('peer-ended', 'peer', 0),
+    rec('peer-resident', 'peer', 0),
+    rec('peer-busy', 'peer', 0, { busy: true }),
+    rec('peer-waiting', 'peer', 0, { waiting: 'a question' }),
+    rec('peer-ended-old', 'peer', 30),
+    rec('peer-running-old', 'peer', 30),
+  ]
+  const live = ['peer-running', 'peer-running-old']
+  const { shown, hidden, gone } = visibleRecords(records, STALE_NOW, ['peer-resident'], STALE_DAYS, live)
+  expect(shown.map(r => r.name)).toEqual(['ops', 'peer-running', 'peer-resident', 'peer-busy', 'peer-waiting'])
+  expect(gone).toBe(2)
+  expect(hidden).toBe(1)
+})
+
+test('visibleRecords hides nothing for not running when the running list is unknown', () => {
+  const { shown, hidden, gone } = visibleRecords([rec('a', 'peer', 0), rec('b', 'peer', 30)], STALE_NOW, [], STALE_DAYS, undefined)
+  expect(shown.map(r => r.name)).toEqual(['a'])
+  expect(gone).toBe(0)
+  expect(hidden).toBe(1)
+})
+
+test('parseLiveNames reads names from the list, and gives undefined when the list cannot be trusted', () => {
+  expect(parseLiveNames(JSON.stringify([{ name: 'ops' }, { name: 'peer-a', pid: 1 }, { pid: 2 }, { name: '' }]))).toEqual(['ops', 'peer-a'])
+  expect(parseLiveNames(JSON.stringify({ agents: [{ name: 'peer-b' }] }))).toEqual(['peer-b'])
+  expect(parseLiveNames('[]')).toBeUndefined()
+  expect(parseLiveNames('not json')).toBeUndefined()
+  expect(parseLiveNames('')).toBeUndefined()
+  expect(parseLiveNames('{"error":"x"}')).toBeUndefined()
+})
+
+test('hiddenNote says how many were hidden and why', () => {
+  expect(hiddenNote(0, 0)).toBe('')
+  expect(hiddenNote(4, 0)).toBe('終了している 4 件は隠した')
+  expect(hiddenNote(0, 2)).toBe('7 日以上動いていない 2 件は隠した')
+  expect(hiddenNote(4, 2)).toBe('終了している 4 件、7 日以上動いていない 2 件は隠した')
+})
+
+test('the dash hides a session whose name is not among the running ones, and says so', async ($, on) => {
+  const store = world(on, OPS)
+  const at = Date.parse('2026-10-08T02:00:00Z')
+  const base = { role: 'peer', busy: false, updatedAt: at }
+  store.set('ops-dash:session:ops', { name: 'ops', role: 'ops', busy: false, updatedAt: at })
+  store.set('ops-dash:session:peer-up', { name: 'peer-up', pj: 'X1', ...base })
+  store.set('ops-dash:session:peer-down', { name: 'peer-down', pj: 'X2', ...base })
+  AGENTS = JSON.stringify([{ name: 'ops', pid: 1 }, { name: 'peer-up', pid: 2 }])
+  try {
+    await $.session.start(START as any)
+    await settle()
+    const all = (await texts($, 'dock')).join('\n')
+    expect(all).toContain('peer-up')
+    expect(all).not.toContain('peer-down')
+    expect(all).toContain('終了している 1 件は隠した')
+    // The list could not be read: nothing is hidden for that reason.
+    AGENTS = 'not json'
+  } finally {
+    AGENTS = undefined
+  }
+})
