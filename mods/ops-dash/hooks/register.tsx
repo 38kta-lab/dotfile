@@ -2492,7 +2492,7 @@ export const register: Register = (on, options) => {
     // calendar (user 2026-11-22). The dock is at most 45% of the terminal, so about 99 columns on a 220-column window: it is meant for 80-99.
     const gap = 2
     const twoCol = dashLayout !== 'single' && width >= 78
-    const leftW = 38
+    const leftW = 44 // wide enough for the usage rows (label, bar, percent and the reset time) not to wrap
     const rightW = width - gap - leftW
 
     return (

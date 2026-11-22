@@ -656,7 +656,7 @@ test('shortName drops the claude- prefix and leaves other names alone', () => {
   expect(shortName('claude-')).toBe('claude-')
 })
 
-// width 120 or 83: usage and sessions (38) with trend beside them (the rest), then calendar and tasks across the full width; width 70: one column;
+// width 120 or 83: usage and sessions (44) with trend beside them (the rest), then calendar and tasks across the full width; width 70: one column;
 // dash_layout "single": one column at any width.
 const RULE_WIDTHS = async ($: any, cols: number): Promise<Record<string, number>> => {
   const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock', cols) })
@@ -670,22 +670,22 @@ const RULE_WIDTHS = async ($: any, cols: number): Promise<Record<string, number>
   return out
 }
 
-test('at 120 columns usage and sessions (38) have trend beside them (80), and calendar and tasks run across the full width', OPTIONS as any, async ($, on) => {
+test('at 120 columns usage and sessions (44) have trend beside them (74), and calendar and tasks run across the full width', OPTIONS as any, async ($, on) => {
   world(on, OPS, new Map(), false, [], TASKS_MD)
   await $.session.start(START as any)
   await settle()
   const w = await RULE_WIDTHS($, 120)
-  for (const k of ['system usage', 'sessions']) expect(w[k]).toBe(38)
-  expect(w['trend']).toBe(80)
+  for (const k of ['system usage', 'sessions']) expect(w[k]).toBe(44)
+  expect(w['trend']).toBe(74)
   for (const k of ['calendar', 'tasks']) expect(w[k]).toBe(120)
 })
 
-test('at 83 columns (the real dock) the top is still two columns: 38 and 43', OPTIONS as any, async ($, on) => {
+test('at 83 columns (the real dock) the top is still two columns: 44 and 37', OPTIONS as any, async ($, on) => {
   world(on, OPS, new Map(), false, [], TASKS_MD)
   await $.session.start(START as any)
   await settle()
   const w = await RULE_WIDTHS($, 83)
-  expect([w['system usage'], w['sessions'], w['trend'], w['calendar'], w['tasks']]).toEqual([38, 38, 43, 83, 83])
+  expect([w['system usage'], w['sessions'], w['trend'], w['calendar'], w['tasks']]).toEqual([44, 44, 37, 83, 83])
 })
 
 test('below 78 columns the dash stays one column', OPTIONS as any, async ($, on) => {
@@ -709,7 +709,7 @@ test('options like the real ones (pane_background, resident_sessions, slack_mcp)
   await $.session.start(START as any)
   await settle()
   const w = await RULE_WIDTHS($, 120)
-  expect(w['sessions']).toBe(38)
+  expect(w['sessions']).toBe(44)
   expect(w['calendar']).toBe(120)
 })
 
