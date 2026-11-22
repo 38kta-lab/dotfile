@@ -144,7 +144,9 @@ const PANE = 'peers'
 // `/peers` is the built-in alias of /list-agents, so the command is /dash.
 const COMMAND = 'dash'
 // Every pane opens at one width, so switching tabs does not move the edge (user 10/13).
-const PANE_COLUMNS = 84
+// The width the panes ask for (pane_columns). A request only: the width the person dragged the dock to wins, and Claude Code keeps it
+// (~/.claude.json, pluginPanes.dockColumns), with a ceiling of 45% of the terminal.
+let PANE_COLUMNS = 84
 
 type Me = { name: string; role: string; pj?: string }
 
@@ -1344,6 +1346,8 @@ export const register: Register = (on, options) => {
   resolved = false
   liveState = undefined
   paneBackground = String(options.pane_background ?? '').trim()
+  const askedColumns = Number(String(options.pane_columns ?? '').trim())
+  PANE_COLUMNS = Number.isInteger(askedColumns) && askedColumns >= 24 && askedColumns <= 255 ? askedColumns : 84
   const dashLayout = String(options.dash_layout ?? '').trim()
   // The outermost hook of every pane's render: whatever the pane's own hook draws is wrapped by paintPane.
   on('ui.render', { component: 'Pane' }, async ($, e, next) => paintPane($, e, await next(e)))

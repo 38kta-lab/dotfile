@@ -712,3 +712,22 @@ test('options like the real ones (pane_background, resident_sessions, slack_mcp)
   expect(w['sessions']).toBe(44)
   expect(w['calendar']).toBe(120)
 })
+
+test('the dash asks for pane_columns when it opens', { options: { python: '/usr/bin/python3', life_repo: '/home/u/life', pane_columns: '91' } } as any, async ($, on) => {
+  const opened: any[] = []
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  await $.session.start(START as any)
+  await settle()
+  expect(opened.length).toBeGreaterThan(0)
+  expect(opened.every(o => o.columns === 91)).toBe(true)
+})
+
+test('without pane_columns the dash asks for 84', { options: { python: '/usr/bin/python3', life_repo: '/home/u/life' } } as any, async ($, on) => {
+  const opened: any[] = []
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  on('ui.open', (_$: any, e: any) => { opened.push(e); return { value: { isPlaced: true } } })
+  await $.session.start(START as any)
+  await settle()
+  expect(opened.every(o => o.columns === 84)).toBe(true)
+})

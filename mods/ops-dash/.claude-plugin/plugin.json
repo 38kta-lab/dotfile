@@ -30,6 +30,12 @@
       "description": "Empty: one column below 78 columns; from 78, usage and sessions on the left with trend beside them, then calendar and tasks across the full width. \"single\": always one column.",
       "default": ""
     },
+    "pane_columns": {
+      "type": "string",
+      "title": "Pane width",
+      "description": "The width, in columns, the panes of this mod ask for when they open (24 to 255; default 84). A request only: a width you dragged the dock to wins and is kept by Claude Code, and the dock is at most 45% of the terminal.",
+      "default": ""
+    },
     "pane_background": {
       "type": "string",
       "title": "Pane background",
