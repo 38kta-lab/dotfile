@@ -2348,6 +2348,7 @@ export const register: Register = (on, options) => {
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
       }
       const peerBar = Math.max(6, Math.min(12, w - 40))
+      const pjCol = w < 52 ? Math.min(pjW, 7) : pjW // a narrow column: the pj name is cut so a busy or waiting row still fits
       return (
         <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
@@ -2358,7 +2359,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
             <Text bold>{pad(shortName(r.name), nameW)}</Text>
-            <Text dimColor>{pad(r.pj ?? '', pjW)}</Text>
+            <Text dimColor>{pad(clip(r.pj ?? '', pjCol - 1), pjCol)}</Text>
             {r.contextPercent === undefined ? (
               <Text dimColor>{pad('ctx —', peerBar + 5)}</Text>
             ) : (
@@ -2485,11 +2486,12 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    // One column below 110 columns (or when dash_layout is "single"). From 110: usage and sessions on the left with trend at their
-    // right (the room the short rows leave), then calendar and tasks across the full width, tasks staying under calendar (user 2026-11-22).
+    // One column below 78 columns (or when dash_layout is "single"). From 78: usage and sessions on the left (42 wide: short bars) with
+    // trend at their right, in the room those short rows leave; then calendar and tasks across the full width, tasks staying under
+    // calendar (user 2026-11-22). The dock is at most 45% of the terminal, so about 99 columns on a 220-column window: it is meant for 80-99.
     const gap = 2
-    const twoCol = dashLayout !== 'single' && width >= 110
-    const leftW = Math.min(60, Math.floor((width - gap) / 2))
+    const twoCol = dashLayout !== 'single' && width >= 78
+    const leftW = 44
     const rightW = width - gap - leftW
 
     return (

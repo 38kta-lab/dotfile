@@ -27,7 +27,7 @@
     "dash_layout": {
       "type": "string",
       "title": "Dash layout",
-      "description": "Empty: one column below 110 columns, two columns (usage across the top; sessions and tasks left, calendar and trend right) from 110. \"single\": always one column.",
+      "description": "Empty: one column below 78 columns; from 78, usage and sessions on the left with trend beside them, then calendar and tasks across the full width. \"single\": always one column.",
       "default": ""
     },
     "pane_background": {
