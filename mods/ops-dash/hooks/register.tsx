@@ -76,20 +76,49 @@ export function hiddenNote(stale: number): string {
 }
 
 const LIVE_TTL_MS = 30_000
-let liveCache: { at: number; names?: string[] } | undefined
+const LIVE_GOOD_MS = 30 * 60_000 // a failed read falls back on the last good list for this long
 
-// Asks `claude agents --json` at most once in LIVE_TTL_MS. A failure (error, timeout, odd output) gives undefined and is cached for the same time.
-async function liveSessionNames($: any, now: number): Promise<string[] | undefined> {
-  if (liveCache && now - liveCache.at < LIVE_TTL_MS) return liveCache.names
-  let names: string[] | undefined
+// What the last asks for the running sessions came to. `names` is the list when the last ask worked; `good` is the last list that did
+// (kept through failures); `why` is what went wrong on the last ask, if it did.
+export type LiveState = { at: number; names?: string[]; why?: string; good?: { at: number; names: string[] } }
+
+export function nextLive(prev: LiveState | undefined, now: number, outcome: { names?: string[]; why?: string }): LiveState {
+  if (outcome.names) return { at: now, names: outcome.names, good: { at: now, names: outcome.names } }
+  return { at: now, why: outcome.why ?? '一覧が読めない', good: prev?.good }
+}
+
+// The list to filter with: the fresh one, else the last good one while it is young enough, else none (nothing is hidden for this reason).
+export function usableLive(s: LiveState | undefined, now: number): string[] | undefined {
+  if (!s) return undefined
+  if (s.names) return s.names
+  return s.good && now - s.good.at < LIVE_GOOD_MS ? s.good.names : undefined
+}
+
+// The line to show when the list cannot be used at all, so a full list is not a silent surprise.
+export function liveNote(s: LiveState | undefined, now: number): string {
+  if (!s || usableLive(s, now) || !s.why) return ''
+  return `動いているセッションの一覧を取れない（${s.why}）。終了した分も出ている`
+}
+
+let liveState: LiveState | undefined
+
+// Asks `claude agents --json` at most once in LIVE_TTL_MS. A failure keeps the last good list and says why.
+async function refreshLive($: any, now: number): Promise<LiveState | undefined> {
+  if (liveState && now - liveState.at < LIVE_TTL_MS) return liveState
+  let outcome: { names?: string[]; why?: string }
   try {
     const r = await $.process.run(['claude', 'agents', '--json'], { timeoutMs: 10000 })
-    names = r.exitCode === 0 ? parseLiveNames(String(r.stdout ?? '')) : undefined
-  } catch {
-    names = undefined
+    if (r.exitCode !== 0) outcome = { why: `exit ${r.exitCode}${r.stderr ? ' ' + String(r.stderr).trim().slice(0, 50) : ''}` }
+    else if (r.isStdoutTruncated) outcome = { why: '出力が長すぎて切れた' }
+    else {
+      const names = parseLiveNames(String(r.stdout ?? ''))
+      outcome = names ? { names } : { why: '空か読めない形' }
+    }
+  } catch (err) {
+    outcome = { why: String(err).slice(0, 60) }
   }
-  liveCache = { at: now, names }
-  return names
+  liveState = nextLive(liveState, now, outcome)
+  return liveState
 }
 
 export type Dispatch = { at: number; line: string }
@@ -1296,7 +1325,7 @@ async function who($: any): Promise<Me | undefined> {
 
 export const register: Register = (on, options) => {
   resolved = false
-  liveCache = undefined
+  liveState = undefined
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
   // The threads tab is off unless threads_pane is set (user 2026-11-22: it does not work for now). The recording and the numbers on peer replies stay.
@@ -2081,7 +2110,8 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const { records: allRecords, limits } = await readAll($)
     const now = await $.clock.now()
-    const live = await liveSessionNames($, now)
+    const liveS = await refreshLive($, now)
+    const live = usableLive(liveS, now)
     const { shown: records, hidden: hiddenSessions } = visibleRecords(allRecords, now, resident, STALE_DAYS, live)
     const width = Math.max(40, e.props.bodyColumns ?? 58)
 
@@ -2288,6 +2318,7 @@ export const register: Register = (on, options) => {
 
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
+        {liveNote(liveS, now) !== '' && <Text color="yellow">{liveNote(liveS, now)}</Text>}
         {hiddenSessions > 0 && <Text dimColor>{hiddenNote(hiddenSessions)}</Text>}
         {sorted.map(r => (
           <Box flexDirection="row">

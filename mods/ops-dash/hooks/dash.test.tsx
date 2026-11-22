@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -570,6 +570,46 @@ test('the dash hides a session whose name is not among the running ones, and say
     expect(all).not.toContain('隠した')
     // The list could not be read: nothing is hidden for that reason.
     AGENTS = 'not json'
+  } finally {
+    AGENTS = undefined
+  }
+})
+
+test('a failed ask for the running sessions falls back on the last good list, then on nothing, and says why', () => {
+  const t0 = 1_000_000
+  let s = nextLive(undefined, t0, { names: ['ops', 'peer-a'] })
+  expect(usableLive(s, t0)).toEqual(['ops', 'peer-a'])
+  expect(liveNote(s, t0)).toBe('')
+  // the next ask fails: the last good list still serves, and nothing is said
+  s = nextLive(s, t0 + 60_000, { why: 'exit 1' })
+  expect(usableLive(s, t0 + 60_000)).toEqual(['ops', 'peer-a'])
+  expect(liveNote(s, t0 + 60_000)).toBe('')
+  // far later with no good ask in between: the good list is too old, so nothing is hidden for this reason, and the line says why
+  const late = t0 + 31 * 60_000
+  expect(usableLive(s, late)).toBeUndefined()
+  expect(liveNote(s, late)).toBe('動いているセッションの一覧を取れない（exit 1）。終了した分も出ている')
+  // a good ask afterwards clears it
+  s = nextLive(s, late + 1, { names: ['ops'] })
+  expect(usableLive(s, late + 1)).toEqual(['ops'])
+  expect(liveNote(s, late + 1)).toBe('')
+  // a failure with no good list at all says why at once
+  const first = nextLive(undefined, t0, { why: '空か読めない形' })
+  expect(usableLive(first, t0)).toBeUndefined()
+  expect(liveNote(first, t0)).toContain('空か読めない形')
+})
+
+test('the dash says why when the running list cannot be read, and then hides nothing for that reason', async ($, on) => {
+  const store = world(on, OPS)
+  const at = Date.parse('2026-10-08T02:00:00Z')
+  store.set('ops-dash:session:ops', { name: 'ops', role: 'ops', busy: false, updatedAt: at })
+  store.set('ops-dash:session:peer-down', { name: 'peer-down', role: 'peer', pj: 'X2', busy: false, updatedAt: at })
+  AGENTS = 'not json'
+  try {
+    await $.session.start(START as any)
+    await settle()
+    const all = (await texts($, 'dock')).join('\n')
+    expect(all).toContain('peer-down')
+    expect(all).toContain('動いているセッションの一覧を取れない（空か読めない形）')
   } finally {
     AGENTS = undefined
   }
