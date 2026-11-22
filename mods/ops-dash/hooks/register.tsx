@@ -2288,9 +2288,8 @@ export const register: Register = (on, options) => {
     // sessions: one line each
     const sorted = [...records].sort((a, b) => (a.role === 'ops' ? -1 : b.role === 'ops' ? 1 : a.name.localeCompare(b.name)))
     const peerBar = Math.max(6, Math.min(12, width - 40))
-    // The name and pj columns take the widest entry, so every bar starts at the same column (user 10/15).
+    // The name column takes the widest entry, so every bar starts at the same column (user 10/15). No pj column: the session name and the PJ are linked (user 2026-11-22).
     const nameW = Math.max(8, ...sorted.map(r => cells(shortName(r.name)) + 1))
-    const pjW = Math.max(5, ...sorted.map(r => cells(r.pj ?? '') + 1))
 
     // calendar: fixed height, then the next few events as buttons
     const next = upcoming(calendar, now, NEXT_EVENTS)
@@ -2351,8 +2350,7 @@ export const register: Register = (on, options) => {
         const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
       }
-      const peerBar = Math.max(6, Math.min(12, w - 40))
-      const pjCol = w < 52 ? Math.min(pjW, 7) : pjW // a narrow column: the pj name is cut so a busy or waiting row still fits
+      const peerBar = Math.max(6, Math.min(12, w - 30))
       return (
         <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
@@ -2363,7 +2361,6 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
             <Text bold>{pad(shortName(r.name), nameW)}</Text>
-            <Text dimColor>{pad(clip(r.pj ?? '', pjCol - 1), pjCol)}</Text>
             {r.contextPercent === undefined ? (
               <Text dimColor>{pad('ctx —', peerBar + 5)}</Text>
             ) : (
@@ -2495,7 +2492,7 @@ export const register: Register = (on, options) => {
     // calendar (user 2026-11-22). The dock is at most 45% of the terminal, so about 99 columns on a 220-column window: it is meant for 80-99.
     const gap = 2
     const twoCol = dashLayout !== 'single' && width >= 78
-    const leftW = 44
+    const leftW = 38
     const rightW = width - gap - leftW
 
     return (
