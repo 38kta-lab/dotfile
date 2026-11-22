@@ -364,14 +364,54 @@ export function shortTitle(title: string): string {
   return title.replace(/\[status:[^\]]+\]/g, '').replace(/【[^】]*】/g, '').trim()
 }
 
+// The color of a PJ by its kind, the one color for its tasks' tags and its events' boxes (user 2026-11-22). A color name goes through the
+// theme (mapColors); the "other" kind is a raw hex because "gray" as a box is the dark one.
+export function kindColor(code?: string): string {
+  if (!code) return 'gray'
+  if (/^\d{2}_[A-Z]/.test(code)) return 'cyan' // research
+  if (/^C\d\d/.test(code)) return 'blue' // collaboration
+  if (/^A\d\d/.test(code)) return 'yellow' // application
+  if (/^E\d\d/.test(code)) return 'green' // education
+  if (/^X\d\d/.test(code)) return 'magenta' // cross-cutting
+  if (/^M\d\d/.test(code)) return '#9db4c2' // misc
+  if (code === '事務') return 'red' // office work
+  return 'gray'
+}
+
+// The first PJ tag of a title ("[21_Q][22_R] ..." → "21_Q"); status tags do not count.
+export function firstPjCode(title: string): string | undefined {
+  for (const m of title.matchAll(/\[([^\]]+)\]/g)) if (!m[1].startsWith('status:')) return m[1].split('/')[0].trim()
+  return undefined
+}
+
 export function eventColor(ev: CalEvent): string {
+  return kindColor(firstPjCode(ev.title))
+}
+
+// A work block (focus, experiment, break, or a TimeBlock event that is not a meeting) is drawn soft: a dark fill with the kind's color as
+// text. A meeting, or anything in the shared calendar, is drawn solid. So the kind shows in the color and the nature in the weight.
+export function eventSoft(ev: CalEvent): boolean {
   const t = ev.title
-  if (/\[status:focus\]/.test(t)) return 'green'
-  if (/\[status:meeting\]/.test(t) || /【MTG】/.test(t)) return 'blue'
-  if (/\[status:experiment\]/.test(t)) return 'magenta'
-  if (/\[status:break\]/.test(t)) return 'gray'
-  if (!ev.calendarId.startsWith('c_')) return 'blue'
-  return 'cyan'
+  if (/\[status:meeting\]/.test(t) || /【MTG】/.test(t)) return false
+  if (/\[status:(focus|experiment|break)\]/.test(t)) return true
+  return ev.calendarId.startsWith('c_')
+}
+
+// What a grid cell says: the PJ code, then what the event is ("02_B ビリン会議"); 【MTG】, the status tags and " w/ <person>" are left out
+// (the cell is narrow; the detail has them all).
+export function gridLabel(title: string): string {
+  const code = firstPjCode(title)
+  const body = title.replace(/\[[^\]]*\]/g, '').replace(/【[^】]*】/g, '').replace(/\s+w\/\s.*$/, '').trim()
+  return code ? `${code} ${body}`.trim() : body || title
+}
+
+// A dark fill of a color: the color mixed into the theme's background (0 = the color, 1 = the background).
+export function softFill(color: string, mix = 0.68): string {
+  const hex = color.startsWith('#') ? color : (paletteFill[color] ?? paletteText[color])
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return color
+  const bg = [0x06, 0x10, 0x1a]
+  const ch = (i: number) => parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16)
+  return '#' + [0, 1, 2].map(i => Math.round(ch(i) * (1 - mix) + bg[i] * mix).toString(16).padStart(2, '0')).join('')
 }
 
 function dayStart(ms: number): number {
@@ -388,7 +428,7 @@ function allDayCovers(ev: CalEvent, day: number): boolean {
   return day >= s && day < e
 }
 
-export type Cell = { text: string; color?: string }
+export type Cell = { text: string; color?: string; soft?: boolean }
 export type Week = { days: { label: string; isToday: boolean }[]; allDay: Cell[]; hours: { label: string; isNow: boolean; cells: Cell[] }[] }
 
 // The grid is always 1 header + 1 all-day row + 12 hour rows, whatever the events.
@@ -412,8 +452,8 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
   const allDay = days.map(d => {
     const ev = events.find(e => isAllDay(e) && allDayCovers(e, d.start))
     if (!ev) return blank
-    const first = allDayCovers(ev, d.start - 86400000) && d.start !== today ? '' : shortTitle(ev.title)
-    return { text: fit(first), color: eventColor(ev) }
+    const first = allDayCovers(ev, d.start - 86400000) && d.start !== today ? '' : gridLabel(ev.title)
+    return { text: fit(first), color: eventColor(ev), soft: eventSoft(ev) }
   })
 
   const nowHour = new Date(now).getHours()
@@ -430,7 +470,7 @@ export function weekGrid(events: CalEvent[], now: number, dayWidth: number): Wee
       const ev = starting[0] ?? overlapping[0]
       if (!ev) return blank
       const startsHere = Date.parse(ev.start) >= from || h === HOUR_FIRST
-      return { text: fit(startsHere ? shortTitle(ev.title) : ''), color: eventColor(ev) }
+      return { text: fit(startsHere ? gridLabel(ev.title) : ''), color: eventColor(ev), soft: eventSoft(ev) }
     })
     hours.push({ label: String(h).padStart(2, '0'), isNow: h === nowHour, cells: cellsRow })
   }
@@ -611,9 +651,7 @@ export function daysLeft(now: number, d: { month: number; day: number }): number
 }
 
 export function tagColor(tag: string): string {
-  if (/^\d\d_[A-Z]/.test(tag)) return 'cyan'
-  if (/^[A-Z]\d\d/.test(tag)) return 'magenta'
-  return 'gray'
+  return kindColor(tag.split('/')[0].trim())
 }
 
 export function shortTag(tag: string, width: number): string {
@@ -2478,12 +2516,12 @@ export const register: Register = (on, options) => {
         </Box>
         <Box flexDirection="row">
           <Text dimColor>{'終 '}</Text>
-          {week.allDay.map(c => (c.color ? <Text backgroundColor={c.color} color="black">{c.text}</Text> : <Text dimColor>{c.text}</Text>))}
+          {week.allDay.map(c => (c.color ? (c.soft ? <Text backgroundColor={softFill(c.color)} color={c.color}>{c.text}</Text> : <Text backgroundColor={c.color} color="black">{c.text}</Text>) : <Text dimColor>{c.text}</Text>))}
         </Box>
         {week.hours.map(row => (
           <Box flexDirection="row">
             <Text color={row.isNow ? 'yellow' : undefined} dimColor={!row.isNow} bold={row.isNow}>{`${row.label} `}</Text>
-            {row.cells.map(c => (c.color ? <Text backgroundColor={c.color} color="black">{c.text}</Text> : <Text dimColor>{c.text.replace(/ (?=$)/, '·').replace(/^ /, ' ')}</Text>))}
+            {row.cells.map(c => (c.color ? (c.soft ? <Text backgroundColor={softFill(c.color)} color={c.color}>{c.text}</Text> : <Text backgroundColor={c.color} color="black">{c.text}</Text>) : <Text dimColor>{c.text.replace(/ (?=$)/, '·').replace(/^ /, ' ')}</Text>))}
           </Box>
         ))}
         <Box flexDirection="column" marginTop={1}>

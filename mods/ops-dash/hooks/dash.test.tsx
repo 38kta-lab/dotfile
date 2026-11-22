@@ -432,16 +432,16 @@ test('an hour row shows the event that starts in it, not one running on into it'
   ] as any
   const w = weekGrid(evs, now, 8)
   const cell = (h: number) => w.hours.find(r => r.label === String(h).padStart(2, '0'))!.cells[0].text.trim()
-  expect(cell(13)).toBe('22_R')
-  expect(cell(14)).toBe('21_Q')
+  expect(cell(13)).toBe('22_R 文')
+  expect(cell(14)).toBe('21_Q 論')
   expect(cell(15)).toBe('')
-  expect(cell(17)).toBe('Z90')
+  expect(cell(17)).toBe('Z90 実')
   expect(cell(18)).toBe('')
 })
 
 import { shortTitle, bandParts, untilLabel } from './register'
 
-test('a meeting shows the name after 【MTG】, not its project tag', () => {
+test('the band shows the name after 【MTG】, the grid cell shows the PJ code and then what it is', () => {
   expect(shortTitle('[21_Q][22_R] 【MTG】山田さん 打ち合わせ（21_Q: 進捗）')).toBe('山田さん 打ち合わせ（21_Q: 進捗）')
   expect(shortTitle('[21_Q] 論文の残り [status:focus]')).toBe('21_Q')
   expect(shortTitle('学会 B の部会')).toBe('学会 B の部会')
@@ -453,7 +453,7 @@ test('a meeting shows the name after 【MTG】, not its project tag', () => {
   const w = weekGrid(evs, now, 12)
   const cell = (h: number) => w.hours.find(r => r.label === String(h).padStart(2, '0'))!.cells[1].text.trim()
   expect(cell(15)).toBe('学会 B の部')
-  expect(cell(16)).toBe('山田さん 打')
+  expect(cell(16)).toBe('21_Q 山田さ')
 })
 
 test('band: counts, then the next event not yet started and the time to it', () => {
@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel, mapColors, parsePalette, THEME_TEXT, keywordsOf, hubOfKeyword, withPjTag } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel, mapColors, parsePalette, THEME_TEXT, keywordsOf, hubOfKeyword, withPjTag, kindColor, firstPjCode, eventColor, eventSoft, gridLabel, softFill, tagColor } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -815,4 +815,50 @@ test('an untagged event gets its hub tag from a keyword; a tagged one is left al
   expect(withPjTag(ev('beta club meeting'), KW_HUBS).title).toBe('[M08] beta club meeting')
   expect(withPjTag(ev('[12_B] alpha sync'), KW_HUBS).title).toBe('[12_B] alpha sync')
   expect(withPjTag(ev('haircut'), KW_HUBS).title).toBe('haircut')
+})
+
+test('the color of a PJ follows its kind, for tasks and for events', () => {
+  expect(kindColor('11_A')).toBe('cyan')
+  expect(kindColor('C01')).toBe('blue')
+  expect(kindColor('A02')).toBe('yellow')
+  expect(kindColor('E03')).toBe('green')
+  expect(kindColor('X04')).toBe('magenta')
+  expect(kindColor('M05')).toBe('#9db4c2')
+  expect(kindColor('事務')).toBe('red')
+  expect(kindColor('Z9')).toBe('gray')
+  expect(kindColor(undefined)).toBe('gray')
+  expect(tagColor('11_A')).toBe('cyan')
+  expect(tagColor('C01/E03')).toBe('blue')
+  expect(tagColor('事務')).toBe('red')
+})
+
+test('firstPjCode and gridLabel: the code, then the subject; 【MTG】, status tags and w/ are left out', () => {
+  expect(firstPjCode('[11_A][12_B] x')).toBe('11_A')
+  expect(firstPjCode('[status:focus][X04] x')).toBe('X04')
+  expect(firstPjCode('[C01/E03] x')).toBe('C01')
+  expect(firstPjCode('no tag')).toBeUndefined()
+  expect(gridLabel('[11_A] 【MTG】alpha sync w/ Bob')).toBe('11_A alpha sync')
+  expect(gridLabel('[X04][status:focus] write notes')).toBe('X04 write notes')
+  expect(gridLabel('[事務] fill the form')).toBe('事務 fill the form')
+  expect(gridLabel('plain title')).toBe('plain title')
+  expect(gridLabel('[M05]')).toBe('M05')
+})
+
+test('an event is drawn in its PJ kind color; work blocks soft, meetings and shared-calendar events solid', () => {
+  const ev = (title: string, calendarId: string) => ({ title, start: '2026-11-24T09:00:00+09:00', end: '2026-11-24T10:00:00+09:00', calendarId }) as any
+  expect(eventColor(ev('[11_A] 【MTG】alpha sync w/ Bob', 'primary'))).toBe('cyan')
+  expect(eventColor(ev('[A02][status:focus] draft', 'c_tb'))).toBe('yellow')
+  expect(eventColor(ev('haircut', 'primary'))).toBe('gray')
+  expect(eventSoft(ev('[11_A] 【MTG】alpha sync w/ Bob', 'primary'))).toBe(false)
+  expect(eventSoft(ev('[11_A] 【MTG】team talk', 'c_tb'))).toBe(false)           // a meeting is solid even in TimeBlock
+  expect(eventSoft(ev('[A02][status:focus] draft', 'c_tb'))).toBe(true)
+  expect(eventSoft(ev('[事務] fill the form', 'c_tb'))).toBe(true)                // TimeBlock, not a meeting
+  expect(eventSoft(ev('haircut', 'primary'))).toBe(false)
+})
+
+test('softFill mixes a color into the background; a non-hex name it cannot resolve is left as it is', () => {
+  expect(softFill('cyan')).toBe('#184752')
+  expect(softFill('#9db4c2', 0)).toBe('#9db4c2')
+  expect(softFill('#9db4c2', 1)).toBe('#06101a')
+  expect(softFill('inactive')).toBe('inactive')
 })
