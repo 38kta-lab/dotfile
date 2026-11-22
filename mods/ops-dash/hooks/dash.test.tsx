@@ -625,3 +625,25 @@ test('ago and elapsed are always minutes, however long', () => {
   expect(elapsed(now, now - 61 * 60000)).toBe('61分')
   expect(elapsed(now, now - 5 * 60000)).toBe('5分')
 })
+
+test('with pane_background set, the pane is wrapped in a Box of that color, as tall as the pane; without it, nothing is added', { options: { life_repo: '/home/u/life', pane_background: '#102030' } } as any, async ($, on) => {
+  world(on, OPS)
+  await $.session.start(START as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const boxes = await ui.findAll({ type: 'Box' })
+  const painted = boxes.filter((b: any) => b.props?.backgroundColor === '#102030')
+  expect(painted.length).toBe(1)
+  expect(painted[0].props.minHeight).toBe(40)
+  await ui.unmount()
+})
+
+test('without pane_background no Box is painted', { options: { life_repo: '/home/u/life' } } as any, async ($, on) => {
+  world(on, OPS)
+  await $.session.start(START as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock') })
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.filter((b: any) => b.props?.backgroundColor !== undefined).length).toBe(0)
+  await ui.unmount()
+})

@@ -75,6 +75,19 @@ export function hiddenNote(stale: number): string {
   return stale > 0 ? `${STALE_DAYS} 日以上動いていない ${stale} 件は隠した` : ''
 }
 
+// pane_background paints every pane of this mod one color (a hex such as "#050c15", or a theme key), so the panes can match the
+// conversation beside them. Empty: the pane's own color. The Box fills the pane's visible rows, not just its content (user 2026-11-22).
+let paneBackground = ''
+function paintPane($: any, e: any, tree: any): any {
+  if (!paneBackground || !tree) return tree
+  const { Box } = $.ui.resolve(e)
+  return (
+    <Box flexDirection="column" backgroundColor={paneBackground} minHeight={e.props?.scroll?.bodyRows}>
+      {tree}
+    </Box>
+  )
+}
+
 const LIVE_TTL_MS = 30_000
 const LIVE_GOOD_MS = 30 * 60_000 // a failed read falls back on the last good list for this long
 
@@ -1325,6 +1338,9 @@ async function who($: any): Promise<Me | undefined> {
 export const register: Register = (on, options) => {
   resolved = false
   liveState = undefined
+  paneBackground = String(options.pane_background ?? '').trim()
+  // The outermost hook of every pane's render: whatever the pane's own hook draws is wrapped by paintPane.
+  on('ui.render', { component: 'Pane' }, async ($, e, next) => paintPane($, e, await next(e)))
   const python = String(options.python ?? '')
   const repo = String(options.life_repo ?? '')
   // The threads tab is off unless threads_pane is set (user 2026-11-22: it does not work for now). The recording and the numbers on peer replies stay.

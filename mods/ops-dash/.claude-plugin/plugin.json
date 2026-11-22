@@ -24,6 +24,12 @@
       "description": "workspace=server pairs, comma-separated (e.g. team-a=slack-a). Those workspaces may be read through the MCP server when 詳しく hands a Slack message to the model. Empty: --show only.",
       "default": ""
     },
+    "pane_background": {
+      "type": "string",
+      "title": "Pane background",
+      "description": "A color for the background of every pane of this mod: a hex such as #050c15, or a theme key. Set it to the color of the conversation beside the pane to make them match. Empty: the pane's own color.",
+      "default": ""
+    },
     "threads_pane": {
       "type": "string",
       "title": "Threads tab",
