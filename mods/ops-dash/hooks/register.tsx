@@ -397,7 +397,7 @@ export function eventSoft(ev: CalEvent): boolean {
   return ev.calendarId.startsWith('c_')
 }
 
-// What a grid cell says: the PJ code, then what the event is ("02_B ビリン会議"); 【MTG】, the status tags and " w/ <person>" are left out
+// What a grid cell says: the PJ code, then what the event is ("11_A alpha sync"); 【MTG】, the status tags and " w/ <person>" are left out
 // (the cell is narrow; the detail has them all).
 export function gridLabel(title: string): string {
   const code = firstPjCode(title)
