@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -613,4 +613,15 @@ test('the dash says why when the running list cannot be read, and then hides not
   } finally {
     AGENTS = undefined
   }
+})
+
+test('ago and elapsed are always minutes, however long', () => {
+  const now = 10_000_000_000
+  expect(ago(now, now - 47 * 60000)).toBe('47分前')
+  expect(ago(now, now - 125 * 60000)).toBe('125分前')
+  expect(ago(now, now - 239 * 3600000 - 43 * 60000)).toBe('14383分前')
+  expect(ago(now, now)).toBe('0分前')
+  expect(ago(now, undefined)).toBe('')
+  expect(elapsed(now, now - 61 * 60000)).toBe('61分')
+  expect(elapsed(now, now - 5 * 60000)).toBe('5分')
 })

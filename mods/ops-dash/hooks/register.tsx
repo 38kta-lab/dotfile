@@ -165,17 +165,16 @@ export function hhmm(ms?: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-// "47分前" / "2時間05分前"
+// "47分前" / "125分前": always minutes, so rows compare at a glance (user 2026-11-22)
 export function ago(now: number, ms?: number): string {
   if (!ms) return ''
   const m = Math.max(0, Math.round((now - ms) / 60000))
-  return m < 60 ? `${m}分前` : `${Math.floor(m / 60)}時間${String(m % 60).padStart(2, '0')}分前`
+  return `${m}分前`
 }
 
 export function elapsed(now: number, ms?: number): string {
   if (!ms) return ''
-  const m = Math.max(0, Math.round((now - ms) / 60000))
-  return m < 60 ? `${m}分` : `${Math.floor(m / 60)}時間${m % 60}分`
+  return `${Math.max(0, Math.round((now - ms) / 60000))}分`
 }
 
 // Terminal cells a string takes: CJK and full-width forms take two.
