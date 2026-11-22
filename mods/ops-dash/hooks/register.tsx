@@ -964,6 +964,7 @@ async function fetchCalendar($: any, python: string, repo: string): Promise<void
 const HUBS = 'hubs'
 let hubs: Hub[] = []
 let hubsLoadedAt = 0
+const HUBS_TTL_MS = 300_000
 let hubsNote = ''
 let view: { kind: 'list' } | { kind: 'hub'; slug: string; tab: number } = { kind: 'list' }
 let back: { slug: string; tab: number }[] = []
@@ -2258,6 +2259,9 @@ export const register: Register = (on, options) => {
 
     const rule = (label: string) => `─ ${label} ` + '─'.repeat(Math.max(0, width - cells(label) - 3))
     await loadTrend($, repo, now)
+    // The hubs give the calendar its PJ marks (calendar_keywords); a reload of this mod empties them, and only the start of the session
+    // and the hubs tab loaded them, so read them again here when they are missing or older than 5 minutes.
+    if (hubs.length === 0 || now - hubsLoadedAt > HUBS_TTL_MS) await loadHubs($, repo)
 
     if (trendItem) {
       const it = trendItem

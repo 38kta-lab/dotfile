@@ -862,3 +862,16 @@ test('softFill mixes a color into the background; a non-hex name it cannot resol
   expect(softFill('#9db4c2', 1)).toBe('#06101a')
   expect(softFill('inactive')).toBe('inactive')
 })
+
+test('the dash reads the hubs itself, so an event with a hub keyword shows its PJ mark in the next events', OPTIONS as any, async ($, on) => {
+  const hub = '---\ncalendar_keywords: alpha\n---\n# alpha\n'
+  const ev = [{ title: 'alpha sync', start: '2026-10-08T14:00:00+09:00', end: '2026-10-08T15:00:00+09:00', calendar_id: 'primary' }]
+  world(on, OPS, new Map(), false, ev, hub + TASKS_MD)
+  on('fs.list', () => ({ value: [{ name: '11_A_alpha.md', kind: 'file' }] }))
+  await $.session.start(START as any)
+  await settle()
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock', 90) })
+  const labels = (await ui.findAll({ type: 'Button' })).map((b: any) => String(b.props?.label ?? ''))
+  expect(labels.some((l: string) => l.includes('[11_A] alpha sync'))).toBe(true)
+  await ui.unmount()
+})
