@@ -24,6 +24,12 @@
       "description": "workspace=server pairs, comma-separated (e.g. team-a=slack-a). Those workspaces may be read through the MCP server when 詳しく hands a Slack message to the model. Empty: --show only.",
       "default": ""
     },
+    "dash_layout": {
+      "type": "string",
+      "title": "Dash layout",
+      "description": "Empty: one column below 110 columns, two columns (usage across the top; sessions and tasks left, calendar and trend right) from 110. \"single\": always one column.",
+      "default": ""
+    },
     "pane_background": {
       "type": "string",
       "title": "Pane background",

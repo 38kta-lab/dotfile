@@ -172,6 +172,11 @@ async function writeOnce($: any, me: Me, change: Partial<SessionRecord>): Promis
   await $.store.set(key, { ...old, name: me.name, role: me.role, pj: me.pj, ...change, updatedAt: now })
 }
 
+// The name shown in the sessions list: "claude-02" → "02" (the prefix says nothing in this list; user 2026-11-22).
+export function shortName(name: string): string {
+  return name.replace(/^claude-/, '') || name
+}
+
 export function hhmm(ms?: number): string {
   if (!ms) return '—'
   const d = new Date(ms)
@@ -1339,6 +1344,7 @@ export const register: Register = (on, options) => {
   resolved = false
   liveState = undefined
   paneBackground = String(options.pane_background ?? '').trim()
+  const dashLayout = String(options.dash_layout ?? '').trim()
   // The outermost hook of every pane's render: whatever the pane's own hook draws is wrapped by paintPane.
   on('ui.render', { component: 'Pane' }, async ($, e, next) => paintPane($, e, await next(e)))
   const python = String(options.python ?? '')
@@ -2279,7 +2285,7 @@ export const register: Register = (on, options) => {
     const sorted = [...records].sort((a, b) => (a.role === 'ops' ? -1 : b.role === 'ops' ? 1 : a.name.localeCompare(b.name)))
     const peerBar = Math.max(6, Math.min(12, width - 40))
     // The name and pj columns take the widest entry, so every bar starts at the same column (user 10/15).
-    const nameW = Math.max(10, ...sorted.map(r => cells(r.name) + 1))
+    const nameW = Math.max(8, ...sorted.map(r => cells(shortName(r.name)) + 1))
     const pjW = Math.max(5, ...sorted.map(r => cells(r.pj ?? '') + 1))
 
     // calendar: fixed height, then the next few events as buttons
@@ -2315,11 +2321,14 @@ export const register: Register = (on, options) => {
       }
     }
 
-    return (
-      <Box flexDirection="column">
-        <Box flexDirection="row" columnGap={2}>
-          {jumps.map(j => <Button key={`jump-${j.hotkey}`} label={j.label} hotkey={j.hotkey} plain dimColor={!j.key} onPress={() => jump(j.key)} />)}
-        </Box>
+    const usageBlock = (w: number) => {
+      const rule = (label: string) => {
+        const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
+        return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
+      }
+      const smallBar = Math.max(6, Math.min(14, w - 34))
+      return (
+        <Box flexDirection="column">
         <Box marginBottom={1}><Text dimColor>{rule('system usage')}</Text></Box>
         {limitLines.length === 0 && <Text dimColor>まだ計測なし</Text>}
         {limitLines.map(l => (
@@ -2330,7 +2339,17 @@ export const register: Register = (on, options) => {
             <Text dimColor>{`  ${l.reset}`}</Text>
           </Box>
         ))}
-
+        </Box>
+      )
+    }
+    const sessionsBlock = (w: number) => {
+      const rule = (label: string) => {
+        const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
+        return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
+      }
+      const peerBar = Math.max(6, Math.min(12, w - 40))
+      return (
+        <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('sessions')}</Text></Box>
         {sorted.length === 0 && <Text dimColor>まだ状態を書いたセッションなし</Text>}
         {liveNote(liveS, now) !== '' && <Text color="yellow">{liveNote(liveS, now)}</Text>}
@@ -2338,7 +2357,7 @@ export const register: Register = (on, options) => {
         {sorted.map(r => (
           <Box flexDirection="row">
             <Text color={r.waiting ? 'red' : r.busy ? 'yellow' : 'green'}>{r.waiting ? '◆ ' : r.busy ? '● ' : '○ '}</Text>
-            <Text bold>{pad(r.name, nameW)}</Text>
+            <Text bold>{pad(shortName(r.name), nameW)}</Text>
             <Text dimColor>{pad(r.pj ?? '', pjW)}</Text>
             {r.contextPercent === undefined ? (
               <Text dimColor>{pad('ctx —', peerBar + 5)}</Text>
@@ -2357,7 +2376,18 @@ export const register: Register = (on, options) => {
             )}
           </Box>
         ))}
-
+        </Box>
+      )
+    }
+    const calendarBlock = (w: number) => {
+      const rule = (label: string) => {
+        const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
+        return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
+      }
+      const dayWidth = Math.max(5, Math.floor((w - 3) / 7))
+      const week = weekGrid(calendar, now, dayWidth)
+      return (
+        <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule(`calendar  ${calendarNote}`)}</Text></Box>
         <Box flexDirection="row">
           <Text>{'   '}</Text>
@@ -2380,28 +2410,46 @@ export const register: Register = (on, options) => {
           {next.map((ev, i) => (
             <Button
               key={`ev-${i}-${ev.start}`}
-              label={clip(`${pad(whenLabel(ev, now), 18)} ${ev.title.replace(/\[status:[^\]]+\]/g, '').trim()}${ev.meetingUrl ? '  🔗' : ''}`, width - 2)}
+              label={clip(`${pad(whenLabel(ev, now), 18)} ${ev.title.replace(/\[status:[^\]]+\]/g, '').trim()}${ev.meetingUrl ? '  🔗' : ''}`, w - 2)}
               plain
               onPress={() => openEvent($, ev)}
             />
           ))}
           {Array.from({ length: NEXT_EVENTS - Math.max(1, next.length) }, () => <Text> </Text>)}
         </Box>
-
+        </Box>
+      )
+    }
+    const trendBlock = (w: number) => {
+      const rule = (label: string) => {
+        const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
+        return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
+      }
+      return (
+        <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule(trend ? `trend ${trend.date.slice(5).replace('-', '/')}（${trend.items.length} 件・★3 以上 ${trend.items.filter(x => x.stars >= 3).length} 件）` : `trend  ${trendNote}`)}</Text></Box>
         {(() => {
           const top = trend ? topItems(trend.items, TREND_ROWS) : []
           return (
             <Box flexDirection="column">
               {top.map(x => (
-                <Button key={`trend-${x.order}`} label={clip(`${pad('★'.repeat(x.stars), 6)}${pad(x.short, 5)}${x.ja || x.title}`, width - 2)} plain onPress={() => { trendItem = x; trendList = undefined; trendShown = undefined; copied = ''; queueNote = ''; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />
+                <Button key={`trend-${x.order}`} label={clip(`${pad('★'.repeat(x.stars), 6)}${pad(x.short, 5)}${x.ja || x.title}`, w - 2)} plain onPress={() => { trendItem = x; trendList = undefined; trendShown = undefined; copied = ''; queueNote = ''; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />
               ))}
               {Array.from({ length: TREND_ROWS - top.length }, () => <Text> </Text>)}
               {trend && <Button key="trend-all" label="全部を見る（過去の trend も）" hotkey="t" plain onPress={() => { trendList = { minStars: 0 }; trendItem = undefined; trendShown = undefined; void refreshQueued($, repo).then(() => $.ui.invalidate('ui.render')); $.ui.invalidate('ui.render') }} />}
             </Box>
           )
         })()}
-
+        </Box>
+      )
+    }
+    const tasksBlock = (w: number) => {
+      const rule = (label: string) => {
+        const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
+        return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
+      }
+      return (
+        <Box flexDirection="column">
         <Box marginTop={1} marginBottom={1}><Text dimColor>{rule('tasks')}</Text></Box>
         {taskNote !== '' && <Text dimColor>{taskNote}</Text>}
         {tasks.map(section => {
@@ -2411,7 +2459,7 @@ export const register: Register = (on, options) => {
           return (
             <Box flexDirection="column" marginBottom={1}>
               <Box flexDirection="row">
-                <Text bold>{pad(section.title, width - cells(head))}</Text>
+                <Text bold>{pad(section.title, w - cells(head))}</Text>
                 <Text dimColor>{head}</Text>
               </Box>
               {[...open, ...done].map(t => {
@@ -2419,7 +2467,7 @@ export const register: Register = (on, options) => {
                 const due = t.deadline ? `〆${t.deadline.month}/${t.deadline.day}` : ''
                 const who = t.owner ? `→ ${t.owner}` : ''
                 const meta = [who, due].filter(Boolean).join('  ')
-                const titleWidth = Math.max(8, width - 3 - 6 - (meta ? cells(meta) + 2 : 0))
+                const titleWidth = Math.max(8, w - 3 - 6 - (meta ? cells(meta) + 2 : 0))
                 const dueColor = t.done || left === undefined ? undefined : left < 0 ? 'red' : left <= 3 ? 'yellow' : undefined
                 return (
                   <Box flexDirection="row">
@@ -2434,6 +2482,43 @@ export const register: Register = (on, options) => {
             </Box>
           )
         })}
+        </Box>
+      )
+    }
+    // One column below 110 columns (or when dash_layout is "single"); from 110, usage across the top, then two columns:
+    // sessions and tasks on the left, calendar and trend on the right (user 2026-11-22: tasks kept sliding below the fold).
+    const gap = 2
+    const twoCol = dashLayout !== 'single' && width >= 110
+    const colW = Math.floor((width - gap) / 2)
+
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection="row" columnGap={2}>
+          {jumps.map(j => <Button key={`jump-${j.hotkey}`} label={j.label} hotkey={j.hotkey} plain dimColor={!j.key} onPress={() => jump(j.key)} />)}
+        </Box>
+        {twoCol ? (
+          <Box flexDirection="column">
+            {usageBlock(width)}
+            <Box flexDirection="row" columnGap={gap}>
+              <Box flexDirection="column" width={colW}>
+                {sessionsBlock(colW)}
+                {tasksBlock(colW)}
+              </Box>
+              <Box flexDirection="column" width={colW}>
+                {calendarBlock(colW)}
+                {trendBlock(colW)}
+              </Box>
+            </Box>
+          </Box>
+        ) : (
+          <Box flexDirection="column">
+            {usageBlock(width)}
+            {sessionsBlock(width)}
+            {calendarBlock(width)}
+            {trendBlock(width)}
+            {tasksBlock(width)}
+          </Box>
+        )}
       </Box>
     )
   })

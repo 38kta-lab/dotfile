@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -646,4 +646,50 @@ test('without pane_background no Box is painted', { options: { life_repo: '/home
   const boxes = await ui.findAll({ type: 'Box' })
   expect(boxes.filter((b: any) => b.props?.backgroundColor !== undefined).length).toBe(0)
   await ui.unmount()
+})
+
+test('shortName drops the claude- prefix and leaves other names alone', () => {
+  expect(shortName('claude-02')).toBe('02')
+  expect(shortName('claude-search')).toBe('search')
+  expect(shortName('ops')).toBe('ops')
+  expect(shortName('pj-03_C')).toBe('pj-03_C')
+  expect(shortName('claude-')).toBe('claude-')
+})
+
+// width 120: usage across the top, then two columns (each (120 - 2) / 2 = 59 wide); width 84: one column of 84; dash_layout "single": one column at any width.
+const RULE_WIDTHS = async ($: any, cols: number): Promise<Record<string, number>> => {
+  const ui: any = await $.ui.mount({ plugin: 'ops-dash', surface: 'terminal', component: 'Pane', requestId: 'peers', props: PANE_PROPS('dock', cols) })
+  const out: Record<string, number> = {}
+  for (const t of await ui.findAll({ type: 'Text' })) {
+    const text = String(t.text ?? t.props?.children ?? '')
+    const m = text.match(/^─ (system usage|sessions|calendar|trend|tasks)/)
+    if (m) out[m[1]] = [...text].reduce((n, ch) => n + (ch.charCodeAt(0) > 0x2e80 ? 2 : 1), 0)
+  }
+  await ui.unmount()
+  return out
+}
+
+test('at 120 columns the dash is two columns: the rules of sessions and tasks, calendar and trend are each a column wide', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const w = await RULE_WIDTHS($, 120)
+  expect(w['system usage']).toBe(120)
+  for (const k of ['sessions', 'tasks', 'calendar', 'trend']) expect(w[k]).toBe(59)
+})
+
+test('at 84 columns the dash stays one column', OPTIONS as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const w = await RULE_WIDTHS($, 84)
+  for (const k of ['system usage', 'sessions', 'tasks', 'calendar', 'trend']) expect(w[k]).toBe(84)
+})
+
+test('dash_layout single keeps one column even at 120 columns', { options: { python: '/usr/bin/python3', life_repo: '/home/u/life', dash_layout: 'single' } } as any, async ($, on) => {
+  world(on, OPS, new Map(), false, [], TASKS_MD)
+  await $.session.start(START as any)
+  await settle()
+  const w = await RULE_WIDTHS($, 120)
+  for (const k of ['system usage', 'sessions', 'tasks', 'calendar', 'trend']) expect(w[k]).toBe(120)
 })
