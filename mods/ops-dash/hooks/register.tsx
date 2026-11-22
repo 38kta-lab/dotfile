@@ -179,6 +179,11 @@ export function shortName(name: string): string {
   return name.replace(/^claude-/, '') || name
 }
 
+// The usage bar's width so a row (label 8, bar, " 48%" 5, "  11/24 09:00 リセット" up to 22) fits in w columns: 14 at most, 6 at least.
+export function limitBarWidth(w: number): number {
+  return Math.max(6, Math.min(14, w - 8 - 5 - 22 - 1))
+}
+
 export function hhmm(ms?: number): string {
   if (!ms) return '—'
   const d = new Date(ms)
@@ -2329,7 +2334,7 @@ export const register: Register = (on, options) => {
         const l = clip(label, Math.max(4, w - 4)) // a long note must not push the rule past its column
         return `─ ${l} ` + '─'.repeat(Math.max(0, w - cells(l) - 3))
       }
-      const smallBar = Math.max(6, Math.min(14, w - 34))
+      const smallBar = limitBarWidth(w)
       return (
         <Box flexDirection="column">
         <Box marginBottom={1}><Text dimColor>{rule('system usage')}</Text></Box>

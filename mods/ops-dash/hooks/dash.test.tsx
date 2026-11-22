@@ -484,7 +484,7 @@ test('noteShown: a note that went well goes 15 s after it first shows; a failure
   expect(noteShown('t3', '', 1, 0, err)).toBe('')
 })
 
-import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName } from './register'
+import { visibleRecords, STALE_DAYS, parseLiveNames, hiddenNote, nextLive, usableLive, liveNote, ago, elapsed, shortName, limitBarWidth, resetLabel } from './register'
 import type { SessionRecord } from './register'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -730,4 +730,18 @@ test('without pane_columns the dash asks for 84', { options: { python: '/usr/bin
   await $.session.start(START as any)
   await settle()
   expect(opened.every(o => o.columns === 84)).toBe(true)
+})
+
+test('a usage row always fits its column: label 8 + bar + percent 5 + the longest reset label', () => {
+  const longest = '  ' + resetLabel(Date.parse('2026-11-22T00:00:00+09:00'), '2026-11-24T00:00:00Z') // "11/24 09:00 リセット" form
+  const labelCells = [...longest].reduce((n, ch) => n + (ch.charCodeAt(0) > 0x2e80 ? 2 : 1), 0)
+  expect(labelCells).toBeLessThanOrEqual(22)
+  for (let w = 44; w <= 120; w++) {
+    const bar = limitBarWidth(w)
+    expect(bar).toBeGreaterThanOrEqual(6)
+    expect(bar).toBeLessThanOrEqual(14)
+    expect(8 + bar + 5 + 22).toBeLessThanOrEqual(w)
+  }
+  expect(limitBarWidth(44)).toBe(8)
+  expect(limitBarWidth(90)).toBe(14)
 })
